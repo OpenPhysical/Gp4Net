@@ -54,6 +54,14 @@ public interface ICliExecutionContext
     );
 
     /// <summary>
+    /// Ensures a secure channel is established from a complete request.
+    /// </summary>
+    Task<Result<ICliExecutionContext, SmartCardError>> RequireSecureChannel(
+        SecureChannelRequest request,
+        CancellationToken cancellationToken = default
+    );
+
+    /// <summary>
     /// Executes the command logic with the current context.
     /// </summary>
     Task<int> ExecuteAsync(Func<ICliExecutionContext, Task<int>> commandLogic);

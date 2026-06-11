@@ -456,7 +456,12 @@ public static partial class CryptoService
 
                     return sMacResult.Bind(sMac =>
                         sEncResult.Bind(sEnc =>
-                            sDekResult.Map(sDek => new SessionKeys(sMac, sEnc, sDek))
+                            sDekResult.Map(sDek => new SessionKeys(
+                                sEnc,
+                                sMac,
+                                sMac,
+                                Maybe<byte[]>.From(sDek)
+                            ))
                         )
                     );
                 });

@@ -203,12 +203,20 @@ public class Program
             var display = provider.GetRequiredService<IDisplayService>();
             var keysetResolver = provider.GetRequiredService<IKeysetResolver>();
             var serviceFactory = provider.GetRequiredService<ISmartCardServiceFactory>();
+            var readerResolutionService = provider.GetRequiredService<IReaderResolutionService>();
             var logger = provider.GetService<ILogger<CliContext>>();
 
             // Create enumeration service for commands that don't need a connection
             var enumerationService = serviceFactory.CreateForEnumeration();
 
-            return new CliContext(display, enumerationService, keysetResolver, logger);
+            return new CliContext(
+                display,
+                enumerationService,
+                keysetResolver,
+                logger,
+                serviceFactory,
+                readerResolutionService
+            );
         });
 
         // Command pipeline is now implemented as pure function composition

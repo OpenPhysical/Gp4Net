@@ -74,7 +74,7 @@ public class InitializeUpdateCommandTests
         _ = apdu[3].Should().Be(keyId); // P2 - Key Identifier
         _ = apdu[4].Should().Be(0x08); // Lc - Data length
         _ = apdu[5..13].Should().BeEquivalentTo(hostChallenge); // Data - Host Challenge
-        _ = apdu[13].Should().Be(28); // Le - Expected response length
+        _ = apdu[13].Should().Be(0x00); // Le - Maximum response length
     }
 
     [Test]
@@ -189,7 +189,7 @@ public class InitializeUpdateCommandTests
         // P2: Key Identifier (0x00 for SCP03)
         // Lc: 0x08 (8 bytes of host challenge)
         // Data: 8-byte host challenge
-        // Le: 0x1C (28 bytes expected response)
+        // Le: 0x00 (maximum response length)
 
         Result<InitializeUpdateCommand, SmartCardError> result = InitializeUpdateCommand.Create(
             0x01,
@@ -205,7 +205,7 @@ public class InitializeUpdateCommandTests
         _ = apdu[0].Should().Be(0x80); // CLA
         _ = apdu[1].Should().Be(0x50); // INS
         _ = apdu[4].Should().Be(0x08); // Lc
-        _ = apdu[13].Should().Be(28); // Le (28 bytes expected)
+        _ = apdu[13].Should().Be(0x00); // Le (maximum response length)
     }
 
     [Test]

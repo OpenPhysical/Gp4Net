@@ -119,6 +119,14 @@ public class SecureCommandSettings : CommandSettings
     public string Keyset { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets the explicit key version number. When omitted, the card's key
+    /// information template and GP default key selection are used for autodetection.
+    /// </summary>
+    [CommandOption("--key-version")]
+    [Description("Explicit key version number; omit to autodetect")]
+    public string KeyVersion { get; set; } = string.Empty;
+
+    /// <summary>
     /// Gets or sets the file path to save virtual card state.
     /// </summary>
     [CommandOption("--save-file")]

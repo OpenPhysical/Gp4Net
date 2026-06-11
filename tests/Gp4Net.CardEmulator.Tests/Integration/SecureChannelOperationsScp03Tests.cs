@@ -2,28 +2,30 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Gp4Net.CardEmulator.Tests.TestHelpers;
 using Gp4Net.Core;
+using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Services;
 using Gp4Net.Tool.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
-using Gp4Net.CardEmulator.Tests.TestHelpers;
-using Gp4Net.Domain;
 
 namespace Gp4Net.CardEmulator.Tests.Integration;
 
 public class SecureChannelOperationsScp03Tests
 {
-    private static readonly Lazy<string> Scp03ProfilePath = new(() =>
-        Path.Combine(
-            RepositoryPathLocator.FindRepositoryRoot(),
-            "src",
-            "Gp4Net.CardEmulator",
-            "Profiles",
-            "p71_card_2.json"
-        )
-    );
+    private static readonly Lazy<string> Scp03ProfilePath =
+        new(
+            () =>
+                Path.Combine(
+                    RepositoryPathLocator.FindRepositoryRoot(),
+                    "src",
+                    "Gp4Net.CardEmulator",
+                    "Profiles",
+                    "p71_card_2.json"
+                )
+        );
 
     [Test]
     public async Task Should_Establish_Scp03_Secure_Channel_With_Default_Test_Keys()
@@ -55,7 +57,10 @@ public class SecureChannelOperationsScp03Tests
 
         Assert.That(establishResult.IsSuccess, Is.True, () => establishResult.Error.ToString());
         var session = establishResult.Value;
-        Assert.That(session.State.ProtocolVersion, Is.EqualTo(Cryptography.CryptoService.ScpVersion.Scp03));
+        Assert.That(
+            session.State.ProtocolVersion,
+            Is.EqualTo(Cryptography.CryptoService.ScpVersion.Scp03)
+        );
         Assert.That(session.State.SecurityLevel.HasCMac(), Is.True);
     }
 
@@ -87,7 +92,11 @@ public class SecureChannelOperationsScp03Tests
             CancellationToken.None
         );
 
-        Assert.That(establishResult.IsFailure, Is.True, "Establishment should fail with unknown key version");
-        Assert.That(establishResult.Error.Code, Is.EqualTo("INVALID_DATA"));
+        Assert.That(
+            establishResult.IsFailure,
+            Is.True,
+            "Establishment should fail with unknown key version"
+        );
+        Assert.That(establishResult.Error.Code, Is.EqualTo("SECURITY_ERROR"));
     }
 }

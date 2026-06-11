@@ -46,11 +46,6 @@ public class InitializeUpdateCommand : IApduCommand
     /// </summary>
     public byte[] HostChallenge { get; }
 
-    /// <summary>
-    /// Gets whether to use maximum response length (256) for trace compatibility.
-    /// </summary>
-    private readonly bool _useMaxResponseLength;
-
     /// <inheritdoc />
     public byte Cla => CLASS_BYTE;
 
@@ -63,18 +58,13 @@ public class InitializeUpdateCommand : IApduCommand
     /// <returns>A result containing the CommandAPDU or an error.</returns>
     public Result<CommandAPDU, SmartCardError> ToCommandApdu()
     {
-        var expectedLength = _useMaxResponseLength ? 256 : 28;
-
-        return Result.Success<CommandAPDU, SmartCardError>(
-            new CommandAPDU(
-                CLASS_BYTE,
-                INSTRUCTION_BYTE,
-                KeyVersion,
-                KeyIdentifier,
-                (uint)HostChallenge.Length,
-                HostChallenge,
-                (uint)expectedLength
-            )
+        return ApduBuilder.CreateCommand(
+            CLASS_BYTE,
+            INSTRUCTION_BYTE,
+            KeyVersion,
+            KeyIdentifier,
+            Maybe<byte[]>.From(HostChallenge),
+            Maybe<int>.From(256)
         );
     }
 
@@ -84,7 +74,7 @@ public class InitializeUpdateCommand : IApduCommand
     /// <param name="keyVersion">The key version number (0 = first available key).</param>
     /// <param name="keyIdentifier">The key identifier (must be 0x00 for SCP03).</param>
     /// <param name="hostChallenge">The host challenge (8 bytes).</param>
-    /// <param name="useMaxResponseLength">Whether to use maximum response length for trace compatibility.</param>
+    /// <param name="useMaxResponseLength">Retained for compatibility; INITIALIZE UPDATE always uses Le 00.</param>
     private InitializeUpdateCommand(
         byte keyVersion,
         byte keyIdentifier,
@@ -95,7 +85,6 @@ public class InitializeUpdateCommand : IApduCommand
         KeyVersion = keyVersion;
         KeyIdentifier = keyIdentifier;
         HostChallenge = (byte[])hostChallenge.Clone();
-        _useMaxResponseLength = useMaxResponseLength;
     }
 
     /// <summary>

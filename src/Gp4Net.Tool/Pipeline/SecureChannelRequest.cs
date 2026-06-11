@@ -15,7 +15,7 @@ public sealed record SecureChannelRequest(
     Maybe<ExplicitKeys> ExplicitKeys,
     Maybe<Dictionary<string, string>> KeysetParameters,
     SecurityLevel SecurityLevel,
-    byte KeyVersion
+    Maybe<byte> ExplicitKeyVersion
 );
 
 /// <summary>

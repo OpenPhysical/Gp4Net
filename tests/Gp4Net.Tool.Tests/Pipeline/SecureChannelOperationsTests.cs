@@ -50,7 +50,7 @@ public class SecureChannelOperationsTests
             ),
             Maybe<Dictionary<string, string>>.None,
             SecurityLevel.CMac,
-            0x01
+            Maybe<byte>.From(0x01)
         );
 
         var result = await SecureChannelOperations.EstablishFromRequestAsync(
@@ -74,7 +74,31 @@ public class SecureChannelOperationsTests
             Maybe<ExplicitKeys>.None,
             Maybe<Dictionary<string, string>>.None,
             SecurityLevel.CMac,
-            0x01
+            Maybe<byte>.From(0x01)
+        );
+
+        var result = await SecureChannelOperations.EstablishFromRequestAsync(
+            request,
+            service,
+            resolver,
+            CancellationToken.None
+        );
+
+        Assert.That(result.IsSuccess, Is.True, () => result.Error.ToString());
+        Assert.That(result.Value.SecureChannelState.SecurityLevel.HasCMac(), Is.True);
+    }
+
+    [Test]
+    public async Task Should_Autodetect_Key_Version_When_Not_Explicit()
+    {
+        using var service = await CreateSmartCardServiceAsync();
+
+        var request = new SecureChannelRequest(
+            Maybe<string>.From("gp_test_keys"),
+            Maybe<ExplicitKeys>.None,
+            Maybe<Dictionary<string, string>>.None,
+            SecurityLevel.CMac,
+            Maybe<byte>.None
         );
 
         var result = await SecureChannelOperations.EstablishFromRequestAsync(
@@ -98,7 +122,7 @@ public class SecureChannelOperationsTests
             Maybe<ExplicitKeys>.None,
             Maybe<Dictionary<string, string>>.None,
             SecurityLevel.CMac,
-            0x01
+            Maybe<byte>.From(0x01)
         );
 
         var result = await SecureChannelOperations.EstablishFromRequestAsync(

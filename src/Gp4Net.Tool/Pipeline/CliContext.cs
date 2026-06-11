@@ -3,7 +3,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Domain;
 using Gp4Net.Services;
+using Gp4Net.Tool.Services;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 
@@ -18,6 +20,8 @@ public class CliContext : ICliExecutionContext
 {
     private readonly ILogger<CliContext> _logger;
     private readonly IKeysetResolver _keysetResolver;
+    private readonly ISmartCardServiceFactory? _serviceFactory;
+    private readonly IReaderResolutionService? _readerResolutionService;
 
     public IDisplayService Display { get; }
     public ISmartCardService CardService { get; }
@@ -37,7 +41,9 @@ public class CliContext : ICliExecutionContext
         IDisplayService display,
         ISmartCardService cardService,
         IKeysetResolver keysetResolver,
-        ILogger<CliContext> logger
+        ILogger<CliContext> logger,
+        ISmartCardServiceFactory? serviceFactory = null,
+        IReaderResolutionService? readerResolutionService = null
     )
     {
         // Pure assignment - dependency injection framework ensures non-null services
@@ -45,6 +51,8 @@ public class CliContext : ICliExecutionContext
         CardService = cardService;
         _keysetResolver = keysetResolver;
         _logger = logger;
+        _serviceFactory = serviceFactory;
+        _readerResolutionService = readerResolutionService;
 
         // Create pure function for secure channel establishment
         EstablishSecureChannelAsync = (request, cancellationToken) =>
@@ -59,13 +67,42 @@ public class CliContext : ICliExecutionContext
     /// <summary>
     /// Ensures a card connection is established using pure functional patterns.
     /// </summary>
-    public Task<Result<ICliExecutionContext, SmartCardError>> RequireCardConnection(
+    public async Task<Result<ICliExecutionContext, SmartCardError>> RequireCardConnection(
         Maybe<string> readerName = default
     )
     {
-        // Pure functional card connection handling
-        // Reader resolution and connection is managed by the smart card service
-        return Task.FromResult(Result.Success<ICliExecutionContext, SmartCardError>(this));
+        if (_serviceFactory is null || _readerResolutionService is null)
+        {
+            var connectedResult = await CardService.IsConnectedAsync();
+            return connectedResult.Bind(connected =>
+                connected
+                    ? Result.Success<ICliExecutionContext, SmartCardError>(this)
+                    : Result.Failure<ICliExecutionContext, SmartCardError>(
+                        SmartCardError.CommunicationError(
+                            "No card connection established and no connection factory is available."
+                        )
+                    )
+            );
+        }
+
+        var connectedServiceResult = await ReaderResolutionHelper.ResolveAndConnectAsync(
+            readerName,
+            _serviceFactory,
+            _readerResolutionService,
+            Display
+        );
+
+        return connectedServiceResult.Map(connectedService =>
+            (ICliExecutionContext)
+                new CliContext(
+                    Display,
+                    connectedService,
+                    _keysetResolver,
+                    _logger,
+                    _serviceFactory,
+                    _readerResolutionService
+                )
+        );
     }
 
     /// <summary>
@@ -76,8 +113,41 @@ public class CliContext : ICliExecutionContext
         Maybe<string> keyset = default
     )
     {
-        // Secure channel establishment is now handled by pure pipeline functions
-        return Task.FromResult(Result.Success<ICliExecutionContext, SmartCardError>(this));
+        var request = new SecureChannelRequest(
+            KeysetName: keyset,
+            ExplicitKeys: Maybe<ExplicitKeys>.None,
+            KeysetParameters: Maybe<System.Collections.Generic.Dictionary<string, string>>.None,
+            SecurityLevel: (SecurityLevel)securityLevel,
+            ExplicitKeyVersion: Maybe<byte>.None
+        );
+
+        return RequireSecureChannel(request);
+    }
+
+    public async Task<Result<ICliExecutionContext, SmartCardError>> RequireSecureChannel(
+        SecureChannelRequest request,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var secureChannelResult = await EstablishSecureChannelAsync(request, cancellationToken);
+        return secureChannelResult
+            .Bind(secureContext =>
+                CardService.WithContextValue(
+                    "SecureChannelSession",
+                    secureContext.SecureChannelState
+                )
+            )
+            .Map(securedService =>
+                (ICliExecutionContext)
+                    new CliContext(
+                        Display,
+                        securedService,
+                        _keysetResolver,
+                        _logger,
+                        _serviceFactory,
+                        _readerResolutionService
+                    )
+            );
     }
 
     /// <summary>

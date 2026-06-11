@@ -7,6 +7,9 @@ using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
+using Gp4Net.Extensions;
+using Gp4Net.Services;
+using Gp4Net.Services.GlobalPlatform;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Compliance;
@@ -181,6 +184,54 @@ public class Scp03ProtocolValidationTests
         _ = updatedChaining
             .Should()
             .NotBeEquivalentTo(initialMacChaining, "MAC chaining should change after command");
+    }
+
+    /// <summary>
+    /// GP SCP03 Section 6.2.4: the command APDU contains the truncated C-MAC,
+    /// but the next command chaining value is the full 16-byte AES-CMAC.
+    /// </summary>
+    [Test]
+    public void Scp03_CommandSecurity_Should_Chain_Full_CMac_While_Appending_Truncated_CMac()
+    {
+        byte[] sEnc = Convert.FromHexString("00112233445566778899AABBCCDDEEFF");
+        byte[] sMac = Convert.FromHexString("0102030405060708090A0B0C0D0E0F10");
+        byte[] sRMac = Convert.FromHexString("102030405060708090A0B0C0D0E0F000");
+        byte[] initialChaining = new byte[16];
+
+        var state = SecureChannelState
+            .Create(
+                new SessionKeys(sEnc, sMac, sRMac),
+                SecurityLevel.CMac,
+                CryptoService.ScpVersion.Scp03,
+                initialChaining,
+                0x70
+            )
+            .Value;
+
+        var command = Commands
+            .CreateGetStatusCommand(
+                Gp4Net
+                    .Domain
+                    .Commands
+                    .GetStatusCommand
+                    .StatusSubset
+                    .ApplicationsAndSupplementaryDomains,
+                new byte[] { 0x4F, 0x00 }
+            )
+            .Bind(cmd => cmd.ToCommandApdu())
+            .Value;
+
+        var macInput = command.GetMacInput().Value;
+        byte[] expectedFullMac = CryptoService
+            .ScpOperations.Scp03.CalculateCommandMac(macInput.Bytes, sMac, initialChaining)
+            .Value;
+
+        var secured = ScpService.Security.ApplyCommandSecurity(command, state).Value;
+        var (securedCommand, updatedState) = secured;
+        byte[] securedData = securedCommand.Udc;
+
+        _ = securedData[^8..].Should().Equal(expectedFullMac[..8]);
+        _ = updatedState.MacChainingValue.Should().Equal(expectedFullMac);
     }
 
     /// <summary>

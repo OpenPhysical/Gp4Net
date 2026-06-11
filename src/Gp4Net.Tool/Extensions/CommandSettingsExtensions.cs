@@ -27,7 +27,7 @@ public static class CommandSettingsExtensions
             ExplicitKeys: ExtractExplicitKeys(settings),
             KeysetParameters: ExtractKeysetParameters(settings),
             SecurityLevel: SecurityLevel.CMac, // Default for GP operations
-            KeyVersion: ExtractKeyVersion(settings)
+            ExplicitKeyVersion: ExtractKeyVersion(settings)
         );
     }
 
@@ -96,14 +96,16 @@ public static class CommandSettingsExtensions
     /// <summary>
     /// Extracts key version from settings with functional fallback.
     /// </summary>
-    private static byte ExtractKeyVersion(SecureCommandSettings settings)
+    private static Maybe<byte> ExtractKeyVersion(SecureCommandSettings settings)
     {
-        var keyVersionProperty = GetPropertyValue(settings.GetType(), settings, "KeyVersion");
-        return keyVersionProperty
-            .Bind(static value =>
-                byte.TryParse(value, out byte result) ? Maybe<byte>.From(result) : Maybe<byte>.None
-            )
-            .GetValueOrDefault(0x01);
+        object? value = settings.GetType().GetProperty("KeyVersion")?.GetValue(settings);
+        return value switch
+        {
+            Maybe<byte> maybe => maybe,
+            byte keyVersion => Maybe<byte>.From(keyVersion),
+            string text => ParseByte(text),
+            _ => Maybe<byte>.None,
+        };
     }
 
     /// <summary>
@@ -144,9 +146,36 @@ public static class CommandSettingsExtensions
         string propertyName
     )
     {
-        return Maybe<string>.From(
-            settingsType.GetProperty(propertyName)?.GetValue(settings) as string
-        );
+        object? value = settingsType.GetProperty(propertyName)?.GetValue(settings);
+        return value switch
+        {
+            string text => Maybe<string>.From(text),
+            Maybe<string> maybe => maybe,
+            _ => Maybe<string>.None,
+        };
+    }
+
+    private static Maybe<byte> ParseByte(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return Maybe<byte>.None;
+        }
+
+        string normalized = value.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+            ? value[2..]
+            : value;
+
+        return byte.TryParse(normalized, out byte decimalValue)
+            ? Maybe<byte>.From(decimalValue)
+            : byte.TryParse(
+                normalized,
+                System.Globalization.NumberStyles.HexNumber,
+                provider: null,
+                out byte hexValue
+            )
+                ? Maybe<byte>.From(hexValue)
+                : Maybe<byte>.None;
     }
 
     /// <summary>

@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Tool.Extensions;
 using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
@@ -69,7 +70,9 @@ public class InstallCliCommand : IPipelineCommand<InstallCliCommand.Settings>
         return await connectionResult.Match(
             async connectedCtx =>
             {
-                var secureChannelResult = await connectedCtx.RequireSecureChannel();
+                var secureChannelResult = await connectedCtx.RequireSecureChannel(
+                    settings.ToSecureChannelRequest()
+                );
                 return await secureChannelResult.Match(
                     async secureCtx =>
                     {
@@ -87,7 +90,7 @@ public class InstallCliCommand : IPipelineCommand<InstallCliCommand.Settings>
                                 settings.InstallApplets,
                                 settings.MakeSelectable,
                                 (command, ct) =>
-                                    secureCtx.CardService.ExecuteCommandAsync(command, ct),
+                                    secureCtx.CardService.ExecuteCommandAsync(command, true, ct),
                                 CancellationToken.None
                             );
 

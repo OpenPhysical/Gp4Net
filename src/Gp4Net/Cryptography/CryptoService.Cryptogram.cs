@@ -412,7 +412,13 @@ public static partial class CryptoService
                 .. parameters.SequenceCounter,
                 .. parameters.CardChallenge
             ];
-            return CalculateScp02Cryptogram(parameters.Keys.EncKey, data);
+            return KeyDerivation
+                .DeriveScp02SessionKey(
+                    parameters.Keys.EncKey,
+                    parameters.SequenceCounter,
+                    Scp.Scp02.KeyDerivationConstants.SEnc
+                )
+                .Bind(sEnc => CalculateScp02Cryptogram(sEnc, data));
         }
 
         /// <summary>
@@ -430,7 +436,13 @@ public static partial class CryptoService
                 .. parameters.CardChallenge,
                 .. parameters.HostChallenge
             ];
-            return CalculateScp02Cryptogram(parameters.Keys.EncKey, data);
+            return KeyDerivation
+                .DeriveScp02SessionKey(
+                    parameters.Keys.EncKey,
+                    parameters.SequenceCounter,
+                    Scp.Scp02.KeyDerivationConstants.SEnc
+                )
+                .Bind(sEnc => CalculateScp02Cryptogram(sEnc, data));
         }
 
         // --- SCP03 KDF HELPERS (SPEC COMPLIANT) ---

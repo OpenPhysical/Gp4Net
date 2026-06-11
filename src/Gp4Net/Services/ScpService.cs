@@ -4,6 +4,8 @@
 // -----------------------------------------------------------------------------
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
@@ -35,6 +37,16 @@ namespace Gp4Net.Services;
 [PublicAPI]
 public static partial class ScpService
 {
+    private sealed record ExternalAuthenticateMaterial(
+        ExternalAuthenticateCommand Command,
+        byte[] ChainingMac
+    );
+
+    private sealed record AuthenticatedSecureChannel(
+        SecureChannelState State,
+        Types.SecureChannelVectors Vectors
+    );
+
     /// <summary>
     /// Supporting types for SCP operations.
     /// </summary>
@@ -99,7 +111,30 @@ public static partial class ScpService
         public sealed record SecureChannelSession(
             SecureChannelState State,
             ScpOption ScpOption,
-            byte[] SessionId
+            byte[] SessionId,
+            SecureChannelVectors? Vectors = null
+        );
+
+        /// <summary>
+        /// Captured secure channel establishment material useful for test vectors.
+        /// </summary>
+        public sealed record SecureChannelVectors(
+            byte[] HostChallenge,
+            byte[] InitializeUpdateResponse,
+            byte[] KeyDiversificationData,
+            byte KeyVersion,
+            byte ScpId,
+            byte ImplementationParameter,
+            byte[] SequenceCounter,
+            byte[] CardChallenge,
+            byte[] CardCryptogram,
+            byte[] SEnc,
+            byte[] SMac,
+            byte[] SRMac,
+            byte[] HostCryptogram,
+            byte[] ExternalAuthenticateMac,
+            byte[] ExternalAuthenticateChainingMac,
+            byte[] ExternalAuthenticateCommand
         );
 
         /// <summary>
@@ -178,103 +213,212 @@ public static partial class ScpService
             CancellationToken cancellationToken = default
         )
         {
+            return await EstablishAsync(
+                cardService,
+                rawKeyset,
+                securityLevel,
+                Maybe<byte>.From(rawKeyset.KeyVersion),
+                cancellationToken
+            );
+        }
+
+        /// <summary>
+        /// Establishes a secure channel with optional key version autodetection.
+        /// When no explicit KVN is supplied, candidates come from GET DATA(E0) and
+        /// then GP P1=00 default key selection.
+        /// </summary>
+        public static async Task<Result<Types.SecureChannelSession, SmartCardError>> EstablishAsync(
+            ISmartCardService cardService,
+            RawKeyset rawKeyset,
+            SecurityLevel securityLevel,
+            Maybe<byte> explicitKeyVersion,
+            CancellationToken cancellationToken = default
+        )
+        {
             // Query card capabilities first (optional, may fail)
-            var capabilitiesResult = await QueryCardCapabilities(cardService, cancellationToken);
+            _ = await QueryCardCapabilities(cardService, cancellationToken);
 
             // Generate host challenge (8 bytes for maximum compatibility)
             byte[] hostChallenge = new byte[8];
             Random.Shared.NextBytes(hostChallenge);
 
-            // Send INITIALIZE UPDATE to negotiate protocol
-            return await SendInitializeUpdate(
+            IReadOnlyList<byte> candidateKeyVersions = await ResolveCandidateKeyVersions(
+                cardService,
+                explicitKeyVersion,
+                cancellationToken
+            );
+            var failures = new List<string>();
+
+            foreach (byte candidateKeyVersion in candidateKeyVersions)
+            {
+                var initializeUpdateResult = await SendInitializeUpdate(
                     cardService,
                     hostChallenge,
-                    rawKeyset.KeyVersion,
+                    candidateKeyVersion,
                     0x00,
                     cancellationToken
-                )
-                .Bind(async initUpdateResponse =>
-                    // Determine SCP version from card response
-                    await initUpdateResponse
-                        .ScpVersion.ToResult(
-                            SmartCardError.InvalidResponse(
-                                "Card did not return SCP version in INITIALIZE UPDATE response"
-                            )
-                        )
-                        .Bind(detectedVersion =>
-                            rawKeyset
-                                .ToTypedKeyset(detectedVersion)
-                                .Bind(async typedKeyset =>
-                                {
-                                    // Process based on detected protocol
-                                    return detectedVersion switch
-                                    {
-                                        CryptoService.ScpVersion.Scp02
-                                            => await ProcessScp02InitializeUpdate(
-                                                    initUpdateResponse,
-                                                    hostChallenge, // Pass full 8 bytes
-                                                    (Scp02KeySet)typedKeyset
-                                                )
-                                                .Bind(async context =>
-                                                    await SendExternalAuthenticate(
-                                                        cardService,
-                                                        context,
-                                                        securityLevel,
-                                                        cancellationToken
-                                                    )
-                                                )
-                                                .Map(state => new Types.SecureChannelSession(
-                                                    state,
-                                                    new Types.ScpOption(
-                                                        CryptoService.ScpVersion.Scp02,
-                                                        state.ImplementationParameter
-                                                    ),
-                                                    hostChallenge
-                                                )),
-
-                                        CryptoService.ScpVersion.Scp03
-                                            => await DiversifyScp03KeySetAsync(
-                                                    (Scp03KeySet)typedKeyset,
-                                                    rawKeyset.Diversification,
-                                                    initUpdateResponse.KeyDiversificationData
-                                                )
-                                                .Bind(async diversifiedKeyset =>
-                                                    await ProcessScp03InitializeUpdate(
-                                                        initUpdateResponse,
-                                                        hostChallenge,
-                                                        diversifiedKeyset
-                                                    )
-                                                )
-                                                .Bind(async context =>
-                                                    await SendExternalAuthenticate(
-                                                        cardService,
-                                                        context,
-                                                        securityLevel,
-                                                        cancellationToken
-                                                    )
-                                                )
-                                                .Map(state => new Types.SecureChannelSession(
-                                                    state,
-                                                    new Types.ScpOption(
-                                                        CryptoService.ScpVersion.Scp03,
-                                                        state.ImplementationParameter
-                                                    ),
-                                                    hostChallenge
-                                                )),
-
-                                        _
-                                            => Result.Failure<
-                                                Types.SecureChannelSession,
-                                                SmartCardError
-                                            >(
-                                                SmartCardError.InvalidResponse(
-                                                    $"Unsupported SCP version from card: {detectedVersion}"
-                                                )
-                                            ),
-                                    };
-                                })
-                        )
                 );
+
+                if (initializeUpdateResult.IsFailure)
+                {
+                    failures.Add(
+                        $"P1=0x{candidateKeyVersion:X2}: {initializeUpdateResult.Error.Message}"
+                    );
+                    continue;
+                }
+
+                var sessionResult = await EstablishFromInitializeUpdateResponse(
+                    cardService,
+                    rawKeyset with
+                    {
+                        KeyVersion = initializeUpdateResult.Value.KeyVersion,
+                    },
+                    hostChallenge,
+                    initializeUpdateResult.Value,
+                    securityLevel,
+                    cancellationToken
+                );
+
+                if (sessionResult.IsSuccess)
+                {
+                    return sessionResult;
+                }
+
+                failures.Add($"P1=0x{candidateKeyVersion:X2}: {sessionResult.Error.Message}");
+            }
+
+            string tried = string.Join(", ", candidateKeyVersions.Select(kvn => $"0x{kvn:X2}"));
+            string detail = failures.Count > 0 ? string.Join("; ", failures) : "no candidates";
+            return Result.Failure<Types.SecureChannelSession, SmartCardError>(
+                SmartCardError.SecurityError(
+                    $"Unable to establish secure channel. Tried key versions: {tried}. {detail}"
+                )
+            );
+        }
+
+        private static async Task<
+            Result<Types.SecureChannelSession, SmartCardError>
+        > EstablishFromInitializeUpdateResponse(
+            ISmartCardService cardService,
+            RawKeyset rawKeyset,
+            byte[] hostChallenge,
+            InitializeUpdateResponse initUpdateResponse,
+            SecurityLevel securityLevel,
+            CancellationToken cancellationToken
+        )
+        {
+            return await initUpdateResponse
+                .ScpVersion.ToResult(
+                    SmartCardError.InvalidResponse(
+                        "Card did not return SCP version in INITIALIZE UPDATE response"
+                    )
+                )
+                .Bind(detectedVersion =>
+                    rawKeyset
+                        .ToTypedKeyset(detectedVersion)
+                        .Bind(async typedKeyset =>
+                        {
+                            return detectedVersion switch
+                            {
+                                CryptoService.ScpVersion.Scp02
+                                    => await ProcessScp02InitializeUpdate(
+                                            initUpdateResponse,
+                                            hostChallenge,
+                                            (Scp02KeySet)typedKeyset
+                                        )
+                                        .Bind(async context =>
+                                            await SendExternalAuthenticate(
+                                                cardService,
+                                                context,
+                                                securityLevel,
+                                                cancellationToken
+                                            )
+                                        )
+                                        .Map(auth => new Types.SecureChannelSession(
+                                            auth.State,
+                                            new Types.ScpOption(
+                                                CryptoService.ScpVersion.Scp02,
+                                                auth.State.ImplementationParameter
+                                            ),
+                                            hostChallenge,
+                                            auth.Vectors
+                                        )),
+
+                                CryptoService.ScpVersion.Scp03
+                                    => await DiversifyScp03KeySetAsync(
+                                            (Scp03KeySet)typedKeyset,
+                                            rawKeyset.Diversification,
+                                            initUpdateResponse.KeyDiversificationData
+                                        )
+                                        .Bind(async diversifiedKeyset =>
+                                            await ProcessScp03InitializeUpdate(
+                                                initUpdateResponse,
+                                                hostChallenge,
+                                                diversifiedKeyset
+                                            )
+                                        )
+                                        .Bind(async context =>
+                                            await SendExternalAuthenticate(
+                                                cardService,
+                                                context,
+                                                securityLevel,
+                                                cancellationToken
+                                            )
+                                        )
+                                        .Map(auth => new Types.SecureChannelSession(
+                                            auth.State,
+                                            new Types.ScpOption(
+                                                CryptoService.ScpVersion.Scp03,
+                                                auth.State.ImplementationParameter
+                                            ),
+                                            hostChallenge,
+                                            auth.Vectors
+                                        )),
+
+                                _
+                                    => Result.Failure<Types.SecureChannelSession, SmartCardError>(
+                                        SmartCardError.InvalidResponse(
+                                            $"Unsupported SCP version from card: {detectedVersion}"
+                                        )
+                                    ),
+                            };
+                        })
+                );
+        }
+
+        private static async Task<IReadOnlyList<byte>> ResolveCandidateKeyVersions(
+            ISmartCardService cardService,
+            Maybe<byte> explicitKeyVersion,
+            CancellationToken cancellationToken
+        )
+        {
+            if (explicitKeyVersion.HasValue)
+            {
+                return [explicitKeyVersion.Value];
+            }
+
+            List<byte> candidates = [];
+            var keyInfoResult = await TryGetData(
+                    GetDataCommand.DataObjects.KeyInformationTemplate,
+                    cardService,
+                    cancellationToken
+                )
+                .Bind(ExtractSuccessfulData)
+                .Bind(Gp4Net.Domain.CardInfo.KeyInformationTemplate.Parse);
+
+            if (keyInfoResult.IsSuccess)
+            {
+                candidates.AddRange(
+                    keyInfoResult.Value.Keys.Select(key => key.KeyVersion).Distinct()
+                );
+            }
+
+            if (!candidates.Contains(0x00))
+            {
+                candidates.Add(0x00);
+            }
+
+            return candidates;
         }
 
         private static async Task<Result<Scp03KeySet, SmartCardError>> DiversifyScp03KeySetAsync(
@@ -371,13 +515,14 @@ public static partial class ScpService
                         cancellationToken
                     )
                 )
-                .Map(state => new Types.SecureChannelSession(
-                    state,
+                .Map(auth => new Types.SecureChannelSession(
+                    auth.State,
                     new Types.ScpOption(
                         CryptoService.ScpVersion.Scp02,
-                        state.ImplementationParameter
+                        auth.State.ImplementationParameter
                     ),
-                    hostChallenge
+                    hostChallenge,
+                    auth.Vectors
                 ));
         }
 
@@ -413,13 +558,14 @@ public static partial class ScpService
                         cancellationToken
                     )
                 )
-                .Map(state => new Types.SecureChannelSession(
-                    state,
+                .Map(auth => new Types.SecureChannelSession(
+                    auth.State,
                     new Types.ScpOption(
                         CryptoService.ScpVersion.Scp03,
-                        state.ImplementationParameter
+                        auth.State.ImplementationParameter
                     ),
-                    hostChallenge
+                    hostChallenge,
+                    auth.Vectors
                 ));
         }
 
@@ -516,15 +662,12 @@ public static partial class ScpService
                         response.SequenceCounter,
                         (ScpImplementation)response.ImplementationParameter
                     )
-                   .Bind(context =>
-                       CryptoService
-                           .KeyDerivation.DeriveSessionKeys(context)
-                           .Bind(sessionKeys =>
-                                VerifyScp02CardCryptogram(
-                                    response,
-                                    hostChallenge,
-                                    keySet
-                                ).Map(() => sessionKeys)
+                    .Bind(context =>
+                        CryptoService
+                            .KeyDerivation.DeriveSessionKeys(context)
+                            .Bind(sessionKeys =>
+                                VerifyScp02CardCryptogram(response, hostChallenge, sessionKeys)
+                                    .Map(() => sessionKeys)
                             )
                     )
                     .Bind(sessionKeys =>
@@ -576,15 +719,12 @@ public static partial class ScpService
         private static UnitResult<SmartCardError> VerifyScp02CardCryptogram(
             InitializeUpdateResponse response,
             byte[] hostChallenge,
-            Scp02KeySet keySet
+            SessionKeys sessionKeys
         ) =>
             CryptoService
                 .Cryptogram.BuildScp02CardCryptogramData(response, hostChallenge)
                 .Bind(data =>
-                    CryptoService.ScpOperations.Scp02.CalculateCryptogram(
-                        keySet.EncKey,
-                        data
-                    )
+                    CryptoService.ScpOperations.Scp02.CalculateCryptogram(sessionKeys.SEnc, data)
                 )
                 .Bind(calculated =>
                     CryptoService.Utils.CompareBytes(calculated, response.CardCryptogram)
@@ -621,7 +761,7 @@ public static partial class ScpService
                 );
 
         private static async Task<
-            Result<SecureChannelState, SmartCardError>
+            Result<AuthenticatedSecureChannel, SmartCardError>
         > SendExternalAuthenticate(
             ISmartCardService cardService,
             SecureChannelContext context,
@@ -629,19 +769,34 @@ public static partial class ScpService
             CancellationToken cancellationToken
         ) =>
             await CreateExternalAuthenticateCommand(context, securityLevel)
-                .Bind(cmd => cmd.ToCommandApdu())
-                .Map(apdu => apdu.ToBytes())
-                .Bind(async bytes => await cardService.SendCommandAsync(bytes, cancellationToken))
-                .Bind(response =>
-                    response.IsSuccess
-                        ? CreateSecureChannelState(context, securityLevel)
-                        : Result.Failure<SecureChannelState, SmartCardError>(
-                            SmartCardError.AuthenticationFailed("EXTERNAL AUTHENTICATE failed")
+                .Bind(async material =>
+                    await material
+                        .Command.ToCommandApdu()
+                        .Map(apdu => apdu.ToBytes())
+                        .Bind(async bytes =>
+                            await cardService.SendCommandAsync(bytes, cancellationToken)
+                        )
+                        .Bind(response =>
+                            response.IsSuccess
+                                ? CreateSecureChannelState(
+                                        context,
+                                        securityLevel,
+                                        material.ChainingMac
+                                    )
+                                    .Map(state => new AuthenticatedSecureChannel(
+                                        state,
+                                        CreateSecureChannelVectors(context, material)
+                                    ))
+                                : Result.Failure<AuthenticatedSecureChannel, SmartCardError>(
+                                    SmartCardError.AuthenticationFailed(
+                                        "EXTERNAL AUTHENTICATE failed"
+                                    )
+                                )
                         )
                 );
 
         private static Result<
-            ExternalAuthenticateCommand,
+            ExternalAuthenticateMaterial,
             SmartCardError
         > CreateExternalAuthenticateCommand(
             SecureChannelContext context,
@@ -654,13 +809,13 @@ public static partial class ScpService
                 CryptoService.ScpVersion.Scp03
                     => CreateScp03ExternalAuthenticate(context, securityLevel),
                 _
-                    => Result.Failure<ExternalAuthenticateCommand, SmartCardError>(
+                    => Result.Failure<ExternalAuthenticateMaterial, SmartCardError>(
                         SmartCardError.InvalidArgument($"Unsupported protocol: {context.Protocol}")
                     ),
             };
 
         private static Result<
-            ExternalAuthenticateCommand,
+            ExternalAuthenticateMaterial,
             SmartCardError
         > CreateScp02ExternalAuthenticate(
             SecureChannelContext context,
@@ -672,19 +827,10 @@ public static partial class ScpService
                     context.HostChallenge
                 )
                 .Bind(data =>
-                    Maybe<Scp02KeySet>
-                        .From(context.KeySet as Scp02KeySet)
-                        .ToResult(
-                            SmartCardError.InvalidArgument(
-                                "SCP02 secure channel requires SCP02 key set"
-                            )
-                        )
-                        .Bind(staticKeys =>
-                            CryptoService.ScpOperations.Scp02.CalculateCryptogram(
-                                staticKeys.EncKey,
-                                data
-                            )
-                        )
+                    CryptoService.ScpOperations.Scp02.CalculateCryptogram(
+                        context.SessionKeys.SEnc,
+                        data
+                    )
                 )
                 .Bind(cryptogram =>
                     ExternalAuthenticateCommand
@@ -711,17 +857,18 @@ public static partial class ScpService
                                     Scp.Common.ZeroChaining8
                                 )
                                 .Bind(mac =>
-                                    ExternalAuthenticateCommand.CreateWithMac(
-                                        securityLevel,
-                                        cryptogram,
-                                        mac
-                                    )
+                                    ExternalAuthenticateCommand
+                                        .CreateWithMac(securityLevel, cryptogram, mac)
+                                        .Map(command => new ExternalAuthenticateMaterial(
+                                            command,
+                                            mac
+                                        ))
                                 );
                         })
                 );
 
         private static Result<
-            ExternalAuthenticateCommand,
+            ExternalAuthenticateMaterial,
             SmartCardError
         > CreateScp03ExternalAuthenticate(
             SecureChannelContext context,
@@ -764,21 +911,26 @@ public static partial class ScpService
                                     Scp.Common.ZeroChaining16
                                 )
                                 .Bind(fullMac =>
-                                    ExternalAuthenticateCommand.CreateWithMac(
-                                        securityLevel,
-                                        cryptogram,
-                                        fullMac[..Constants.Constants.Scp.Scp03.MAC_SIZE]
-                                    )
+                                    ExternalAuthenticateCommand
+                                        .CreateWithMac(
+                                            securityLevel,
+                                            cryptogram,
+                                            fullMac[..Constants.Constants.Scp.Scp03.MAC_SIZE]
+                                        )
+                                        .Map(command => new ExternalAuthenticateMaterial(
+                                            command,
+                                            fullMac
+                                        ))
                                 );
                         })
                 );
 
         private static Result<SecureChannelState, SmartCardError> CreateSecureChannelState(
             SecureChannelContext context,
-            SecurityLevel securityLevel
+            SecurityLevel securityLevel,
+            byte[] externalAuthenticateMac
         ) =>
-            CryptoService
-                .ScpOperations.Common.GetZeroChainingValue(context.Protocol)
+            GetInitialMacChainingValue(context, externalAuthenticateMac)
                 .Bind(initialChaining =>
                     SecureChannelState.Create(
                         context.SessionKeys,
@@ -788,5 +940,64 @@ public static partial class ScpService
                         context.InitializeUpdateResponse.ImplementationParameter
                     )
                 );
+
+        private static Result<byte[], SmartCardError> GetInitialMacChainingValue(
+            SecureChannelContext context,
+            byte[] externalAuthenticateMac
+        )
+        {
+            if (
+                context.Protocol == CryptoService.ScpVersion.Scp02
+                && externalAuthenticateMac.Length == Constants.Constants.Scp.Scp02.MAC_SIZE
+            )
+            {
+                return Result.Success<byte[], SmartCardError>(externalAuthenticateMac);
+            }
+
+            if (
+                context.Protocol == CryptoService.ScpVersion.Scp03
+                && externalAuthenticateMac.Length
+                    == Constants.Constants.Scp.Scp03.CHAINING_VALUE_SIZE
+            )
+            {
+                return Result.Success<byte[], SmartCardError>(externalAuthenticateMac);
+            }
+
+            return CryptoService.ScpOperations.Common.GetZeroChainingValue(context.Protocol);
+        }
+
+        private static Types.SecureChannelVectors CreateSecureChannelVectors(
+            SecureChannelContext context,
+            ExternalAuthenticateMaterial material
+        )
+        {
+            var response = context.InitializeUpdateResponse;
+
+            return new Types.SecureChannelVectors(
+                HostChallenge: [.. context.HostChallenge],
+                InitializeUpdateResponse:
+                [
+                    .. response.KeyDiversificationData,
+                    .. response.KeyInformation,
+                    .. response.SequenceCounter,
+                    .. response.CardChallenge,
+                    .. response.CardCryptogram,
+                ],
+                KeyDiversificationData: [.. response.KeyDiversificationData],
+                KeyVersion: response.KeyVersion,
+                ScpId: response.ScpId,
+                ImplementationParameter: response.ImplementationParameter,
+                SequenceCounter: response.SequenceCounter,
+                CardChallenge: [.. response.CardChallenge],
+                CardCryptogram: [.. response.CardCryptogram],
+                SEnc: [.. context.SessionKeys.SEnc],
+                SMac: [.. context.SessionKeys.SMac],
+                SRMac: [.. context.SessionKeys.SrMac],
+                HostCryptogram: [.. material.Command.HostCryptogram],
+                ExternalAuthenticateMac: [.. material.Command.Mac],
+                ExternalAuthenticateChainingMac: [.. material.ChainingMac],
+                ExternalAuthenticateCommand: material.Command.ToBytes()
+            );
+        }
     }
 }

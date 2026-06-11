@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.CapFile;
+using Gp4Net.Tool.Extensions;
 using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
@@ -94,7 +95,9 @@ public class UninstallCommand : IPipelineCommand<UninstallCommand.Settings>
         return await connectionResult.Match(
             async connectedCtx =>
             {
-                var secureChannelResult = await connectedCtx.RequireSecureChannel();
+                var secureChannelResult = await connectedCtx.RequireSecureChannel(
+                    settings.ToSecureChannelRequest()
+                );
 
                 return await secureChannelResult.Match(
                     async secureCtx =>
@@ -116,17 +119,22 @@ public class UninstallCommand : IPipelineCommand<UninstallCommand.Settings>
                                     deleteRelated: false
                                 );
 
-                            if (deleteCmd.IsSuccess)
-                            {
-                                var result = await secureCtx.CardService.ExecuteCommandAsync(
-                                    deleteCmd.Value.ToApdu(),
-                                    CancellationToken.None
-                                );
+                            var deleteResult = await ExecuteDeleteAsync(
+                                secureCtx,
+                                deleteCmd,
+                                $"Applet {Convert.ToHexString(applet.Aid)}"
+                            );
 
-                                if (result.IsSuccess)
-                                {
-                                    alreadyRemoved = false;
-                                }
+                            if (deleteResult.IsFailure)
+                            {
+                                return Result.Failure<UninstallResult, SmartCardError>(
+                                    deleteResult.Error
+                                );
+                            }
+
+                            if (deleteResult.Value == DeleteOutcome.Deleted)
+                            {
+                                alreadyRemoved = false;
                             }
                         }
 
@@ -142,17 +150,22 @@ public class UninstallCommand : IPipelineCommand<UninstallCommand.Settings>
                                     deleteRelated: true
                                 );
 
-                            if (deleteCmd.IsSuccess)
-                            {
-                                var result = await secureCtx.CardService.ExecuteCommandAsync(
-                                    deleteCmd.Value.ToApdu(),
-                                    CancellationToken.None
-                                );
+                            var deleteResult = await ExecuteDeleteAsync(
+                                secureCtx,
+                                deleteCmd,
+                                $"Package {Convert.ToHexString(packageAid)}"
+                            );
 
-                                if (result.IsSuccess)
-                                {
-                                    alreadyRemoved = false;
-                                }
+                            if (deleteResult.IsFailure)
+                            {
+                                return Result.Failure<UninstallResult, SmartCardError>(
+                                    deleteResult.Error
+                                );
+                            }
+
+                            if (deleteResult.Value == DeleteOutcome.Deleted)
+                            {
+                                alreadyRemoved = false;
                             }
                         }
                         else
@@ -181,6 +194,55 @@ public class UninstallCommand : IPipelineCommand<UninstallCommand.Settings>
                 );
             }
         );
+    }
+
+    private static async Task<Result<DeleteOutcome, SmartCardError>> ExecuteDeleteAsync(
+        ICliExecutionContext context,
+        Result<Gp4Net.Domain.Commands.DeleteCommand, SmartCardError> deleteCommand,
+        string targetDescription
+    )
+    {
+        if (deleteCommand.IsFailure)
+        {
+            return Result.Failure<DeleteOutcome, SmartCardError>(deleteCommand.Error);
+        }
+
+        var result = await context.CardService.ExecuteCommandAsync(
+            deleteCommand.Value.ToApdu(),
+            true,
+            CancellationToken.None
+        );
+
+        if (result.IsFailure)
+        {
+            return Result.Failure<DeleteOutcome, SmartCardError>(result.Error);
+        }
+
+        var response = result.Value;
+        if (response.IsSuccess)
+        {
+            return Result.Success<DeleteOutcome, SmartCardError>(DeleteOutcome.Deleted);
+        }
+
+        if (IsAlreadyRemovedStatus(response.StatusWord))
+        {
+            context.Display.Info($"{targetDescription} already absent ({response.StatusWord})");
+            return Result.Success<DeleteOutcome, SmartCardError>(DeleteOutcome.AlreadyRemoved);
+        }
+
+        return Result.Failure<DeleteOutcome, SmartCardError>(
+            SmartCardError.FromStatusWord(response.StatusWord)
+        );
+    }
+
+    private static bool IsAlreadyRemovedStatus(StatusWord statusWord) =>
+        statusWord == Gp4Net.Constants.Constants.StatusWords.Legacy.ReferencedDataNotFound
+        || statusWord == Gp4Net.Constants.Constants.StatusWords.Legacy.FileNotFound;
+
+    private enum DeleteOutcome
+    {
+        Deleted,
+        AlreadyRemoved,
     }
 
     public sealed record UninstallResult(bool AlreadyRemoved);

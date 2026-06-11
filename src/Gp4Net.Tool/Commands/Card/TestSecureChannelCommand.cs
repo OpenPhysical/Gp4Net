@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
@@ -5,16 +6,20 @@ using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Cryptography;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Services;
 using Gp4Net.Services.GlobalPlatform;
+using Gp4Net.Tool.Commands;
+using Gp4Net.Tool.Extensions;
 using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Pipeline;
 using Gp4Net.Tool.Services;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Spectre.Console.Cli;
 
 namespace Gp4Net.Tool.Commands.Card;
@@ -52,7 +57,7 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
     /// Command settings.
     /// </summary>
     [PublicAPI]
-    public class Settings : CommandSettings
+    public class Settings : SecureCommandSettings
     {
         /// <summary>
         /// Gets or sets whether to use SCP03.
@@ -67,13 +72,6 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
         [CommandOption("-s|--security-level")]
         [Description("Security level (1=MAC, 3=MAC+ENC)")]
         public byte SecurityLevel { get; set; } = 1;
-
-        /// <summary>
-        /// Gets or sets the smart card reader name.
-        /// </summary>
-        [CommandOption("-r|--reader")]
-        [Description("Smart card reader name")]
-        public string ReaderName { get; set; } = string.Empty;
     }
 
     /// <summary>
@@ -87,7 +85,8 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
         _displayService.Info("Starting secure channel test...");
 
         return await GetAvailableReaders(settings)
-            .Bind(readerName => CreateSmartCardServiceForPhysicalCard(readerName, settings))
+            .Bind(readerName => ConnectSmartCardService(readerName))
+            .Bind(service => TestSecureChannelEstablishment(service, settings))
             .Match(
                 success => Task.FromResult(0),
                 error =>
@@ -101,6 +100,15 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
     private Result<string, SmartCardError> GetAvailableReaders(Settings settings)
     {
         _displayService.Info("Enumerating available card readers...");
+
+        if (
+            !string.IsNullOrWhiteSpace(settings.ReaderName)
+            && ReaderEnumerationService.IsVirtualReader(settings.ReaderName)
+        )
+        {
+            _displayService.Info($"Using virtual reader: {settings.ReaderName}");
+            return Result.Success<string, SmartCardError>(settings.ReaderName);
+        }
 
         return Result
             .Try(() =>
@@ -155,27 +163,23 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
             .Bind(result => result);
     }
 
-    private Task<Result<bool, SmartCardError>> CreateSmartCardServiceForPhysicalCard(
-        string readerName,
-        Settings settings
+    private async Task<Result<ISmartCardService, SmartCardError>> ConnectSmartCardService(
+        string readerName
     )
     {
-        _displayService.Success("✓ DI registration fixed - tool starts successfully");
-        _displayService.Success("✓ Physical card integration architecture implemented");
-        _displayService.Success($"✓ Reader resolution working for: {readerName}");
+        _displayService.Info($"Connecting to reader: {readerName}");
+        var result = await PhysicalCardConnectionService.CreateServiceAsync(
+            readerName,
+            NullLogger<SmartCardService>.Instance,
+            CancellationToken.None
+        );
 
-        _displayService.Info("Physical card communication test:");
-        _displayService.Info($"  - Reader: {readerName}");
-        _displayService.Info($"  - SCP: {(settings.UseScp03 ? "SCP03" : "SCP02")}");
-        _displayService.Info($"  - Security Level: {settings.SecurityLevel}");
+        if (result.IsSuccess)
+        {
+            _displayService.Success("Connected to card");
+        }
 
-        _displayService.Warning("Physical card testing requires complete implementation");
-        _displayService.Info("Next steps:");
-        _displayService.Info("  1. Fix WSCT APDU type references");
-        _displayService.Info("  2. Fix CommandProcessor factory method");
-        _displayService.Info("  3. Complete secure channel testing");
-
-        return Task.FromResult(Result.Success<bool, SmartCardError>(true));
+        return result;
     }
 
     private async Task<Result<bool, SmartCardError>> TestSecureChannelEstablishment(
@@ -188,15 +192,23 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
         _displayService.Info($"Security Level: {settings.SecurityLevel}");
         _displayService.Info($"Protocol: {(settings.UseScp03 ? "SCP03" : "SCP02")}");
 
-        // Create proper KeySet from GP test keys
-        byte protocolVersion = settings.UseScp03 ? (byte)0x03 : (byte)0x02;
-        var keySetResult =
-            protocolVersion == 0x03
-                ? GpTestKeys.CreateScp03TestKeySet().Map(keySet => (KeySet)keySet)
-                : GpTestKeys.CreateScp02TestKeySet().Map(keySet => (KeySet)keySet);
+        string keysetName = settings.GetKeyset().GetValueOrDefault("gp_test_keys");
+        if (keysetName is not "gp_test_keys" and not "gp_test")
+        {
+            return Result.Failure<bool, SmartCardError>(
+                SmartCardError.InvalidArgument(
+                    $"Unsupported test keyset '{keysetName}'. Only gp_test_keys is supported."
+                )
+            );
+        }
 
-        return await keySetResult.Match(
-            async keySet => await ExecuteTestWithKeySet(smartCardService, keySet, settings),
+        var explicitKeyVersion = settings.ToSecureChannelRequest().ExplicitKeyVersion;
+        var rawKeysetResult = GpTestKeys.CreateRawTestKeyset(
+            explicitKeyVersion.GetValueOrDefault(0x00)
+        );
+
+        return await rawKeysetResult.Match(
+            async rawKeyset => await ExecuteTestWithKeySet(smartCardService, rawKeyset, settings),
             error =>
             {
                 _displayService.Error($"Failed to create test keyset: {error.Message}");
@@ -210,7 +222,7 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
     /// </summary>
     private async Task<Result<bool, SmartCardError>> ExecuteTestWithKeySet(
         ISmartCardService smartCardService,
-        KeySet keySet,
+        RawKeyset rawKeyset,
         Settings settings
     )
     {
@@ -221,8 +233,9 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
         // Establish secure channel using static ScpService
         var secureChannelResult = await ScpService.Establishment.EstablishAsync(
             smartCardService,
-            keySet,
+            rawKeyset,
             securityLevel,
+            settings.ToSecureChannelRequest().ExplicitKeyVersion,
             CancellationToken.None
         );
 
@@ -231,9 +244,26 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
         return await secureChannelResult.Match(
             async secureChannelSession =>
             {
+                if (
+                    settings.UseScp03
+                    && secureChannelSession.ScpOption.Protocol != CryptoService.ScpVersion.Scp03
+                )
+                {
+                    return Result.Failure<bool, SmartCardError>(
+                        SmartCardError.SecurityError(
+                            $"Expected SCP03, but card negotiated {secureChannelSession.ScpOption.Protocol}"
+                        )
+                    );
+                }
+
                 _displayService.Success(
                     $"✓ Secure channel established successfully in {sw.ElapsedMilliseconds}ms"
                 );
+                if (settings.Debug)
+                {
+                    DisplayVectors(secureChannelSession);
+                }
+
                 return await TestSecureMessaging(smartCardService, secureChannelSession);
             },
             error =>
@@ -251,9 +281,20 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
     {
         _displayService.Info("Testing secure messaging...");
 
+        var securedServiceResult = smartCardService.WithContextValue(
+            "SecureChannelSession",
+            secureChannelSession.State
+        );
+        if (securedServiceResult.IsFailure)
+        {
+            return Result.Failure<bool, SmartCardError>(securedServiceResult.Error);
+        }
+
+        var securedService = securedServiceResult.Value;
+
         // Test with GET STATUS command through secure channel
         var getStatusResult = await Applications.GetApplicationsAndSecurityDomainsAsync(
-            (command, ct) => smartCardService.ExecuteCommandAsync(command, ct),
+            (command, ct) => securedService.ExecuteCommandAsync(command, true, ct),
             CancellationToken.None
         );
 
@@ -269,8 +310,76 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
                 _displayService.Warning(
                     $"! Secure channel established but command failed: {error.Message}"
                 );
-                return Result.Success<bool, SmartCardError>(true); // Still consider secure channel test successful
+                return Result.Failure<bool, SmartCardError>(error);
             }
         );
     }
+
+    private void DisplayVectors(ScpService.Types.SecureChannelSession secureChannelSession)
+    {
+        var vectors = secureChannelSession.Vectors;
+        if (vectors is null)
+        {
+            return;
+        }
+
+        _displayService.Info("Secure channel vectors:");
+        _displayService.Info($"  Protocol: {secureChannelSession.ScpOption.Protocol}");
+        _displayService.Info($"  Implementation: 0x{vectors.ImplementationParameter:X2}");
+        _displayService.Info($"  Key version: 0x{vectors.KeyVersion:X2}");
+        _displayService.Info($"  Host challenge: {ToHex(vectors.HostChallenge)}");
+        _displayService.Info(
+            $"  Initialize Update response: {ToHex(vectors.InitializeUpdateResponse)}"
+        );
+        _displayService.Info($"  KDD: {ToHex(vectors.KeyDiversificationData)}");
+        _displayService.Info($"  SSC: {ToHex(vectors.SequenceCounter)}");
+        _displayService.Info($"  Card challenge: {ToHex(vectors.CardChallenge)}");
+        _displayService.Info($"  Card cryptogram: {ToHex(vectors.CardCryptogram)}");
+        _displayService.Info($"  S-ENC: {ToHex(vectors.SEnc)}");
+        _displayService.Info($"  S-MAC: {ToHex(vectors.SMac)}");
+        _displayService.Info($"  S-RMAC: {ToHex(vectors.SRMac)}");
+        _displayService.Info($"  Host cryptogram: {ToHex(vectors.HostCryptogram)}");
+        _displayService.Info(
+            $"  External Authenticate MAC: {ToHex(vectors.ExternalAuthenticateMac)}"
+        );
+        _displayService.Info(
+            $"  External Authenticate chaining MAC: {ToHex(vectors.ExternalAuthenticateChainingMac)}"
+        );
+        _displayService.Info(
+            $"  External Authenticate APDU: {ToHex(vectors.ExternalAuthenticateCommand)}"
+        );
+
+        var firstStatusCommand = Gp4Net
+            .Services.GlobalPlatform.Commands.CreateGetStatusCommand(
+                Gp4Net
+                    .Domain
+                    .Commands
+                    .GetStatusCommand
+                    .StatusSubset
+                    .ApplicationsAndSupplementaryDomains,
+                new byte[] { 0x4F, 0x00 }
+            )
+            .Bind(command => command.ToCommandApdu());
+
+        if (firstStatusCommand.IsSuccess)
+        {
+            var secured = ScpService.Security.ApplyCommandSecurity(
+                firstStatusCommand.Value,
+                secureChannelSession.State
+            );
+
+            if (secured.IsSuccess)
+            {
+                var (securedCommand, nextState) = secured.Value;
+                _displayService.Info(
+                    $"  First secured GET STATUS APDU: {ToHex(securedCommand.ToBytes())}"
+                );
+                _displayService.Info(
+                    $"  First secured GET STATUS chaining: {ToHex(nextState.MacChainingValue)}"
+                );
+            }
+        }
+    }
+
+    private static string ToHex(byte[] data) => Convert.ToHexString(data);
 }

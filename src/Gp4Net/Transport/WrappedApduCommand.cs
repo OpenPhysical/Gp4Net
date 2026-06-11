@@ -9,7 +9,7 @@ namespace Gp4Net.Transport;
 [PublicAPI]
 public sealed class WrappedApduCommand : IApduCommand
 {
-    private readonly CommandAPDU _command;
+    private readonly CommandAPDU? _command;
     private readonly byte[] _bytes;
 
     /// <summary>
@@ -28,8 +28,8 @@ public sealed class WrappedApduCommand : IApduCommand
     /// <param name="bytes">The APDU bytes.</param>
     public WrappedApduCommand(byte[] bytes)
     {
-        _bytes = bytes;
-        _command = new CommandAPDU(bytes);
+        _bytes = (byte[])bytes.Clone();
+        _command = null;
     }
 
     /// <summary>
@@ -38,10 +38,10 @@ public sealed class WrappedApduCommand : IApduCommand
     public byte[] WrappedBytes => _bytes;
 
     /// <inheritdoc />
-    public byte Cla => _command.Cla;
+    public byte Cla => _bytes.Length > 0 ? _bytes[0] : (byte)0x00;
 
     /// <inheritdoc />
-    public byte Ins => _command.Ins;
+    public byte Ins => _bytes.Length > 1 ? _bytes[1] : (byte)0x00;
 
     /// <summary>
     /// Creates a new WrappedApduCommand from a CommandAPDU.
@@ -58,7 +58,7 @@ public sealed class WrappedApduCommand : IApduCommand
     public static WrappedApduCommand Create(byte[] bytes) => new(bytes);
 
     /// <inheritdoc />
-    public CommandAPDU ToApdu() => _command;
+    public CommandAPDU ToApdu() => _command ?? new CommandAPDU(_bytes);
 
     /// <inheritdoc />
     public byte[] ToBytes() => _bytes;
@@ -75,5 +75,5 @@ public sealed class WrappedApduCommand : IApduCommand
     /// </summary>
     /// <param name="wrapped">The wrapped command.</param>
     /// <returns>The underlying CommandAPDU.</returns>
-    public static implicit operator CommandAPDU(WrappedApduCommand wrapped) => wrapped._command;
+    public static implicit operator CommandAPDU(WrappedApduCommand wrapped) => wrapped.ToApdu();
 }

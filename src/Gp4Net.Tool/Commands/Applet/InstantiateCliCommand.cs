@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
+using Gp4Net.Tool.Extensions;
 using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
@@ -33,7 +34,9 @@ public class InstantiateCliCommand : IPipelineCommand<InstantiateCliCommand.Sett
             return await connectionResult.Match(
                 async connectedCtx =>
                 {
-                    var secureChannelResult = await connectedCtx.RequireSecureChannel();
+                    var secureChannelResult = await connectedCtx.RequireSecureChannel(
+                        settings.ToSecureChannelRequest()
+                    );
                     return await secureChannelResult.Match(
                         async secureCtx =>
                         {
@@ -89,7 +92,9 @@ public class InstantiateCliCommand : IPipelineCommand<InstantiateCliCommand.Sett
                                 if (settings.MakeSelectable)
                                 {
                                     AnsiConsole.WriteLine();
-                                    AnsiConsole.MarkupLine("3. INSTALL [for make selectable] command");
+                                    AnsiConsole.MarkupLine(
+                                        "3. INSTALL [for make selectable] command"
+                                    );
                                     AnsiConsole.MarkupLine(
                                         $"   - Instance AID: {settings.InstanceAid ?? settings.AppletAid}"
                                     );
@@ -241,9 +246,7 @@ public class InstantiateCliCommand : IPipelineCommand<InstantiateCliCommand.Sett
                 }
                 catch
                 {
-                    return ValidationResult.Error(
-                        "Install parameters must be a valid hex string"
-                    );
+                    return ValidationResult.Error("Install parameters must be a valid hex string");
                 }
             }
 

@@ -28,7 +28,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.0.x'
+        dotnet-version: '9.0.x'
 
     - name: Restore dependencies
       run: dotnet restore
@@ -36,19 +36,26 @@ jobs:
     - name: Build
       run: dotnet build --no-restore --configuration Release
 
+    - name: Test (act)
+      if: env.ACT == 'true'
+      env:
+        VSTEST_CONNECTION_TIMEOUT: 1800
+      run: dotnet test tests/Gp4Net.Tests/Gp4Net.Tests.csproj --no-build --configuration Release --logger trx --results-directory TestResults --filter "Category=Unit" --settings act.runsettings /p:CollectCoverage=false
+
     - name: Test
+      if: env.ACT != 'true'
       run: dotnet test --no-build --configuration Release --logger trx --collect:"XPlat Code Coverage" --results-directory TestResults /p:CollectCoverage=false
 
     - name: Upload test results
       uses: actions/upload-artifact@v4
-      if: always()
+      if: always() && env.ACT != 'true'
       with:
         name: test-results-${{ matrix.os }}
         path: TestResults/
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v4
-      if: matrix.os == 'ubuntu-latest'
+      if: matrix.os == 'ubuntu-latest' && env.ACT != 'true'
       with:
         directory: TestResults/
         flags: unittests
@@ -69,7 +76,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.0.x'
+        dotnet-version: '9.0.x'
 
     - name: Restore dependencies
       run: dotnet restore

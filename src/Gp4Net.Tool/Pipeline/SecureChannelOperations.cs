@@ -42,7 +42,8 @@ public static class SecureChannelOperations
                     EstablishWithExplicitKeysAsync(
                         cardService,
                         explicitKeys,
-                        request.KeyVersion,
+                        request.ExplicitKeyVersion,
+                        request.SecurityLevel,
                         cancellationToken
                     ),
                 () =>
@@ -51,13 +52,15 @@ public static class SecureChannelOperations
                             EstablishWithKeysetAsync(
                                 cardService,
                                 keysetName,
-                                request.KeyVersion,
+                                request.ExplicitKeyVersion,
+                                request.SecurityLevel,
                                 cancellationToken
                             ),
                         () =>
                             EstablishWithDefaultKeysetAsync(
                                 cardService,
-                                request.KeyVersion,
+                                request.ExplicitKeyVersion,
+                                request.SecurityLevel,
                                 cancellationToken
                             )
                     )
@@ -74,10 +77,13 @@ public static class SecureChannelOperations
     > EstablishWithExplicitKeysAsync(
         ISmartCardService cardService,
         ExplicitKeys keys,
-        byte keyVersion,
+        Maybe<byte> explicitKeyVersion,
+        SecurityLevel securityLevel,
         CancellationToken cancellationToken
     )
     {
+        byte keyVersion = explicitKeyVersion.GetValueOrDefault(0x00);
+
         // Create protocol-agnostic keyset for proper negotiation
         var rawKeysetResult = RawKeyset.Create(
             keys.EncryptionKey,
@@ -97,7 +103,8 @@ public static class SecureChannelOperations
         var sessionResult = await ScpService.Establishment.EstablishAsync(
             cardService,
             rawKeysetResult.Value,
-            SecurityLevel.CMac,
+            securityLevel,
+            explicitKeyVersion,
             cancellationToken
         );
 
@@ -110,16 +117,18 @@ public static class SecureChannelOperations
     private static async Task<Result<SecureChannelState, SmartCardError>> EstablishWithKeysetAsync(
         ISmartCardService cardService,
         string keysetName,
-        byte keyVersion,
+        Maybe<byte> explicitKeyVersion,
+        SecurityLevel securityLevel,
         CancellationToken cancellationToken
     )
     {
-        return await ResolveKeysetByName(keysetName, keyVersion)
+        return await ResolveKeysetByName(keysetName, explicitKeyVersion.GetValueOrDefault(0x00))
             .Bind(rawKeyset =>
                 ScpService.Establishment.EstablishAsync(
                     cardService,
                     rawKeyset,
-                    SecurityLevel.CMac,
+                    securityLevel,
+                    explicitKeyVersion,
                     cancellationToken
                 )
             )
@@ -131,11 +140,18 @@ public static class SecureChannelOperations
     /// </summary>
     private static Task<Result<SecureChannelState, SmartCardError>> EstablishWithDefaultKeysetAsync(
         ISmartCardService cardService,
-        byte keyVersion,
+        Maybe<byte> explicitKeyVersion,
+        SecurityLevel securityLevel,
         CancellationToken cancellationToken
     )
     {
-        return EstablishWithKeysetAsync(cardService, "gp_test_keys", keyVersion, cancellationToken);
+        return EstablishWithKeysetAsync(
+            cardService,
+            "gp_test_keys",
+            explicitKeyVersion,
+            securityLevel,
+            cancellationToken
+        );
     }
 
     /// <summary>

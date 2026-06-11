@@ -169,7 +169,10 @@ public class PutKeyCommandTests
         _ = keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.Des);
         _ = keyDataBlock.Length.Should().Be(8);
         _ = keyDataBlock.Value.Should().BeEquivalentTo(ValidDesKey);
-        _ = keyDataBlock.KeyCheckValue.GetValueOrDefault(Array.Empty<byte>()).Should().BeEquivalentTo(ValidKeyCheckValue);
+        _ = keyDataBlock
+            .KeyCheckValue.GetValueOrDefault(Array.Empty<byte>())
+            .Should()
+            .BeEquivalentTo(ValidKeyCheckValue);
     }
 
     [Test]
@@ -215,7 +218,7 @@ public class PutKeyCommandTests
         _ = result.Error.Should().BeOfType<SmartCardError>();
         _ = result
             .Error.Message.Should()
-            .Contain($"Key check value must be 3 bytes, got {length} bytes");
+            .Contain($"Key check value must be 3 bytes for DES, got {length} bytes");
     }
 
     [Test]
@@ -246,7 +249,10 @@ public class PutKeyCommandTests
         _ = keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.TripleDes2Key);
         _ = keyDataBlock.Length.Should().Be(16);
         _ = keyDataBlock.Value.Should().BeEquivalentTo(ValidTripleDes2Key);
-        _ = keyDataBlock.KeyCheckValue.GetValueOrDefault(Array.Empty<byte>()).Should().BeEquivalentTo(ValidKeyCheckValue);
+        _ = keyDataBlock
+            .KeyCheckValue.GetValueOrDefault(Array.Empty<byte>())
+            .Should()
+            .BeEquivalentTo(ValidKeyCheckValue);
     }
 
     [Test]
@@ -305,7 +311,10 @@ public class PutKeyCommandTests
         _ = keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.TripleDes3Key);
         _ = keyDataBlock.Length.Should().Be(24);
         _ = keyDataBlock.Value.Should().BeEquivalentTo(ValidTripleDes3Key);
-        _ = keyDataBlock.KeyCheckValue.GetValueOrDefault(Array.Empty<byte>()).Should().BeEquivalentTo(ValidKeyCheckValue);
+        _ = keyDataBlock
+            .KeyCheckValue.GetValueOrDefault(Array.Empty<byte>())
+            .Should()
+            .BeEquivalentTo(ValidKeyCheckValue);
     }
 
     [Test]
@@ -362,7 +371,10 @@ public class PutKeyCommandTests
         _ = keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.Aes128);
         _ = keyDataBlock.Length.Should().Be(16);
         _ = keyDataBlock.Value.Should().BeEquivalentTo(ValidAes128Key);
-        _ = keyDataBlock.KeyCheckValue.GetValueOrDefault(Array.Empty<byte>()).Should().BeEquivalentTo(ValidKeyCheckValue);
+        _ = keyDataBlock
+            .KeyCheckValue.GetValueOrDefault(Array.Empty<byte>())
+            .Should()
+            .BeEquivalentTo(ValidKeyCheckValue);
     }
 
     [Test]
@@ -419,7 +431,10 @@ public class PutKeyCommandTests
         _ = keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.Aes192);
         _ = keyDataBlock.Length.Should().Be(24);
         _ = keyDataBlock.Value.Should().BeEquivalentTo(ValidAes192Key);
-        _ = keyDataBlock.KeyCheckValue.GetValueOrDefault(Array.Empty<byte>()).Should().BeEquivalentTo(ValidKeyCheckValue);
+        _ = keyDataBlock
+            .KeyCheckValue.GetValueOrDefault(Array.Empty<byte>())
+            .Should()
+            .BeEquivalentTo(ValidKeyCheckValue);
     }
 
     [Test]
@@ -476,7 +491,10 @@ public class PutKeyCommandTests
         _ = keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.Aes256);
         _ = keyDataBlock.Length.Should().Be(32);
         _ = keyDataBlock.Value.Should().BeEquivalentTo(ValidAes256Key);
-        _ = keyDataBlock.KeyCheckValue.GetValueOrDefault(Array.Empty<byte>()).Should().BeEquivalentTo(ValidKeyCheckValue);
+        _ = keyDataBlock
+            .KeyCheckValue.GetValueOrDefault(Array.Empty<byte>())
+            .Should()
+            .BeEquivalentTo(ValidKeyCheckValue);
     }
 
     [Test]
@@ -647,7 +665,10 @@ public class PutKeyCommandTests
 
         // KeyDataBlock should have its own copy
         _ = keyDataBlock.KeyCheckValue.GetValueOrDefault(Array.Empty<byte>())[0].Should().Be(0x12); // Original first byte
-        _ = keyDataBlock.KeyCheckValue.GetValueOrDefault(Array.Empty<byte>()).Should().NotBeSameAs(originalKcv);
+        _ = keyDataBlock
+            .KeyCheckValue.GetValueOrDefault(Array.Empty<byte>())
+            .Should()
+            .NotBeSameAs(originalKcv);
     }
 
     [Test]

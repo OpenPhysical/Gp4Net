@@ -11,6 +11,7 @@ using Gp4Net.Domain;
 using Gp4Net.Domain.CapFile;
 using Gp4Net.Services;
 using Gp4Net.Services.GlobalPlatform;
+using Gp4Net.Tool.Extensions;
 using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
@@ -127,7 +128,9 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
             return await connectionResult.Match(
                 async connectedCtx =>
                 {
-                    var secureChannelResult = await connectedCtx.RequireSecureChannel();
+                    var secureChannelResult = await connectedCtx.RequireSecureChannel(
+                        settings.ToSecureChannelRequest()
+                    );
                     return await secureChannelResult.Match(
                         async secureCtx =>
                         {
@@ -271,14 +274,16 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
         return await connectionResult.Match(
             async connectedCtx =>
             {
-                var secureChannelResult = await connectedCtx.RequireSecureChannel();
+                var secureChannelResult = await connectedCtx.RequireSecureChannel(
+                    settings.ToSecureChannelRequest()
+                );
                 return await secureChannelResult.Match(
                     async secureCtx =>
                     {
                         var statusResult =
                             await Applications.GetApplicationsAndSecurityDomainsAsync(
                                 (command, ct) =>
-                                    secureCtx.CardService.ExecuteCommandAsync(command, ct),
+                                    secureCtx.CardService.ExecuteCommandAsync(command, true, ct),
                                 CancellationToken.None
                             );
 
@@ -449,7 +454,7 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
                     var result = await CardManagement.DeleteApplicationAsync(
                         aid,
                         settings.DeleteRelated,
-                        (command, ct) => context.CardService.ExecuteCommandAsync(command, ct),
+                        (command, ct) => context.CardService.ExecuteCommandAsync(command, true, ct),
                         CancellationToken.None
                     );
 

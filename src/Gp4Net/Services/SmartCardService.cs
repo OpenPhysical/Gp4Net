@@ -18,7 +18,7 @@ namespace Gp4Net.Services;
 /// </summary>
 public class SmartCardService : ISmartCardService
 {
-    private readonly CommandEnvironment _environment;
+    private CommandEnvironment _environment;
     private readonly CommandProcessor _processor;
     private readonly ILogger<SmartCardService> _logger;
     private bool _disposed;
@@ -40,20 +40,7 @@ public class SmartCardService : ISmartCardService
     /// <inheritdoc/>
     public IPipelineContext Context
     {
-        get
-        {
-            // Build context from environment for backward compatibility
-            var context = ImmutablePipelineContext
-                .Empty.With("CardChannel", _environment.Channel)
-                .With("ApduTransport", _environment.Transport);
-
-            if (_environment.SecureChannel.HasValue)
-            {
-                context = context.With("SecureChannelSession", _environment.SecureChannel.Value);
-            }
-
-            return context;
-        }
+        get { return BuildContext(_environment); }
     }
 
     /// <inheritdoc/>
@@ -106,24 +93,43 @@ public class SmartCardService : ISmartCardService
             cancellationToken
         );
 
-        // Convert CommandResult to CommandResponse for backward compatibility
-        return result.Map(cmdResult => new CommandResponse(
-            cmdResult.Data,
-            cmdResult.StatusWord,
-            Context, // Use the Context property which builds from environment
-            new Dictionary<string, object>
-            {
-                [ResponseMetadata.EXECUTION_TIME] =
-                    cmdResult.Metadata?.ExecutionTime.GetValueOrDefault(TimeSpan.Zero)
-                    ?? TimeSpan.Zero,
-                [ResponseMetadata.TRANSMITTED_BYTES] =
-                    cmdResult.Metadata?.TransmittedBytes.GetValueOrDefault([]) ?? [],
-                [ResponseMetadata.RECEIVED_BYTES] =
-                    cmdResult.Metadata?.ReceivedBytes.GetValueOrDefault([]) ?? [],
-                [ResponseMetadata.SECURE_CHANNEL_WRAPPED] =
-                    cmdResult.Metadata?.SecureChannelWrapped ?? false,
-            }
-        ));
+        return result.Map(cmdResult =>
+        {
+            _environment = cmdResult.UpdatedEnvironment;
+            var updatedContext = BuildContext(_environment);
+
+            return new CommandResponse(
+                cmdResult.Data,
+                cmdResult.StatusWord,
+                updatedContext,
+                new Dictionary<string, object>
+                {
+                    [ResponseMetadata.EXECUTION_TIME] =
+                        cmdResult.Metadata?.ExecutionTime.GetValueOrDefault(TimeSpan.Zero)
+                        ?? TimeSpan.Zero,
+                    [ResponseMetadata.TRANSMITTED_BYTES] =
+                        cmdResult.Metadata?.TransmittedBytes.GetValueOrDefault([]) ?? [],
+                    [ResponseMetadata.RECEIVED_BYTES] =
+                        cmdResult.Metadata?.ReceivedBytes.GetValueOrDefault([]) ?? [],
+                    [ResponseMetadata.SECURE_CHANNEL_WRAPPED] =
+                        cmdResult.Metadata?.SecureChannelWrapped ?? false,
+                }
+            );
+        });
+    }
+
+    private static IPipelineContext BuildContext(CommandEnvironment environment)
+    {
+        var context = ImmutablePipelineContext
+            .Empty.With("CardChannel", environment.Channel)
+            .With("ApduTransport", environment.Transport);
+
+        if (environment.SecureChannel.HasValue)
+        {
+            context = context.With("SecureChannelSession", environment.SecureChannel.Value);
+        }
+
+        return context;
     }
 
     /// <inheritdoc/>
@@ -237,62 +243,61 @@ public class SmartCardService : ISmartCardService
 
     private static Result<CommandAPDU, SmartCardError> ParseApduCommand(byte[] command)
     {
-        return command.Length switch
-        {
-            4
-                => Result.Success<CommandAPDU, SmartCardError>(
-                    new CommandAPDU(command[0], command[1], command[2], command[3])
-                ),
-            5
-                => Result.Success<CommandAPDU, SmartCardError>(
-                    new CommandAPDU(
-                        command[0],
-                        command[1],
-                        command[2],
-                        command[3],
-                        (uint)(command[4] == 0 ? 256 : command[4])
-                    )
-                ),
-            > 5 => ParseApduWithData(command),
-            _
-                => Result.Failure<CommandAPDU, SmartCardError>(
-                    SmartCardError.InvalidArgument("Invalid APDU command length")
-                ),
-        };
+        return ValidateApduFormat(command).Map(() => new CommandAPDU(command));
     }
 
-    private static Result<CommandAPDU, SmartCardError> ParseApduWithData(byte[] command)
+    private static UnitResult<SmartCardError> ValidateApduFormat(byte[] command)
     {
-        byte cla = command[0];
-        byte ins = command[1];
-        byte p1 = command[2];
-        byte p2 = command[3];
+        if (command.Length < 4)
+        {
+            return SmartCardError.InvalidArgument("Invalid APDU command length");
+        }
+
+        if (command.Length <= 5)
+        {
+            return UnitResult.Success<SmartCardError>();
+        }
+
         byte lc = command[4];
+        return lc == 0x00 ? ValidateExtendedApduFormat(command) : ValidateShortApduFormat(command);
+    }
 
-        if (command.Length == 5 + lc)
+    private static UnitResult<SmartCardError> ValidateShortApduFormat(byte[] command)
+    {
+        int lc = command[4];
+
+        if (command.Length == 5 + lc || command.Length == 5 + lc + 1)
         {
-            // Case 3: command with data, no response expected
-            byte[] data = new byte[lc];
-            Array.Copy(command, 5, data, 0, lc);
-            return Result.Success<CommandAPDU, SmartCardError>(
-                new CommandAPDU(cla, ins, p1, p2, (uint)data.Length, data)
-            );
-        }
-        if (command.Length == 5 + lc + 1)
-        {
-            // Case 4: command with data and expected response
-            byte[] data = new byte[lc];
-            Array.Copy(command, 5, data, 0, lc);
-            byte le = command[5 + lc];
-            int expectedLength = le == 0 ? 256 : le;
-            return Result.Success<CommandAPDU, SmartCardError>(
-                new CommandAPDU(cla, ins, p1, p2, (uint)data.Length, data, (uint)expectedLength)
-            );
+            return UnitResult.Success<SmartCardError>();
         }
 
-        return Result.Failure<CommandAPDU, SmartCardError>(
-            SmartCardError.InvalidArgument("Invalid APDU command format")
-        );
+        return SmartCardError.InvalidArgument("Invalid short APDU command format");
+    }
+
+    private static UnitResult<SmartCardError> ValidateExtendedApduFormat(byte[] command)
+    {
+        if (command.Length == 7)
+        {
+            return UnitResult.Success<SmartCardError>();
+        }
+
+        if (command.Length < 7)
+        {
+            return SmartCardError.InvalidArgument("Invalid extended APDU command format");
+        }
+
+        int lc = command[5] << 8 | command[6];
+        if (lc == 0)
+        {
+            return SmartCardError.InvalidArgument("Invalid extended APDU command data length");
+        }
+
+        if (command.Length == 7 + lc || command.Length == 7 + lc + 2)
+        {
+            return UnitResult.Success<SmartCardError>();
+        }
+
+        return SmartCardError.InvalidArgument("Invalid extended APDU command format");
     }
 
     /// <inheritdoc/>

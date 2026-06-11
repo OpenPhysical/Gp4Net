@@ -252,6 +252,11 @@ public class TestCliContext : ICliExecutionContext
         Maybe<string> keyset = default
     ) => Task.FromResult(Result.Success<ICliExecutionContext, SmartCardError>(this));
 
+    public Task<Result<ICliExecutionContext, SmartCardError>> RequireSecureChannel(
+        SecureChannelRequest request,
+        CancellationToken cancellationToken = default
+    ) => Task.FromResult(Result.Success<ICliExecutionContext, SmartCardError>(this));
+
     public Task<int> ExecuteAsync(Func<ICliExecutionContext, Task<int>> commandLogic) =>
         commandLogic(this);
 

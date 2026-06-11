@@ -12,6 +12,7 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.OpenPhysical;
+using Gp4Net.Tool.Extensions;
 using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Pipeline;
 using Gp4Net.Transport;
@@ -42,8 +43,7 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
             async connectedCtx =>
             {
                 var secureChannelResult = await connectedCtx.RequireSecureChannel(
-                    1,
-                    settings.GetKeyset()
+                    settings.ToSecureChannelRequest()
                 );
                 return await secureChannelResult.Match(
                     async secureCtx => await PutDataObjects(secureCtx, settings),

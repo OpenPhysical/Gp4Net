@@ -34,13 +34,6 @@ public abstract class BaseCommandSettings : SecureCommandSettings
     public Maybe<string> KeyDek { get; set; } = Maybe<string>.None;
 
     /// <summary>
-    /// Gets or sets the key version.
-    /// </summary>
-    [CommandOption("--key-version")]
-    [Description("Key version")]
-    public Maybe<byte> KeyVersion { get; set; } = Maybe<byte>.From(0x01);
-
-    /// <summary>
     /// Gets whether this command requires a secure channel.
     /// </summary>
     public abstract bool RequiresSecureChannel { get; }
