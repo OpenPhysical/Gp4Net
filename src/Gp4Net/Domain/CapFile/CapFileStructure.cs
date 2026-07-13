@@ -811,6 +811,7 @@ public sealed class ManifestInfo
         foreach (string line in lines)
         {
             string trimmedLine = line.Trim();
+            string lineWithoutNewline = line.TrimEnd('\r', '\n');
             if (
                 string.IsNullOrEmpty(trimmedLine)
                 || trimmedLine.StartsWith(
@@ -822,10 +823,13 @@ public sealed class ManifestInfo
                 continue;
             }
 
-            if (trimmedLine.StartsWith(' ') && currentKey != null)
+            if (lineWithoutNewline.StartsWith(' ') && currentKey != null)
             {
                 // Continuation line
-                currentValue = string.Concat(currentValue ?? string.Empty, trimmedLine.Trim());
+                currentValue = string.Concat(
+                    currentValue ?? string.Empty,
+                    lineWithoutNewline.Trim()
+                );
             }
             else
             {

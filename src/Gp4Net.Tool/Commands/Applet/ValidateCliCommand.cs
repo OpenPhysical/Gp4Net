@@ -6,6 +6,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.CapFile;
@@ -143,7 +144,9 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
                 DisplayCapFileInformation(capFile);
                 DisplayMemoryEstimate(capFileData);
                 DisplaySecurityAnalysis(capFile);
-                DisplayDetailedInformation(capFile, settings.Verbose);
+                DisplayExportedApis(capFile);
+                DisplayDetailedInformation(capFile, settings.Detailed);
+                DisplayCapInternals(capFile, _packageRegistry, settings.Detailed, settings.Verbose);
 
                 _ = capFile.Manifest.Match(
                     manifest =>
@@ -154,12 +157,8 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
                     () => true
                 );
 
+                DisplayArchiveMetadata(capFileData);
                 DisplayClassFileInfo(capFileData);
-
-                if (settings.Verbose)
-                {
-                    DisplayStaticFieldArrays(capFile);
-                }
             }
 
             return Result.Success<bool, SmartCardError>(true);
@@ -399,7 +398,11 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         List<string> sensitiveComponents = [];
         if (hasExport)
         {
-            sensitiveComponents.Add("Export component present (exposes APIs)");
+            string exportSummary = ExportComponentAnalysis
+                .Parse(capFile)
+                .Map(FormatExportSummary)
+                .GetValueOrDefault("Export component present (exposes APIs)");
+            sensitiveComponents.Add(exportSummary);
         }
 
         if (hasDebug)
@@ -442,22 +445,24 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
 
             if (cryptoImports.Count > 0)
             {
-                _ = securityTable.AddRow(
-                    "[cyan]Crypto Usage[/]",
-                    string.Join("\n", cryptoImports)
-                );
+                _ = securityTable.AddRow("[cyan]Crypto Usage[/]", string.Join("\n", cryptoImports));
             }
         });
 
-        // Static field analysis summary
+        // Static Field component summary
         var staticFieldComponent = capFile.Components.FirstOrDefault(c =>
             c.Tag == Constants.Constants.JavaCard.ComponentTags.STATIC_FIELD
         );
         if (staticFieldComponent is { Size: > 0 })
         {
+            string details = StaticFieldComponentAnalysis
+                .Parse(staticFieldComponent.Data)
+                .Map(FormatStaticFieldSummary)
+                .GetValueOrDefault($"{staticFieldComponent.Size} bytes");
+
             _ = securityTable.AddRow(
-                "[cyan]Static Data[/]",
-                $"[green]{staticFieldComponent.Size} bytes[/] [dim](use --verbose to inspect)[/]"
+                "[cyan]Static Field Component[/]",
+                $"[green]{details}[/] [dim](use --verbose for layout)[/]"
             );
         }
 
@@ -469,14 +474,834 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
             {
                 appletInfo.Add($"AID: [cyan]{Convert.ToHexString(applet.Aid)}[/]");
             }
-            _ = securityTable.AddRow(
-                "[cyan]Installable Applets[/]",
-                string.Join("\n", appletInfo)
-            );
+            _ = securityTable.AddRow("[cyan]Installable Applets[/]", string.Join("\n", appletInfo));
         }
 
         AnsiConsole.Write(securityTable);
     }
+
+    private static string FormatExportSummary(ExportComponentAnalysis analysis) =>
+        $"Exports {analysis.Classes.Count} classes/interfaces, {analysis.StaticFieldCount} static fields, "
+        + $"{analysis.StaticMethodCount} static methods/constructors";
+
+    private static string FormatToken(byte token) => $"0x{token:X2}";
+
+    private static string FormatOffset(ushort offset) => $"0x{offset:X4}";
+
+    private static string FormatClassKind(ExportedClassInfo exportedClass) =>
+        exportedClass.Descriptor.Match(
+            descriptor => (descriptor.AccessFlags & 0x40) != 0 ? "interface" : "class",
+            () => "[dim]unknown[/]"
+        );
+
+    private static string FormatClassAccess(ExportedClassInfo exportedClass) =>
+        exportedClass.Descriptor.Match(
+            descriptor =>
+            {
+                List<string> flags = [];
+                if ((descriptor.AccessFlags & 0x01) != 0)
+                {
+                    flags.Add("public");
+                }
+
+                if ((descriptor.AccessFlags & 0x10) != 0)
+                {
+                    flags.Add("final");
+                }
+
+                if ((descriptor.AccessFlags & 0x40) != 0)
+                {
+                    flags.Add("interface");
+                }
+
+                if ((descriptor.AccessFlags & 0x80) != 0)
+                {
+                    flags.Add("abstract");
+                }
+
+                string decodedFlags = flags.Count > 0 ? string.Join(" ", flags) : "none";
+                return $"{decodedFlags} [dim](0x{descriptor.AccessFlags:X2})[/]";
+            },
+            () => "[dim]unresolved[/]"
+        );
+
+    private static string FormatStaticFields(IReadOnlyList<ExportedStaticFieldInfo> fields)
+    {
+        if (fields.Count == 0)
+        {
+            return "[dim]none[/]";
+        }
+
+        return string.Join(
+            "\n",
+            fields.Select(field =>
+                $"token {FormatToken(field.Token)} -> static image {FormatOffset(field.StaticFieldImageOffset)}"
+            )
+        );
+    }
+
+    private static string FormatStaticMethods(IReadOnlyList<ExportedStaticMethodInfo> methods)
+    {
+        if (methods.Count == 0)
+        {
+            return "[dim]none[/]";
+        }
+
+        return string.Join("\n", methods.Select(FormatStaticMethod));
+    }
+
+    private static string FormatStaticMethod(ExportedStaticMethodInfo method)
+    {
+        string text =
+            $"token {FormatToken(method.Token)} -> method {FormatOffset(method.MethodOffset)}";
+
+        method.Descriptor.Execute(descriptor =>
+        {
+            text +=
+                $" ({FormatMethodAccessFlags(descriptor.AccessFlags)}; "
+                + $"bytecodes {descriptor.BytecodeCount}; type {FormatOffset(descriptor.TypeOffset)}";
+
+            if (descriptor.ExceptionHandlerCount > 0)
+            {
+                text +=
+                    $"; handlers {descriptor.ExceptionHandlerCount}"
+                    + $" @ {descriptor.ExceptionHandlerIndex}";
+            }
+
+            text += ")";
+        });
+
+        method.MethodHeader.Execute(header =>
+        {
+            text +=
+                $" (stack {header.MaxStack}, args {header.ArgumentCount}, locals {header.MaxLocals}";
+
+            if (header.IsExtended)
+            {
+                text += ", extended";
+            }
+
+            if (header.IsAbstract)
+            {
+                text += ", abstract";
+            }
+
+            text += ")";
+        });
+
+        return text;
+    }
+
+    private static string FormatMethodDescriptor(ExportedStaticMethodInfo method) =>
+        method.Descriptor.Match(FormatMethodDescriptor, () => "[dim]unresolved[/]");
+
+    private static string FormatMethodDescriptor(MethodDescriptorInfo descriptor)
+    {
+        string text =
+            $"{FormatMethodAccessFlags(descriptor.AccessFlags)}; "
+            + $"bytecodes {descriptor.BytecodeCount}; type {FormatOffset(descriptor.TypeOffset)}";
+
+        if (descriptor.ExceptionHandlerCount > 0)
+        {
+            text +=
+                $"; handlers {descriptor.ExceptionHandlerCount} @ {descriptor.ExceptionHandlerIndex}";
+        }
+
+        return text;
+    }
+
+    private static string FormatMethodHeader(ExportedStaticMethodInfo method) =>
+        FormatMethodHeader(method.MethodHeader);
+
+    private static string FormatMethodHeader(Maybe<MethodHeaderInfo> methodHeader) =>
+        methodHeader.Match(
+            header =>
+            {
+                string text =
+                    $"stack {header.MaxStack}, args {header.ArgumentCount}, locals {header.MaxLocals}";
+
+                if (header.IsExtended)
+                {
+                    text += ", extended";
+                }
+
+                if (header.IsAbstract)
+                {
+                    text += ", abstract";
+                }
+
+                return text;
+            },
+            () => "[dim]unresolved[/]"
+        );
+
+    private static string FormatMethodAccessFlags(byte accessFlags)
+    {
+        List<string> flags = [];
+        if ((accessFlags & 0x01) != 0)
+        {
+            flags.Add("public");
+        }
+
+        if ((accessFlags & 0x02) != 0)
+        {
+            flags.Add("private");
+        }
+
+        if ((accessFlags & 0x04) != 0)
+        {
+            flags.Add("protected");
+        }
+
+        if ((accessFlags & 0x08) != 0)
+        {
+            flags.Add("static");
+        }
+
+        if ((accessFlags & 0x10) != 0)
+        {
+            flags.Add("final");
+        }
+
+        if ((accessFlags & 0x40) != 0)
+        {
+            flags.Add("abstract");
+        }
+
+        if ((accessFlags & 0x80) != 0)
+        {
+            flags.Add("init");
+        }
+
+        string decodedFlags = flags.Count > 0 ? string.Join(" ", flags) : "none";
+        return $"{decodedFlags} 0x{accessFlags:X2}";
+    }
+
+    private static string FormatDescriptorClassAccess(byte accessFlags)
+    {
+        List<string> flags = [];
+        if ((accessFlags & 0x01) != 0)
+        {
+            flags.Add("public");
+        }
+
+        if ((accessFlags & 0x10) != 0)
+        {
+            flags.Add("final");
+        }
+
+        if ((accessFlags & 0x40) != 0)
+        {
+            flags.Add("interface");
+        }
+
+        if ((accessFlags & 0x80) != 0)
+        {
+            flags.Add("abstract");
+        }
+
+        string decodedFlags = flags.Count > 0 ? string.Join(" ", flags) : "none";
+        return $"{decodedFlags} 0x{accessFlags:X2}";
+    }
+
+    private static string FormatFieldAccessFlags(byte accessFlags)
+    {
+        List<string> flags = [];
+        if ((accessFlags & 0x01) != 0)
+        {
+            flags.Add("public");
+        }
+
+        if ((accessFlags & 0x02) != 0)
+        {
+            flags.Add("private");
+        }
+
+        if ((accessFlags & 0x04) != 0)
+        {
+            flags.Add("protected");
+        }
+
+        if ((accessFlags & 0x08) != 0)
+        {
+            flags.Add("static");
+        }
+
+        if ((accessFlags & 0x10) != 0)
+        {
+            flags.Add("final");
+        }
+
+        string decodedFlags = flags.Count > 0 ? string.Join(" ", flags) : "none";
+        return $"{decodedFlags} 0x{accessFlags:X2}";
+    }
+
+    private static void DisplayExportedApis(CapFileStructure capFile)
+    {
+        var exportComponent = capFile.Components.FirstOrDefault(c =>
+            c.Tag == Constants.Constants.JavaCard.ComponentTags.EXPORT
+        );
+        if (exportComponent == null)
+        {
+            return;
+        }
+
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[bold yellow]Exported APIs:[/]");
+
+        var analysisResult = ExportComponentAnalysis.Parse(capFile);
+        if (analysisResult.IsFailure)
+        {
+            AnsiConsole.MarkupLine($"[yellow]{Markup.Escape(analysisResult.Error.Message)}[/]");
+            return;
+        }
+
+        var analysis = analysisResult.Value;
+        var summaryTable = new Table()
+            .AddColumn("[cyan]Metric[/]")
+            .AddColumn("[cyan]Value[/]")
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Yellow);
+
+        _ = summaryTable.AddRow(
+            "[cyan]Component Body Size[/]",
+            $"{analysis.ComponentBodySize} bytes"
+        );
+        _ = summaryTable.AddRow(
+            "[cyan]Exported Classes/Interfaces[/]",
+            analysis.Classes.Count.ToString()
+        );
+        _ = summaryTable.AddRow("[cyan]Static Fields[/]", analysis.StaticFieldCount.ToString());
+        _ = summaryTable.AddRow(
+            "[cyan]Static Methods/Constructors[/]",
+            analysis.StaticMethodCount.ToString()
+        );
+        summaryTable.Caption = new TableTitle("[dim]Export Component Summary[/]");
+        AnsiConsole.Write(summaryTable);
+
+        var classTable = new Table()
+            .AddColumn("[cyan]Class Token[/]")
+            .AddColumn("[cyan]Offset[/]")
+            .AddColumn("[cyan]Kind[/]")
+            .AddColumn("[cyan]Access[/]")
+            .AddColumn("[cyan]Fields[/]")
+            .AddColumn("[cyan]Methods[/]")
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Yellow);
+
+        foreach (var exportedClass in analysis.Classes)
+        {
+            _ = classTable.AddRow(
+                FormatToken(exportedClass.Token),
+                FormatOffset(exportedClass.ClassOffset),
+                FormatClassKind(exportedClass),
+                FormatClassAccess(exportedClass),
+                exportedClass.StaticFields.Count.ToString(),
+                exportedClass.StaticMethods.Count.ToString()
+            );
+        }
+
+        classTable.Caption = new TableTitle("[dim]Exported Class Tokens[/]");
+        AnsiConsole.Write(classTable);
+
+        DisplayExportedStaticFields(
+            analysis.Classes.SelectMany(exportedClass =>
+                exportedClass.StaticFields.Select(field => (exportedClass, field))
+            )
+        );
+        DisplayExportedStaticMethods(
+            analysis.Classes.SelectMany(exportedClass =>
+                exportedClass.StaticMethods.Select(method => (exportedClass, method))
+            )
+        );
+
+        AnsiConsole.MarkupLine(
+            "[dim]CAP Export components expose tokens and offsets, not Java names.[/]"
+        );
+    }
+
+    private static void DisplayExportedStaticFields(
+        IEnumerable<(ExportedClassInfo exportedClass, ExportedStaticFieldInfo field)> exportedFields
+    )
+    {
+        var fields = exportedFields.ToList();
+        if (fields.Count == 0)
+        {
+            return;
+        }
+
+        var fieldTable = new Table()
+            .AddColumn("[cyan]Class Token[/]")
+            .AddColumn("[cyan]Field Token[/]")
+            .AddColumn("[cyan]Static Image Offset[/]")
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Yellow);
+
+        foreach (var (exportedClass, field) in fields)
+        {
+            _ = fieldTable.AddRow(
+                FormatToken(exportedClass.Token),
+                FormatToken(field.Token),
+                FormatOffset(field.StaticFieldImageOffset)
+            );
+        }
+
+        fieldTable.Caption = new TableTitle("[dim]Exported Static Field Tokens[/]");
+        AnsiConsole.Write(fieldTable);
+    }
+
+    private static void DisplayExportedStaticMethods(
+        IEnumerable<(
+            ExportedClassInfo exportedClass,
+            ExportedStaticMethodInfo method
+        )> exportedMethods
+    )
+    {
+        var methods = exportedMethods.ToList();
+        if (methods.Count == 0)
+        {
+            return;
+        }
+
+        var methodTable = new Table()
+            .AddColumn("[cyan]Class Token[/]")
+            .AddColumn("[cyan]Method Token[/]")
+            .AddColumn("[cyan]Method Offset[/]")
+            .AddColumn("[cyan]Descriptor[/]")
+            .AddColumn("[cyan]Header[/]")
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Yellow);
+
+        foreach (var (exportedClass, method) in methods)
+        {
+            _ = methodTable.AddRow(
+                FormatToken(exportedClass.Token),
+                FormatToken(method.Token),
+                FormatOffset(method.MethodOffset),
+                FormatMethodDescriptor(method),
+                FormatMethodHeader(method)
+            );
+        }
+
+        methodTable.Caption = new TableTitle(
+            "[dim]Exported Static Method and Constructor Tokens[/]"
+        );
+        AnsiConsole.Write(methodTable);
+    }
+
+    private static void DisplayCapInternals(
+        CapFileStructure capFile,
+        PackageRegistry packageRegistry,
+        bool detailed,
+        bool verbose
+    )
+    {
+        if (!detailed)
+        {
+            if (verbose)
+            {
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine(
+                    "[dim]Use --detailed with --verbose to show parsed CAP internals and raw parser diagnostics.[/]"
+                );
+            }
+
+            return;
+        }
+
+        var constantPoolResult = ConstantPoolComponentAnalysis.Parse(capFile, packageRegistry);
+        DisplayConstantPool(constantPoolResult, verbose);
+        DisplayReferenceLocations(capFile, constantPoolResult, verbose);
+        DisplayDescriptorComponent(capFile, verbose);
+        DisplayStaticFieldComponent(capFile, verbose);
+    }
+
+    private static void DisplayConstantPool(
+        Result<ConstantPoolComponentAnalysis, SmartCardError> analysisResult,
+        bool verbose
+    )
+    {
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[bold blue]Constant Pool:[/]");
+        if (analysisResult.IsFailure)
+        {
+            AnsiConsole.MarkupLine($"[yellow]{Markup.Escape(analysisResult.Error.Message)}[/]");
+            return;
+        }
+
+        var analysis = analysisResult.Value;
+        var table = new Table()
+            .AddColumn("[cyan]Index[/]")
+            .AddColumn("[cyan]Kind[/]")
+            .AddColumn("[cyan]Target[/]")
+            .AddColumn("[cyan]Package[/]")
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Blue);
+
+        if (verbose)
+        {
+            _ = table.AddColumn("[cyan]Offset[/]").AddColumn("[cyan]Raw[/]");
+        }
+
+        foreach (var entry in analysis.Entries)
+        {
+            var row = new List<string>
+            {
+                FormatOffset(entry.Index),
+                FormatConstantPoolKind(entry.Kind),
+                FormatConstantPoolTarget(entry),
+                FormatConstantPoolPackage(entry),
+            };
+
+            if (verbose)
+            {
+                row.Add(FormatOffset((ushort)entry.ComponentOffset));
+                row.Add(Convert.ToHexString(entry.RawBytes));
+            }
+
+            _ = table.AddRow([.. row]);
+        }
+
+        table.Caption = new TableTitle(
+            verbose
+                ? $"[dim]{analysis.ComponentBodySize} byte body with raw entry bytes[/]"
+                : $"[dim]{analysis.Entries.Count} entries[/]"
+        );
+        AnsiConsole.Write(table);
+    }
+
+    private static void DisplayReferenceLocations(
+        CapFileStructure capFile,
+        Result<ConstantPoolComponentAnalysis, SmartCardError> constantPoolResult,
+        bool verbose
+    )
+    {
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[bold blue]Reference Locations:[/]");
+        if (constantPoolResult.IsFailure)
+        {
+            AnsiConsole.MarkupLine(
+                "[yellow]Reference locations require a parsed Constant Pool.[/]"
+            );
+            return;
+        }
+
+        var analysisResult = ReferenceLocationComponentAnalysis.Parse(
+            capFile,
+            constantPoolResult.Value
+        );
+        if (analysisResult.IsFailure)
+        {
+            AnsiConsole.MarkupLine($"[yellow]{Markup.Escape(analysisResult.Error.Message)}[/]");
+            return;
+        }
+
+        var analysis = analysisResult.Value;
+        var table = new Table()
+            .AddColumn("[cyan]CP Index[/]")
+            .AddColumn("[cyan]Kind[/]")
+            .AddColumn("[cyan]Target[/]")
+            .AddColumn("[cyan]Refs[/]")
+            .AddColumn("[cyan]Widths[/]")
+            .AddColumn("[cyan]Method Offsets[/]")
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Blue);
+
+        foreach (var group in analysis.Groups)
+        {
+            string offsets = FormatMethodOffsets(group.MethodComponentOffsets, verbose);
+            _ = table.AddRow(
+                FormatOffset(group.ConstantPoolIndex),
+                group.ConstantPoolEntry.Match(
+                    entry => FormatConstantPoolKind(entry.Kind),
+                    () => "[dim]unresolved[/]"
+                ),
+                group.ConstantPoolEntry.Match(FormatConstantPoolTarget, () => "[dim]unresolved[/]"),
+                group.ReferenceCount.ToString(),
+                $"{group.OneByteReferenceCount} byte, {group.TwoByteReferenceCount} byte2",
+                offsets
+            );
+        }
+
+        table.Caption = new TableTitle(
+            $"[dim]{analysis.Sites.Count} sites; byte refs {analysis.ByteIndexCount}, byte2 refs {analysis.Byte2IndexCount}[/]"
+        );
+        AnsiConsole.Write(table);
+    }
+
+    private static void DisplayDescriptorComponent(CapFileStructure capFile, bool verbose)
+    {
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[bold blue]Descriptor Component:[/]");
+        var analysisResult = DescriptorComponentAnalysis.Parse(capFile);
+        if (analysisResult.IsFailure)
+        {
+            AnsiConsole.MarkupLine($"[yellow]{Markup.Escape(analysisResult.Error.Message)}[/]");
+            return;
+        }
+
+        var analysis = analysisResult.Value;
+        var classTable = new Table()
+            .AddColumn("[cyan]Token[/]")
+            .AddColumn("[cyan]This Class[/]")
+            .AddColumn("[cyan]Access[/]")
+            .AddColumn("[cyan]Interfaces[/]")
+            .AddColumn("[cyan]Fields[/]")
+            .AddColumn("[cyan]Methods[/]")
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Blue);
+
+        if (verbose)
+        {
+            _ = classTable.AddColumn("[cyan]Offset[/]");
+        }
+
+        foreach (var classInfo in analysis.Classes)
+        {
+            var row = new List<string>
+            {
+                FormatToken(classInfo.Token),
+                FormatOffset(classInfo.ThisClassRef),
+                FormatDescriptorClassAccess(classInfo.AccessFlags),
+                classInfo.Interfaces.Count == 0
+                    ? "[dim]none[/]"
+                    : string.Join(", ", classInfo.Interfaces.Select(FormatOffset)),
+                classInfo.Fields.Count.ToString(),
+                classInfo.Methods.Count.ToString(),
+            };
+
+            if (verbose)
+            {
+                row.Add(FormatOffset((ushort)classInfo.ComponentOffset));
+            }
+
+            _ = classTable.AddRow([.. row]);
+        }
+
+        classTable.Caption = new TableTitle(
+            $"[dim]{analysis.Classes.Count} classes/interfaces, {analysis.TypeDescriptors.Count} type entries[/]"
+        );
+        AnsiConsole.Write(classTable);
+
+        if (verbose && analysis.TypeDescriptorTail.Length > 0)
+        {
+            AnsiConsole.MarkupLine(
+                $"[dim]Descriptor type tail: {analysis.TypeDescriptorTail.Length} bytes[/]"
+            );
+        }
+
+        DisplayDescriptorFields(analysis, verbose);
+        DisplayDescriptorMethods(analysis, verbose);
+    }
+
+    private static void DisplayDescriptorFields(DescriptorComponentAnalysis analysis, bool verbose)
+    {
+        var fields = analysis
+            .Classes.SelectMany(classInfo => classInfo.Fields.Select(field => (classInfo, field)))
+            .ToList();
+        if (fields.Count == 0)
+        {
+            return;
+        }
+
+        var table = new Table()
+            .AddColumn("[cyan]Class[/]")
+            .AddColumn("[cyan]Field[/]")
+            .AddColumn("[cyan]Access[/]")
+            .AddColumn("[cyan]Reference[/]")
+            .AddColumn("[cyan]Type[/]")
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Blue);
+
+        if (verbose)
+        {
+            _ = table.AddColumn("[cyan]Offset[/]");
+        }
+
+        foreach (var (classInfo, field) in fields)
+        {
+            var row = new List<string>
+            {
+                FormatToken(classInfo.Token),
+                FormatToken(field.Token),
+                FormatFieldAccessFlags(field.AccessFlags),
+                FormatFieldReference(field.Reference),
+                FormatDescriptorType(field.TypeReference, field.TypeRawValue),
+            };
+
+            if (verbose)
+            {
+                row.Add(FormatOffset((ushort)field.ComponentOffset));
+            }
+
+            _ = table.AddRow([.. row]);
+        }
+
+        table.Caption = new TableTitle("[dim]Descriptor Field Tokens[/]");
+        AnsiConsole.Write(table);
+    }
+
+    private static void DisplayDescriptorMethods(DescriptorComponentAnalysis analysis, bool verbose)
+    {
+        var methods = analysis
+            .Classes.SelectMany(classInfo =>
+                classInfo.Methods.Select(method => (classInfo, method))
+            )
+            .ToList();
+        if (methods.Count == 0)
+        {
+            return;
+        }
+
+        var table = new Table()
+            .AddColumn("[cyan]Class[/]")
+            .AddColumn("[cyan]Method[/]")
+            .AddColumn("[cyan]Method Offset[/]")
+            .AddColumn("[cyan]Access[/]")
+            .AddColumn("[cyan]Descriptor[/]")
+            .AddColumn("[cyan]Header[/]")
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Blue);
+
+        if (verbose)
+        {
+            _ = table.AddColumn("[cyan]Desc Offset[/]");
+        }
+
+        foreach (var (classInfo, method) in methods)
+        {
+            var row = new List<string>
+            {
+                FormatToken(classInfo.Token),
+                FormatToken(method.Token),
+                FormatOffset(method.MethodOffset),
+                FormatMethodAccessFlags(method.AccessFlags),
+                FormatMethodDescriptor(method),
+                FormatMethodHeader(method.MethodHeader),
+            };
+
+            if (verbose)
+            {
+                row.Add(FormatOffset((ushort)method.ComponentOffset));
+            }
+
+            _ = table.AddRow([.. row]);
+        }
+
+        table.Caption = new TableTitle("[dim]Descriptor Method Tokens[/]");
+        AnsiConsole.Write(table);
+    }
+
+    private static string FormatConstantPoolKind(ConstantPoolEntryKind kind) =>
+        kind switch
+        {
+            ConstantPoolEntryKind.Class => "class",
+            ConstantPoolEntryKind.InstanceField => "instance field",
+            ConstantPoolEntryKind.VirtualMethod => "virtual method",
+            ConstantPoolEntryKind.SuperMethod => "super method",
+            ConstantPoolEntryKind.StaticField => "static field",
+            ConstantPoolEntryKind.StaticMethod => "static method",
+            _ => kind.ToString(),
+        };
+
+    private static string FormatConstantPoolTarget(ConstantPoolEntryInfo entry)
+    {
+        var target = entry.Target;
+        if (target.IsExternal)
+        {
+            string text =
+                $"pkg {target.PackageToken.Match(FormatToken, () => "??")}, "
+                + $"class {target.ClassToken.Match(FormatToken, () => "??")}";
+            target.MemberToken.Execute(token => text += $", member {FormatOffset(token)}");
+            return text;
+        }
+
+        string internalText = target.InternalOffset.Match(
+            offset => $"internal {FormatOffset(offset)}",
+            () => "internal ??"
+        );
+        target.MemberToken.Execute(token => internalText += $", member {FormatOffset(token)}");
+        return internalText;
+    }
+
+    private static string FormatConstantPoolPackage(ConstantPoolEntryInfo entry)
+    {
+        if (!entry.Target.IsExternal)
+        {
+            return "[dim]internal[/]";
+        }
+
+        return entry.Target.ImportedPackage.Match(
+            package =>
+            {
+                string name = package.ResolvedName.GetValueOrDefault("Unknown");
+                return $"{package.AidHex} v{package.Version}\n[dim]{Markup.Escape(name)}[/]";
+            },
+            () => "[dim]unresolved import token[/]"
+        );
+    }
+
+    private static string FormatMethodOffsets(IReadOnlyList<int> offsets, bool verbose)
+    {
+        var shown = verbose ? offsets : offsets.Take(8).ToList();
+        string text = string.Join(", ", shown.Select(offset => $"0x{offset:X4}"));
+        if (!verbose && offsets.Count > 8)
+        {
+            text += $"\n[dim]... +{offsets.Count - 8} more[/]";
+        }
+
+        return text;
+    }
+
+    private static string FormatFieldReference(DescriptorFieldReference reference)
+    {
+        if (reference.IsExternal)
+        {
+            return $"pkg {reference.PackageToken.Match(FormatToken, () => "??")}, "
+                + $"class {reference.ClassToken.Match(FormatToken, () => "??")}, "
+                + $"member {reference.MemberToken.Match(FormatToken, () => "??")}";
+        }
+
+        if (reference.IsStatic)
+        {
+            return reference.StaticFieldImageOffset.Match(
+                offset => $"static image {FormatOffset(offset)}",
+                () => "static image ??"
+            );
+        }
+
+        return reference.InternalClassRef.Match(
+            classRef =>
+                $"class {FormatOffset(classRef)}, member {reference.MemberToken.Match(FormatToken, () => "??")}",
+            () => "class ??"
+        );
+    }
+
+    private static string FormatDescriptorType(DescriptorTypeReference type, ushort rawValue)
+    {
+        if (type.IsPrimitive)
+        {
+            return type.PrimitiveType.Match(
+                primitive => $"{GetDescriptorPrimitiveName(primitive)} 0x{rawValue:X4}",
+                () => $"primitive 0x{rawValue:X4}"
+            );
+        }
+
+        return type.TypeDescriptorOffset.Match(
+            offset => $"type descriptor {FormatOffset(offset)}",
+            () => $"reference 0x{rawValue:X4}"
+        );
+    }
+
+    private static string GetDescriptorPrimitiveName(byte primitive) =>
+        primitive switch
+        {
+            0x02 => "boolean",
+            0x03 => "byte",
+            0x04 => "short",
+            0x05 => "int",
+            _ => $"primitive(0x{primitive:X2})",
+        };
 
     private static void DisplayMemoryEstimate(byte[] capFileData)
     {
@@ -495,8 +1320,14 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
 
             memoryTable.Caption = new TableTitle("[dim]Estimated Load Footprint[/]");
 
-            _ = memoryTable.AddRow("[cyan]Code Memory[/]", $"[green]{memoryReq.CodeMemory} bytes[/]");
-            _ = memoryTable.AddRow("[cyan]Data Memory[/]", $"[green]{memoryReq.DataMemory} bytes[/]");
+            _ = memoryTable.AddRow(
+                "[cyan]Code Memory[/]",
+                $"[green]{memoryReq.CodeMemory} bytes[/]"
+            );
+            _ = memoryTable.AddRow(
+                "[cyan]Data Memory[/]",
+                $"[green]{memoryReq.DataMemory} bytes[/]"
+            );
             _ = memoryTable.AddRow("[cyan]Total Size[/]", $"[green]{memoryReq.TotalSize} bytes[/]");
 
             AnsiConsole.Write(memoryTable);
@@ -532,7 +1363,10 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
             );
 
             manifest.CapFileVersion.Execute(value =>
-                manifestTable.AddRow("[cyan]CAP File Version[/]", $"[yellow]{Markup.Escape(value)}[/]")
+                manifestTable.AddRow(
+                    "[cyan]CAP File Version[/]",
+                    $"[yellow]{Markup.Escape(value)}[/]"
+                )
             );
 
             manifest.ConverterVersion.Execute(value =>
@@ -590,6 +1424,10 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
                         resolvedName = $"[green]{packageInfo?.DisplayName ?? "Unknown"}[/]";
                         sdkVersion = $"[yellow]{packageInfo?.SdkVersion ?? "Unknown"}[/]";
                     }
+                    else
+                    {
+                        resolvedName = FormatUnknownAidHint(formattedAid);
+                    }
 
                     _ = importsTable.AddRow(
                         $"[cyan]{formattedAid}[/]",
@@ -608,6 +1446,178 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
                 $"[yellow]Could not display manifest information: {Markup.Escape(ex.Message)}[/]"
             );
         }
+    }
+
+    private static void DisplayArchiveMetadata(byte[] capFileData)
+    {
+        try
+        {
+            using var stream = new MemoryStream(capFileData);
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+
+            var manifestMetadata = ReadManifestMetadata(archive);
+            var javaCardXmlMetadata = ReadJavaCardXmlMetadata(archive);
+
+            if (manifestMetadata.Count == 0 && javaCardXmlMetadata.Count == 0)
+            {
+                return;
+            }
+
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[bold magenta]Archive Metadata:[/]");
+
+            var table = new Table()
+                .AddColumn("[cyan]Source[/]")
+                .AddColumn("[cyan]Property[/]")
+                .AddColumn("[cyan]Value[/]")
+                .Border(TableBorder.Rounded)
+                .BorderColor(Color.Purple);
+
+            table.Caption = new TableTitle("[dim]Non-CAP Archive Files[/]");
+
+            foreach (var metadata in manifestMetadata)
+            {
+                _ = table.AddRow(
+                    "[cyan]MANIFEST.MF[/]",
+                    $"[cyan]{Markup.Escape(metadata.Key)}[/]",
+                    Markup.Escape(metadata.Value)
+                );
+            }
+
+            foreach (var metadata in javaCardXmlMetadata)
+            {
+                _ = table.AddRow(
+                    "[cyan]javacard.xml[/]",
+                    $"[cyan]{Markup.Escape(metadata.Key)}[/]",
+                    Markup.Escape(metadata.Value)
+                );
+            }
+
+            AnsiConsole.Write(table);
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine(
+                $"[yellow]Could not display archive metadata: {Markup.Escape(ex.Message)}[/]"
+            );
+        }
+    }
+
+    private static IReadOnlyDictionary<string, string> ReadManifestMetadata(ZipArchive archive)
+    {
+        var manifestEntry = archive.GetEntry("META-INF/MANIFEST.MF");
+        if (manifestEntry == null)
+        {
+            return new Dictionary<string, string>();
+        }
+
+        using var manifestStream = manifestEntry.Open();
+        using var reader = new StreamReader(manifestStream);
+        var properties = ParseManifestProperties(reader.ReadToEnd());
+
+        string[] usefulKeys =
+        [
+            "Created-By",
+            "Runtime-Descriptor-Version",
+            "Application-Type",
+            "Classic-Package-AID",
+            "Sealed",
+            "Name",
+        ];
+
+        return usefulKeys
+            .Where(properties.ContainsKey)
+            .ToDictionary(key => key, key => properties[key]);
+    }
+
+    private static IReadOnlyDictionary<string, string> ReadJavaCardXmlMetadata(ZipArchive archive)
+    {
+        var xmlEntry = archive.GetEntry("META-INF/javacard.xml");
+        if (xmlEntry == null)
+        {
+            return new Dictionary<string, string>();
+        }
+
+        using var xmlStream = xmlEntry.Open();
+        var document = XDocument.Load(xmlStream);
+        var root = document.Root;
+        if (root == null)
+        {
+            return new Dictionary<string, string>();
+        }
+
+        var metadata = new Dictionary<string, string>
+        {
+            ["Root Element"] = root.Name.LocalName,
+            ["Root Namespace"] = root.Name.NamespaceName,
+        };
+
+        foreach (var attribute in root.Attributes())
+        {
+            if (attribute.IsNamespaceDeclaration)
+            {
+                continue;
+            }
+
+            string key =
+                attribute.Name.LocalName == "schemaLocation"
+                    ? "Schema Location"
+                    : attribute.Name.LocalName;
+            metadata[key] = attribute.Value;
+        }
+
+        if (!root.Elements().Any())
+        {
+            metadata["Content"] = "No applet or extension declarations";
+        }
+
+        return metadata;
+    }
+
+    private static Dictionary<string, string> ParseManifestProperties(string manifestContent)
+    {
+        string[] lines = manifestContent.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var properties = new Dictionary<string, string>();
+        string? currentKey = null;
+        string? currentValue = null;
+
+        foreach (string line in lines)
+        {
+            string trimmedEnd = line.TrimEnd('\r', '\n');
+            if (string.IsNullOrWhiteSpace(trimmedEnd))
+            {
+                continue;
+            }
+
+            if (trimmedEnd.StartsWith(' ') && currentKey != null)
+            {
+                currentValue = string.Concat(currentValue ?? string.Empty, trimmedEnd.Trim());
+                continue;
+            }
+
+            if (currentKey != null && currentValue != null)
+            {
+                properties[currentKey] = currentValue;
+            }
+
+            int colonIndex = trimmedEnd.IndexOf(':');
+            if (colonIndex <= 0)
+            {
+                currentKey = null;
+                currentValue = null;
+                continue;
+            }
+
+            currentKey = trimmedEnd.Substring(0, colonIndex).Trim();
+            currentValue = trimmedEnd.Substring(colonIndex + 1).Trim();
+        }
+
+        if (currentKey != null && currentValue != null)
+        {
+            properties[currentKey] = currentValue;
+        }
+
+        return properties;
     }
 
     private static string GetComponentNotes(byte tag, int size)
@@ -654,6 +1664,79 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
     {
         return aid.Replace("0x", "").Replace(":", "").ToUpper();
     }
+
+    private static string FormatUnknownAidHint(string aidHex)
+    {
+        List<string> hints = [];
+        if (aidHex.Length >= 10)
+        {
+            string rid = aidHex[..10];
+            hints.Add(
+                KnownAidRidNames.TryGetValue(rid, out string? name)
+                    ? $"RID {rid} ({name})"
+                    : $"RID {rid}"
+            );
+        }
+
+        if (aidHex.Length > 10)
+        {
+            string suffix = aidHex[10..];
+            var ascii = TryDecodePrintableAsciiHex(suffix);
+            if (!string.IsNullOrWhiteSpace(ascii))
+            {
+                hints.Add($"suffix \"{Markup.Escape(ascii)}\"");
+            }
+            else
+            {
+                hints.Add($"PIX {suffix}");
+            }
+        }
+
+        return hints.Count > 0
+            ? $"[dim]Unknown[/]\n[dim]{string.Join(", ", hints)}[/]"
+            : "[dim]Unknown[/]";
+    }
+
+    private static string TryDecodePrintableAsciiHex(string hex)
+    {
+        if (hex.Length % 2 != 0)
+        {
+            return string.Empty;
+        }
+
+        var chars = new List<char>();
+        for (int i = 0; i < hex.Length; i += 2)
+        {
+            if (
+                !byte.TryParse(
+                    hex.Substring(i, 2),
+                    System.Globalization.NumberStyles.HexNumber,
+                    null,
+                    out byte value
+                )
+            )
+            {
+                return string.Empty;
+            }
+
+            if (value is < 0x20 or > 0x7E)
+            {
+                return string.Empty;
+            }
+
+            chars.Add((char)value);
+        }
+
+        return new string([.. chars]);
+    }
+
+    private static readonly IReadOnlyDictionary<string, string> KnownAidRidNames = new Dictionary<
+        string,
+        string
+    >
+    {
+        ["D276000085"] = "NXP Semiconductors / NFC Forum",
+    };
 
     private static void DisplayClassFileInfo(byte[] capFileData)
     {
@@ -770,11 +1853,15 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         }
     }
 
-    private static void DisplayStaticFieldArrays(CapFileStructure capFile)
+    private static string FormatStaticFieldSummary(StaticFieldComponentAnalysis analysis) =>
+        $"{analysis.ComponentBodySize} bytes; image {analysis.ImageSize} bytes, "
+        + $"refs {analysis.ReferenceCount}, arrays {analysis.ArrayInitCount}, "
+        + $"defaults {analysis.DefaultValueCount}, non-defaults {analysis.NonDefaultValueCount}";
+
+    private static void DisplayStaticFieldComponent(CapFileStructure capFile, bool verbose)
     {
         try
         {
-            // Find the static field component
             var staticFieldComponent = capFile.Components.FirstOrDefault(c =>
                 c.Tag == Constants.Constants.JavaCard.ComponentTags.STATIC_FIELD
             );
@@ -785,54 +1872,67 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
             }
 
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("[bold]Static Field Arrays:[/]");
+            AnsiConsole.MarkupLine("[bold]Static Field Component:[/]");
 
             byte[] data = staticFieldComponent.Data;
-            if (data.Length < 8)
+            var analysisResult = StaticFieldComponentAnalysis.Parse(data);
+            if (analysisResult.IsFailure)
             {
-                AnsiConsole.WriteLine("Static field component too short");
+                AnsiConsole.MarkupLine($"[yellow]{Markup.Escape(analysisResult.Error.Message)}[/]");
                 return;
             }
 
-            int offset = 0;
-            // Skip image_size (2 bytes), reference_count (2 bytes)
-            offset += 4;
+            var analysis = analysisResult.Value;
+            var table = new Table()
+                .AddColumn("[cyan]Field[/]")
+                .AddColumn("[cyan]Value[/]")
+                .Border(TableBorder.Rounded)
+                .BorderColor(Color.Blue);
 
-            // Read array_init_count
-            ushort arrayInitCount = (ushort)(data[offset] << 8 | data[offset + 1]);
-            offset += 2;
+            _ = table.AddRow("[cyan]Component Body Size[/]", $"{analysis.ComponentBodySize} bytes");
+            _ = table.AddRow("[cyan]Image Size[/]", $"{analysis.ImageSize} bytes");
+            _ = table.AddRow("[cyan]Reference Count[/]", analysis.ReferenceCount.ToString());
+            _ = table.AddRow("[cyan]Initialized Arrays[/]", analysis.ArrayInitCount.ToString());
+            _ = table.AddRow("[cyan]Default Values[/]", analysis.DefaultValueCount.ToString());
+            _ = table.AddRow(
+                "[cyan]Non-Default Values[/]",
+                analysis.NonDefaultValueCount.ToString()
+            );
 
-            AnsiConsole.WriteLine($"Found {arrayInitCount} initialized arrays:");
-            AnsiConsole.WriteLine();
-
-            // Parse each array_init_info structure
-            for (int i = 0; i < arrayInitCount; i++)
+            if (verbose && analysis.TrailingByteCount > 0)
             {
-                if (offset + 2 >= data.Length)
-                {
-                    break;
-                }
+                _ = table.AddRow("[cyan]Trailing Bytes[/]", analysis.TrailingByteCount.ToString());
+            }
 
-                byte type = data[offset++];
-                ushort count = (ushort)(data[offset] << 8 | data[offset + 1]);
-                offset += 2;
+            AnsiConsole.Write(table);
 
-                if (offset + count > data.Length)
-                {
-                    break;
-                }
+            if (analysis.InitializedArrays.Count == 0 && analysis.NonDefaultValues.Length == 0)
+            {
+                AnsiConsole.MarkupLine(
+                    "[dim]No initialized array data or non-default static values are present.[/]"
+                );
+                return;
+            }
 
-                byte[] arrayData = new byte[count];
-                Array.Copy(data, offset, arrayData, 0, count);
-                offset += count;
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[bold]Initialized Static Arrays:[/]");
 
-                DisplayArrayData(i, type, arrayData);
+            for (int i = 0; i < analysis.InitializedArrays.Count; i++)
+            {
+                var array = analysis.InitializedArrays[i];
+                DisplayArrayData(i, array.Type, array.Values);
+            }
+
+            if (analysis.NonDefaultValues.Length > 0)
+            {
+                AnsiConsole.MarkupLine("[bold]Non-Default Static Values:[/]");
+                DisplayHexDump(analysis.NonDefaultValues);
             }
         }
         catch (Exception ex)
         {
             AnsiConsole.MarkupLine(
-                $"[red]Error parsing static field arrays: {Markup.Escape(ex.Message)}[/]"
+                $"[red]Error parsing static field component: {Markup.Escape(ex.Message)}[/]"
             );
         }
     }
@@ -842,7 +1942,12 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         string typeName = GetArrayTypeName(type);
         AnsiConsole.WriteLine($"Array #{index}: {typeName}[{data.Length}]");
 
-        // Display as hexdump
+        DisplayHexDump(data);
+        AnsiConsole.WriteLine();
+    }
+
+    private static void DisplayHexDump(byte[] data)
+    {
         for (int i = 0; i < data.Length; i += 16)
         {
             byte[] lineBytes = [.. data.Skip(i).Take(16)];
@@ -852,7 +1957,6 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
             );
             AnsiConsole.WriteLine($"  {i:X4}:  {hex, -47} |{ascii}|");
         }
-        AnsiConsole.WriteLine();
     }
 
     private static string GetArrayTypeName(byte type)

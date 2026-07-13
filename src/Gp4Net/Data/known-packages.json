@@ -1,6 +1,6 @@
 {
   "generatedAt": "2025-06-27T20:44:59.205316Z",
-  "packageCount": 28,
+  "packageCount": 29,
   "description": "Unified Java Card package database containing Oracle SDK and GlobalPlatform packages",
   "packages": {
     "A0000000620101-v1.6": {
@@ -306,6 +306,17 @@
       "sourceFile": "../../Downloads/GlobalPlatform Card API - org.globalplatform - 1.8/exports23/org/globalplatform/javacard/globalplatform.exp",
       "sdkVersion": "globalplatform-v1.8.0-jc23",
       "lastUpdated": "2025-06-27T20:41:46.339745Z"
+    },
+    "D276000085304A434F5058-v1.24": {
+      "name": "NXP JCOPX private Ed25519/X25519 API",
+      "aid": "D276000085304A434F5058",
+      "version": "1.24",
+      "majorVersion": 1,
+      "minorVersion": 24,
+      "sourceFile": "https://github.com/suut/Curve25519-JavaCard",
+      "sdkVersion": "nxp-jcop-4.5-j3r452",
+      "lastUpdated": "2026-07-04T00:00:00Z",
+      "originalName": "0JCOPX"
     }
   }
 }
