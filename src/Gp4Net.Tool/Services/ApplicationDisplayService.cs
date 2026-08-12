@@ -73,34 +73,15 @@ public class ApplicationDisplayService
     /// </summary>
     /// <param name="state">The lifecycle state.</param>
     /// <returns>The colored display string.</returns>
-    public static string GetStateDisplay(LifecycleState state)
+    public static string GetStateDisplay(string state)
     {
         return state switch
         {
-            LifecycleState.Selectable => "[green]Selectable[/]",
-            LifecycleState.Personalized => "[blue]Personalized[/]",
-            LifecycleState.Locked => "[red]Locked[/]",
-            LifecycleState.Installed => "[cyan]Installed[/]",
-            LifecycleState.Terminated => "[red]Terminated[/]",
-            _ => state.ToString(),
-        };
-    }
-
-    /// <summary>
-    /// Gets the color for a lifecycle state.
-    /// </summary>
-    /// <param name="state">The lifecycle state.</param>
-    /// <returns>The color name.</returns>
-    public static string GetStateColor(LifecycleState state)
-    {
-        return state switch
-        {
-            LifecycleState.Selectable => "green",
-            LifecycleState.Personalized => "cyan",
-            LifecycleState.Locked => "red",
-            LifecycleState.Installed => "cyan",
-            LifecycleState.Terminated => "red",
-            _ => "yellow",
+            "Selectable" => "[green]Selectable[/]",
+            "Personalized" or "Secured" => $"[blue]{state}[/]",
+            "Locked" or "CardLocked" or "Terminated" => $"[red]{state}[/]",
+            "Installed" or "Initialized" => $"[cyan]{state}[/]",
+            _ => state,
         };
     }
 
@@ -177,7 +158,7 @@ public class ApplicationDisplayService
         [
             GetTypeDisplay(app.Type),
             $"[cyan]{Convert.ToHexString(app.Aid)}[/]",
-            GetStateDisplay(app.LifecycleState),
+            GetStateDisplay(app.LifecycleStateString),
             GetPrivilegesDisplay(app.Privileges),
         ];
 
@@ -225,7 +206,7 @@ public class ApplicationDisplayService
             {
                 type = a.Type.ToString(),
                 aid = Convert.ToHexString(a.Aid),
-                state = a.LifecycleState.ToString(),
+                state = a.LifecycleStateString,
                 privileges = a.Privileges.Select(p => p.ToString()).ToArray(),
                 version = a.Version,
                 associatedSD = a.AssociatedSecurityDomain.HasValue
@@ -251,7 +232,7 @@ public class ApplicationDisplayService
             Console.WriteLine(
                 $"{app.Type},"
                     + $"{Convert.ToHexString(app.Aid)},"
-                    + $"{app.LifecycleState},"
+                    + $"{app.LifecycleStateString},"
                     + $"\"{string.Join(";", app.Privileges.Select(p => p.ToString()))}\","
                     + $"{app.Version.GetValueOrDefault("")},"
                     + $"{(app.AssociatedSecurityDomain.HasValue ? Convert.ToHexString(app.AssociatedSecurityDomain.Value) : "")}"
@@ -275,7 +256,7 @@ public class ApplicationDisplayService
             {
                 var panel = new Panel(
                     $"[dim]AID:[/] {Convert.ToHexString(app.Aid)}\n"
-                        + $"[dim]State:[/] {app.LifecycleState}\n"
+                        + $"[dim]State:[/] {app.LifecycleStateString}\n"
                         + $"[dim]Privileges:[/] {GetPrivilegesDisplaySimple(app.Privileges)}"
                 )
                 {

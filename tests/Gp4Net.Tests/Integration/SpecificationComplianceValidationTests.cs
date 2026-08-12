@@ -211,18 +211,15 @@ public class SpecificationComplianceValidationTests
             .BeTrue("35-byte response should be valid (real-world trace data)");
     }
 
+    /// <summary>GP Card Specification v2.3.1, Table 11-36.</summary>
     [Test]
     public void GetStatusResponse_UsesE3ContainersOnly()
     {
-        // Arrange: Test E3 container compliance (already fixed, but validate it works)
-        // Valid TLV: E3 (template) containing 4F (AID), 9F70 (state), C5 (privileges)
         byte[] aid = Convert.FromHexString("A0000000031010");
         byte[] tlvData = BuildE3ContainerResponse(aid, 0x07, [0x80, 0x00, 0x00]);
 
-        // Act: Parse the response
         Result<GetStatusResponse, SmartCardError> result = GetStatusResponse.Parse(tlvData);
 
-        // Assert: Should parse successfully with E3 containers
         _ = result
             .IsSuccess.Should()
             .BeTrue("E3 container format should parse successfully per GP Table 11-36");
@@ -230,12 +227,7 @@ public class SpecificationComplianceValidationTests
 
         var app = result.Value.Applications[0];
         _ = app.Aid.Should().BeEquivalentTo(aid, "AID should be parsed correctly");
-        _ = app
-            .State.Should()
-            .Be(
-                ApplicationStatusEntry.LifecycleState.Selectable,
-                "State should be parsed correctly"
-            );
+        _ = app.RawLifecycleState.Should().Be(0x07, "state should be preserved exactly");
         _ = app
             .Privileges.Should()
             .BeEquivalentTo(

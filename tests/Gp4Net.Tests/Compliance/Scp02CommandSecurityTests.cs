@@ -81,6 +81,28 @@ public class Scp02CommandSecurityTests
         _ = result.Value.securedCommand.Udc[^8..].Should().Equal(expectedMac);
     }
 
+    [Test]
+    public void Should_Reject_Extended_Lc_Instead_Of_Sending_Cleartext()
+    {
+        // GP Card Specification v2.3.1 §§11.1.5 and E.4.6 require short Lc and C-ENC.
+        byte[] command = [0x84, 0xE2, 0x00, 0x00, 0x00, 0x00, 0x09, .. new byte[9]];
+
+        var result = CryptoService.ScpOperations.Scp02.ApplyCommandEncryption(command, SEnc);
+
+        _ = result.IsFailure.Should().BeTrue();
+    }
+
+    [Test]
+    public void Should_Reject_Ciphertext_That_Cannot_Fit_Short_Lc()
+    {
+        // GP Card Specification v2.3.1 §§11.1.5 and E.4.6 cap encrypted data plus C-MAC at 255.
+        byte[] command = [0x84, 0xE2, 0x00, 0x00, 0xF8, .. new byte[248]];
+
+        var result = CryptoService.ScpOperations.Scp02.ApplyCommandEncryption(command, SEnc);
+
+        _ = result.IsFailure.Should().BeTrue();
+    }
+
     private static SecureChannelState CreateState(
         ScpImplementation implementation,
         byte[] chaining

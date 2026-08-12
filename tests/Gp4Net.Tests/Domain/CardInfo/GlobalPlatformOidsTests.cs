@@ -20,7 +20,7 @@ public class GlobalPlatformOidsTests
         _ = GlobalPlatformOids
             .GetDescription("1.2.840.114283.4.3.112")
             .Should()
-            .Be("SCP03 with S-ENC and S-MAC");
+            .Be("SCP03 implementation 0x70");
         _ = GlobalPlatformOids
             .GetDescription("1.3.6.1.4.1.42.2.110.1.3")
             .Should()
@@ -90,7 +90,7 @@ public class GlobalPlatformOidsTests
         _ = GlobalPlatformOids
             .FormatOid("1.2.840.114283.4.3.112")
             .Should()
-            .Be("1.2.840.114283.4.3.112 (SCP03 with S-ENC and S-MAC)");
+            .Be("1.2.840.114283.4.3.112 (SCP03 implementation 0x70)");
     }
 
     [Test]

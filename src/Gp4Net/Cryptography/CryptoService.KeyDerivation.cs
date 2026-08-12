@@ -53,16 +53,12 @@ public static partial class CryptoService
 
         /// <summary>
         /// Derives SCP03 session keys using AES-CMAC with specific derivation data.
-        /// Per GlobalPlatform SCP03 v1.1.1 Section 4.1.5 and Table 4-1.
-        /// Valid derivation constants (Table 4-1):
-        ///   0x04 S-ENC, 0x06 S-MAC, 0x07 S-RMAC, 0x08 S-DEK
-        /// (Other permitted constants in this implementation for KDF-based data derivations:
-        ///   0x00 Card cryptogram, 0x01 Host cryptogram, 0x02 Card challenge.)
+        /// SCP03 v1.1.2, §4.1.5 and Table 4-1: 00, 01, 02, 04, 06, and 07.
         /// </summary>
         /// <param name="baseKey">The base static key (16, 24, or 32 bytes).</param>
         /// <param name="hostChallenge">The host challenge (8 bytes).</param>
         /// <param name="cardChallenge">The card challenge (8 bytes).</param>
-        /// <param name="derivationConstant">The key-specific derivation constant (MAC=01, ENC=02, RMAC=03).</param>
+        /// <param name="derivationConstant">A derivation constant from Table 4-1.</param>
         /// <returns>The derived session key or error.</returns>
         public static Result<byte[], SmartCardError> DeriveScp03SessionKey(
             byte[] baseKey,
@@ -158,10 +154,8 @@ public static partial class CryptoService
             byte derivationConstant
         )
         {
-            // Allowed per GP SCP03 Table 4-1 (exclude RFU values such as 0x03, 0x05)
-            // 0x00 card cryptogram, 0x01 host cryptogram, 0x02 card challenge,
-            // 0x04 S-ENC, 0x06 S-MAC, 0x07 S-RMAC, 0x08 S-DEK
-            return derivationConstant is 0x00 or 0x01 or 0x02 or 0x04 or 0x06 or 0x07 or 0x08
+            // SCP03 v1.1.2, Table 4-1. All other values are RFU.
+            return derivationConstant is 0x00 or 0x01 or 0x02 or 0x04 or 0x06 or 0x07
                 ? UnitResult.Success<SmartCardError>()
                 : UnitResult.Failure(
                     SmartCardError.InvalidArgument(

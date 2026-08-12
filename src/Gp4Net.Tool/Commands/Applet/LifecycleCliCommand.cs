@@ -17,6 +17,13 @@ namespace Gp4Net.Tool.Commands.Applet;
 [PublicAPI]
 public class LifecycleCommand : IPipelineCommand<LifecycleCommand.Settings>
 {
+    /// <summary>GP Card Specification v2.3.1, §11.10.2.2.</summary>
+    public enum ApplicationLockState : byte
+    {
+        Previous = 0x00,
+        Locked = 0x80,
+    }
+
     /// <summary>
     /// Executes the lifecycle command to change an application's lifecycle state.
     /// </summary>
@@ -115,8 +122,8 @@ public class LifecycleCommand : IPipelineCommand<LifecycleCommand.Settings>
         /// Gets or sets the new lifecycle state.
         /// </summary>
         [CommandArgument(1, "<STATE>")]
-        [Description("The new lifecycle state (Selectable, Personalized, Blocked, Locked)")]
-        public LifecycleState State { get; set; }
+        [Description("The application lock state (Previous or Locked)")]
+        public ApplicationLockState State { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether to force the operation without confirmation.
@@ -145,7 +152,7 @@ public class LifecycleCommand : IPipelineCommand<LifecycleCommand.Settings>
                 return ValidationResult.Error("AID must be a valid hex string");
             }
 
-            if (!Enum.IsDefined(typeof(LifecycleState), State))
+            if (!Enum.IsDefined(typeof(ApplicationLockState), State))
             {
                 return ValidationResult.Error("Invalid lifecycle state");
             }

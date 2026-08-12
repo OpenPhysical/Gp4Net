@@ -8,12 +8,12 @@ namespace Gp4Net.CardEmulator.Domain;
 
 /// <summary>
 /// Represents a Load File Data Block Hash (LFDBH) as defined in GlobalPlatform Card Specification v2.3.1.
-/// LFDBH is computed as SHA-256 hash of the complete CAP file data for integrity verification.
+/// GP Card Specification v2.3.1, Appendix C.2.
 /// </summary>
 public sealed record LoadFileDataBlockHash
 {
     /// <summary>
-    /// The SHA-256 hash value.
+    /// The hash value.
     /// </summary>
     public byte[] Value { get; }
 
@@ -21,36 +21,53 @@ public sealed record LoadFileDataBlockHash
 
     /// <summary>
     /// Creates a LoadFileDataBlockHash from raw hash bytes.
-    /// Validates that the hash is exactly 32 bytes (SHA-256).
+    /// Accepts the LFDBH lengths defined by Appendix C.2.
     /// </summary>
-    /// <param name="hashBytes">The hash bytes (must be 32 bytes).</param>
+    /// <param name="hashBytes">The hash bytes.</param>
     /// <returns>LoadFileDataBlockHash or error.</returns>
     public static Result<LoadFileDataBlockHash, SmartCardError> Create(byte[] hashBytes)
     {
-        return hashBytes.Length == 32
+        return hashBytes.Length is 20 or 32 or 48 or 64
             ? Result.Success<LoadFileDataBlockHash, SmartCardError>(
                 new LoadFileDataBlockHash(hashBytes)
             )
             : Result.Failure<LoadFileDataBlockHash, SmartCardError>(
-                SmartCardError.InvalidData("LFDBH must be exactly 32 bytes (SHA-256)")
+                SmartCardError.InvalidData("LFDBH must be 20, 32, 48, or 64 bytes")
             );
     }
 
     /// <summary>
-    /// Computes LFDBH from complete CAP file data using SHA-256.
-    /// Per GP Card Specification v2.3.1 Section 11.5.2.1.
+    /// Computes LFDBH using the algorithm identified by the expected hash length.
+    /// GP Card Specification v2.3.1, Appendix C.2.
     /// </summary>
     /// <param name="capFileData">Complete CAP file data.</param>
+    /// <param name="hashLength">Expected LFDBH length.</param>
     /// <returns>LoadFileDataBlockHash or error.</returns>
     public static Result<LoadFileDataBlockHash, SmartCardError> ComputeFromCapFile(
-        byte[] capFileData
+        byte[] capFileData,
+        int hashLength
     )
     {
         return capFileData.Length > 0
-            ? CryptoService.Hash.Sha256(capFileData).Bind(Create)
+            ? ComputeHash(capFileData, hashLength).Bind(Create)
             : Result.Failure<LoadFileDataBlockHash, SmartCardError>(
                 SmartCardError.InvalidData("CAP file data cannot be empty")
             );
+    }
+
+    private static Result<byte[], SmartCardError> ComputeHash(byte[] data, int hashLength)
+    {
+        return hashLength switch
+        {
+            20 => CryptoService.Hash.Sha1(data),
+            32 => CryptoService.Hash.Sha256(data),
+            48 => CryptoService.Hash.Sha384(data),
+            64 => CryptoService.Hash.Sha512(data),
+            _
+                => Result.Failure<byte[], SmartCardError>(
+                    SmartCardError.InvalidData($"Unsupported LFDBH length: {hashLength}")
+                ),
+        };
     }
 
     /// <summary>

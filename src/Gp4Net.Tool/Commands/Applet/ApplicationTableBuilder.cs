@@ -108,7 +108,7 @@ public static class ApplicationTableBuilder
         return new ApplicationDataRow(
             Type: GetTypeDisplay(app.Type),
             Aid: $"[cyan]{Convert.ToHexString(app.Aid)}[/]",
-            State: GetStateDisplay(app.LifecycleState),
+            State: GetStateDisplay(app.LifecycleStateString),
             Privileges: GetPrivilegesDisplay(app.Privileges),
             Version: showExtended
                 ? Maybe<string>.From(app.Version.GetValueOrDefault("-"))
@@ -128,7 +128,7 @@ public static class ApplicationTableBuilder
         {
             type = a.Type.ToString(),
             aid = Convert.ToHexString(a.Aid),
-            state = a.LifecycleState.ToString(),
+            state = a.LifecycleStateString,
             privileges = a.Privileges.Select(p => p.ToString()).ToArray(),
             version = a.Version.GetValueOrDefault(),
             associatedSD = a.AssociatedSecurityDomain.HasValue
@@ -150,7 +150,7 @@ public static class ApplicationTableBuilder
             applications.Select(app =>
                 $"{app.Type},"
                 + $"{Convert.ToHexString(app.Aid)},"
-                + $"{app.LifecycleState},"
+                + $"{app.LifecycleStateString},"
                 + $"\"{string.Join(";", app.Privileges.Select(p => p.ToString()))}\","
                 + $"{app.Version.GetValueOrDefault("")},"
                 + $"{(app.AssociatedSecurityDomain.HasValue ? Convert.ToHexString(app.AssociatedSecurityDomain.Value) : "")}"
@@ -182,11 +182,9 @@ public static class ApplicationTableBuilder
             "pkg"
             or "package"
                 => applications.Where(a => a.Type == ApplicationType.LoadFile).ToList(),
-            "selectable"
-                => applications.Where(a => a.LifecycleState == LifecycleState.Selectable).ToList(),
-            "locked" => applications.Where(a => a.LifecycleState == LifecycleState.Locked).ToList(),
-            "installed"
-                => applications.Where(a => a.LifecycleState == LifecycleState.Installed).ToList(),
+            "selectable" => applications.Where(a => a.IsSelectable).ToList(),
+            "locked" => applications.Where(a => a.LifecycleStateString == "Locked").ToList(),
+            "installed" => applications.Where(a => a.LifecycleStateString == "Installed").ToList(),
             _ when filter.Length >= 6
                 => applications
                     .Where(a =>
@@ -234,16 +232,15 @@ public static class ApplicationTableBuilder
     /// <summary>
     /// Gets the colored display string for a lifecycle state.
     /// </summary>
-    private static string GetStateDisplay(LifecycleState state)
+    private static string GetStateDisplay(string state)
     {
         return state switch
         {
-            LifecycleState.Selectable => "[green]Selectable[/]",
-            LifecycleState.Personalized => "[blue]Personalized[/]",
-            LifecycleState.Locked => "[red]Locked[/]",
-            LifecycleState.Installed => "[cyan]Installed[/]",
-            LifecycleState.Terminated => "[red]Terminated[/]",
-            _ => state.ToString(),
+            "Selectable" => "[green]Selectable[/]",
+            "Personalized" or "Secured" => $"[blue]{state}[/]",
+            "Locked" or "CardLocked" or "Terminated" => $"[red]{state}[/]",
+            "Installed" or "Initialized" => $"[cyan]{state}[/]",
+            _ => state,
         };
     }
 

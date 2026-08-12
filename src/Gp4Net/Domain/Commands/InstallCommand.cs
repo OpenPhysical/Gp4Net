@@ -168,6 +168,12 @@ public abstract record InstallCommand : IApduCommand
         );
     }
 
+    private static bool HasEncodableBerLength(Maybe<byte[]> value) =>
+        value.Match(bytes => bytes.Length <= 0xFFFF, () => true);
+
+    private static SmartCardError InvalidBerLength(string fieldName) =>
+        SmartCardError.InvalidArgument($"{fieldName} cannot exceed 65535 bytes.");
+
     /// <summary>
     /// INSTALL [for load] command implementation.
     /// </summary>
@@ -292,6 +298,29 @@ public abstract record InstallCommand : IApduCommand
                 );
             }
 
+            if (!HasEncodableBerLength(loadParameters))
+            {
+                return Result.Failure<InstallForLoadCommand, SmartCardError>(
+                    InvalidBerLength("Load Parameters")
+                );
+            }
+
+            if (!HasEncodableBerLength(installToken))
+            {
+                return Result.Failure<InstallForLoadCommand, SmartCardError>(
+                    InvalidBerLength("Install Token")
+                );
+            }
+
+            if (hash.Match(value => value.Length > 0x7F, () => false))
+            {
+                return Result.Failure<InstallForLoadCommand, SmartCardError>(
+                    SmartCardError.InvalidArgument(
+                        "Load File Data Block Hash cannot exceed 127 bytes."
+                    )
+                );
+            }
+
             var command = new InstallForLoadCommand(
                 type,
                 packageAidResult.Value,
@@ -344,7 +373,9 @@ public abstract record InstallCommand : IApduCommand
             // Load Parameters - mandatory field per GP spec
             if (!LoadParameters.IsDefaultOrEmpty)
             {
-                builder.Add((byte)LoadParameters.Length);
+                builder.AddRange(
+                    GlobalPlatformLengthEncoding.EncodeBerLength(LoadParameters.Length)
+                );
                 builder.AddRange(LoadParameters);
             }
             else
@@ -355,7 +386,7 @@ public abstract record InstallCommand : IApduCommand
             // Install Token
             if (!InstallToken.IsDefaultOrEmpty)
             {
-                builder.Add((byte)InstallToken.Length);
+                builder.AddRange(GlobalPlatformLengthEncoding.EncodeBerLength(InstallToken.Length));
                 builder.AddRange(InstallToken);
             }
             else
@@ -493,6 +524,20 @@ public abstract record InstallCommand : IApduCommand
             {
                 return Result.Failure<InstallForInstallCommand, SmartCardError>(
                     SmartCardError.InvalidArgument("Privileges cannot be null.")
+                );
+            }
+
+            if (!HasEncodableBerLength(installParameters))
+            {
+                return Result.Failure<InstallForInstallCommand, SmartCardError>(
+                    InvalidBerLength("Install Parameters")
+                );
+            }
+
+            if (!HasEncodableBerLength(installToken))
+            {
+                return Result.Failure<InstallForInstallCommand, SmartCardError>(
+                    InvalidBerLength("Install Token")
                 );
             }
 
@@ -647,7 +692,9 @@ public abstract record InstallCommand : IApduCommand
             // Install Parameters
             if (!InstallParameters.IsDefaultOrEmpty)
             {
-                builder.Add((byte)InstallParameters.Length);
+                builder.AddRange(
+                    GlobalPlatformLengthEncoding.EncodeBerLength(InstallParameters.Length)
+                );
                 builder.AddRange(InstallParameters);
             }
             else
@@ -658,7 +705,7 @@ public abstract record InstallCommand : IApduCommand
             // Install Token
             if (!InstallToken.IsDefaultOrEmpty)
             {
-                builder.Add((byte)InstallToken.Length);
+                builder.AddRange(GlobalPlatformLengthEncoding.EncodeBerLength(InstallToken.Length));
                 builder.AddRange(InstallToken);
             }
             else
@@ -738,6 +785,13 @@ public abstract record InstallCommand : IApduCommand
                 );
             }
 
+            if (!HasEncodableBerLength(parameters) || !HasEncodableBerLength(token))
+            {
+                return Result.Failure<InstallForManagementCommand, SmartCardError>(
+                    InvalidBerLength("Parameters or Token")
+                );
+            }
+
             // GP Card Specification v2.3.1, Table 11-44.
             var data = BuildLvData(
                 ImmutableArray<byte>.Empty,
@@ -791,6 +845,13 @@ public abstract record InstallCommand : IApduCommand
                 );
             }
 
+            if (!HasEncodableBerLength(parameters) || !HasEncodableBerLength(token))
+            {
+                return Result.Failure<InstallForManagementCommand, SmartCardError>(
+                    InvalidBerLength("Parameters or Token")
+                );
+            }
+
             // GP Card Specification v2.3.1, Table 11-45.
             var data = BuildLvData(
                 securityDomainResult.Value,
@@ -840,6 +901,13 @@ public abstract record InstallCommand : IApduCommand
                     SmartCardError.InvalidArgument(
                         "Privileges must be empty or contain one or three bytes."
                     )
+                );
+            }
+
+            if (!HasEncodableBerLength(parameters) || !HasEncodableBerLength(token))
+            {
+                return Result.Failure<InstallForManagementCommand, SmartCardError>(
+                    InvalidBerLength("Parameters or Token")
                 );
             }
 
@@ -911,9 +979,17 @@ public abstract record InstallCommand : IApduCommand
         private static ImmutableArray<byte> BuildLvData(params ImmutableArray<byte>[] fields)
         {
             var bytes = ImmutableArray.CreateBuilder<byte>();
-            foreach (var field in fields)
+            for (int index = 0; index < fields.Length; index++)
             {
-                bytes.Add((byte)field.Length);
+                var field = fields[index];
+                if (index < 4)
+                {
+                    bytes.Add((byte)field.Length);
+                }
+                else
+                {
+                    bytes.AddRange(GlobalPlatformLengthEncoding.EncodeBerLength(field.Length));
+                }
                 bytes.AddRange(field);
             }
 

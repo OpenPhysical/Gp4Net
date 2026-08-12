@@ -6,6 +6,7 @@ using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Functional;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
+using Gp4Net.Domain;
 using Gp4Net.Shared;
 using JetBrains.Annotations;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
@@ -233,7 +234,7 @@ public sealed record ApplicationRegistry
     /// <summary>
     /// Gets applications filtered by lifecycle state.
     /// </summary>
-    public ImmutableList<IApplication> GetApplicationsByLifecycleState(LifecycleState state)
+    public ImmutableList<IApplication> GetApplicationsByLifecycleState(byte state)
     {
         return Applications.Values.Where(app => app.LifecycleState == state).ToImmutableList();
     }
@@ -368,10 +369,11 @@ public sealed record ApplicationRegistry
     {
         return application.LifecycleState switch
         {
-            LifecycleState.Selectable => Result.Success<IApplication, SmartCardError>(application),
-            LifecycleState.Personalized
+            (byte)CardLifecycleState.OpReady
+            or (byte)CardLifecycleState.Initialized
+            or (byte)CardLifecycleState.Secured
+            or (byte)CardLifecycleState.CardLocked
                 => Result.Success<IApplication, SmartCardError>(application),
-            LifecycleState.Locked => Result.Success<IApplication, SmartCardError>(application), // Can still select but with limited functionality
             _
                 => Result.Failure<IApplication, SmartCardError>(
                     SmartCardError.ConditionsNotSatisfied()
@@ -497,10 +499,18 @@ public sealed record ApplicationRegistry
         // Validate application lifecycle allows command processing
         return app.LifecycleState switch
         {
-            LifecycleState.Selectable => Result.Success<IApplication, SmartCardError>(app),
-            LifecycleState.Personalized => Result.Success<IApplication, SmartCardError>(app),
-            LifecycleState.Locked
+            (byte)CardLifecycleState.OpReady
+            or (byte)CardLifecycleState.Initialized
+            or (byte)CardLifecycleState.Secured
+                => Result.Success<IApplication, SmartCardError>(app),
+            (byte)CardLifecycleState.CardLocked
                 => instruction == ApduIns.SELECT
+                    ? Result.Success<IApplication, SmartCardError>(app)
+                    : Result.Failure<IApplication, SmartCardError>(
+                        SmartCardError.ConditionsNotSatisfied()
+                    ),
+            (byte)CardLifecycleState.Terminated
+                => instruction == ApduIns.GET_DATA
                     ? Result.Success<IApplication, SmartCardError>(app)
                     : Result.Failure<IApplication, SmartCardError>(
                         SmartCardError.ConditionsNotSatisfied()

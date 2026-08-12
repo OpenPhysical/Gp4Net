@@ -443,7 +443,7 @@ public partial class VirtualCard : IVirtualCard
                     byte[] resolvedModuleAid = moduleAid.Match(mAid => mAid, () => appAid);
 
                     // Create application with proper lifecycle management
-                    const byte validInitialState = LifecycleStates.SELECTABLE;
+                    const byte validInitialState = (byte)ApplicationLifecycleState.Installed;
 
                     return Result
                         .Success<InstalledApplication, SmartCardError>(
@@ -908,7 +908,7 @@ public partial class VirtualCard : IVirtualCard
         CardConfiguration config
     )
     {
-        const byte validInitialState = LifecycleStates.LOADED;
+        const byte validInitialState = (byte)ExecutableLoadFileLifecycleState.Loaded;
 
         var moduleBuilder = ImmutableList.CreateBuilder<ExecutableModule>();
         moduleBuilder.Add(module);
@@ -1068,7 +1068,7 @@ public partial class VirtualCard : IVirtualCard
             () => config.IsdAid
         );
 
-        const byte validInitialState = LifecycleStates.LOADED;
+        const byte validInitialState = (byte)ExecutableLoadFileLifecycleState.Loaded;
 
         return Result
             .Success<LoadFile, SmartCardError>(
@@ -1113,7 +1113,7 @@ public partial class VirtualCard : IVirtualCard
         return ExtractExpectedLfdbhFromState(state)
             .Bind(expectedHash =>
                 LoadFileDataBlockHash
-                    .ComputeFromCapFile(completeCapFileData)
+                    .ComputeFromCapFile(completeCapFileData, expectedHash.Value.Length)
                     .Bind(actualHash => expectedHash.VerifyMatch(actualHash))
             );
     }
@@ -1656,6 +1656,11 @@ public partial class VirtualCard : IVirtualCard
             if (keySet.IsFailure)
                 return keySet.Error;
             newState = newState.WithInstalledKey(keyVersion, keySet.Value);
+            if (keySet.Value is Scp03KeySet)
+            {
+                // SCP03 Amendment D v1.1.2, section 6.2.2.1.
+                newState = newState.WithResetSequenceCounter(keyVersion);
+            }
         }
 
         return (CreatePutKeyResponse(keyVersion, keyData), newState);

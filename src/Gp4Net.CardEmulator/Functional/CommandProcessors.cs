@@ -1024,7 +1024,8 @@ public static class CommandProcessors
     {
         // ISD status: AID (5-16 bytes) + Life Cycle State (1 byte) + Privileges (1 byte)
         byte[] isdAid = config.IsdAid;
-        byte lifecycleState = 0x07; // SELECTABLE per GP Card Specification Table 11-1
+        // GP Card Specification v2.3.1, Table 11-6: the ISD inherits the card state.
+        byte lifecycleState = (byte)state.CardLifecycleState;
         byte privileges = 0x81; // Security Domain + Authorized Management + Personalized per Table 8-1
 
         byte[] statusData = isdAid.Concat([lifecycleState, privileges]).ToArray();

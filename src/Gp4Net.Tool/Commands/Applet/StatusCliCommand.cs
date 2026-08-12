@@ -147,7 +147,7 @@ public class StatusCommand : IPipelineCommand<StatusCommand.Settings>
             .Title($"[bold]{app.Type}: [cyan]{Convert.ToHexString(app.Aid)}[/][/]")
             .Border(TableBorder.Rounded);
 
-        _ = table.AddRow("State", $"[yellow]{app.LifecycleState}[/]");
+        _ = table.AddRow("State", $"[yellow]{app.LifecycleStateString}[/]");
         _ = table.AddRow("Privileges", string.Join(", ", app.Privileges.Select(p => p.ToString())));
 
         app.Version.Match(version => table.AddRow("Version", $"[green]{version}[/]"), () => { });

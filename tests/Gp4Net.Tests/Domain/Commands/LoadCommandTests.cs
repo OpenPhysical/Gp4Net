@@ -336,13 +336,14 @@ public class LoadCommandTests
         _ = dataField[3].Should().Be(0x34); // Length low byte
     }
 
+    /// <summary>
+    /// GP Card Specification v2.3.1, §11.1.5, §11.6.2 and Table 11-58.
+    /// </summary>
     [Test]
-    public void CreateFromCapFileExtended_Should_Not_Skip_Data_After_First_Block_Header()
+    public void CreateFromCapFile_Should_Not_Skip_Data_After_First_Block_Header()
     {
-        // GP Card Spec 2.3.1, 11.6.2 and Table 11-58: C4 wraps the complete
-        // Load File Data Block stream.
         byte[] cap = Enumerable.Range(0, 600).Select(i => (byte)i).ToArray();
-        var blocks = LoadCommand.CreateFromCapFileExtended(cap, 245, true).Value;
+        var blocks = LoadCommand.CreateFromCapFile(cap, 245).Value;
 
         byte[] reconstructed = blocks
             .SelectMany((block, index) => index == 0 ? block.Data[4..] : block.Data)

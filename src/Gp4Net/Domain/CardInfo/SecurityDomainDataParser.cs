@@ -49,11 +49,9 @@ public static class SecurityDomainDataParser
                                     }
                                     break;
                                 case 0x9F6E: // Application production lifecycle data
-                                    if (length >= 1)
-                                    {
-                                        string lifecycle = ParseLifecycleState(value[0]);
-                                        result.Add($"Lifecycle: {lifecycle}");
-                                    }
+                                    result.Add(
+                                        $"Application production lifecycle data: {Convert.ToHexString(value)}"
+                                    );
                                     break;
                                 default:
                                     result.Add($"Tag {tag:X4}: {Convert.ToHexString(value)}");
@@ -75,19 +73,5 @@ public static class SecurityDomainDataParser
         }
 
         return result.Count > 0 ? string.Join(", ", result) : Convert.ToHexString(data);
-    }
-
-    private static string ParseLifecycleState(byte state)
-    {
-        return state switch
-        {
-            0x01 => "Loaded",
-            0x03 => "Installed",
-            0x07 => "Selectable",
-            0x0F => "Personalized",
-            0x83 => "Blocked",
-            0x87 => "Locked",
-            _ => $"0x{state:X2}",
-        };
     }
 }

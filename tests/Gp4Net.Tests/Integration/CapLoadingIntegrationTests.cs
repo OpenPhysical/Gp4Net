@@ -163,6 +163,89 @@ public class CapLoadingIntegrationTests
         // This test focuses on CAP file parsing and LOAD command generation only
     }
 
+    /// <summary>
+    /// GP Card Specification v2.3.1, §§9.3.2, 9.3.3, 9.3.5, 9.3.6 and Tables 11-41
+    /// through 11-43 and 11-56 through 11-58.
+    /// </summary>
+    [Test]
+    public void CreateLoadingCommands_Should_Emit_Complete_Gp_Sequence()
+    {
+        byte[] capFileData = File.ReadAllBytes(_capFilePath);
+        var capFile = CapFileStructure.Parse(capFileData).Value;
+
+        var result = CapFileLoadingWorkflow.CreateLoadingCommands(
+            capFileData,
+            maxLoadBlockSize: 245
+        );
+
+        Assert.That(result.IsSuccess, Is.True);
+        List<byte[]> apdus = [.. result.Value.Select(command => command.ToBytes())];
+        Assert.That(apdus[0][1], Is.EqualTo(0xE6));
+        Assert.That(apdus[0][2], Is.EqualTo(0x02));
+
+        int firstInstallIndex = apdus.Count - capFile.Applets.Count;
+        byte[] firstLoadData = apdus[1][5..^1];
+        var loadFileDataBlock = ParseTlv(firstLoadData);
+        Assert.That(loadFileDataBlock.Tag, Is.EqualTo(0xC4));
+        Assert.That(
+            firstLoadData[(loadFileDataBlock.ValueOffset + 3)..(loadFileDataBlock.ValueOffset + 7)],
+            Is.EqualTo(new byte[] { 0xDE, 0xCA, 0xFF, 0xED })
+        );
+
+        for (int index = 1; index < firstInstallIndex; index++)
+        {
+            Assert.That(apdus[index][1], Is.EqualTo(0xE8));
+            Assert.That(apdus[index][2], Is.EqualTo(index == firstInstallIndex - 1 ? 0x80 : 0x00));
+            Assert.That(apdus[index][3], Is.EqualTo(index - 1));
+        }
+
+        for (int index = 0; index < capFile.Applets.Count; index++)
+        {
+            byte[] apdu = apdus[firstInstallIndex + index];
+            Assert.That(apdu[1], Is.EqualTo(0xE6));
+            Assert.That(apdu[2], Is.EqualTo(0x0C));
+
+            int offset = 5;
+            offset += 1 + apdu[offset];
+            int moduleAidLength = apdu[offset++];
+            Assert.That(
+                apdu[offset..(offset + moduleAidLength)],
+                Is.EqualTo(capFile.Applets[index].Aid)
+            );
+            offset += moduleAidLength;
+            int applicationAidLength = apdu[offset++];
+            Assert.That(
+                apdu[offset..(offset + applicationAidLength)],
+                Is.EqualTo(capFile.Applets[index].Aid)
+            );
+        }
+
+        Assert.That(apdus.All(apdu => apdu[^1] == 0x00), Is.True);
+    }
+
+    /// <summary>GP Card Specification v2.3.1, Table 11-41.</summary>
+    [Test]
+    public void CreateLoadingCommands_Should_Use_Pure_Install_When_Not_Making_Selectable()
+    {
+        byte[] capFileData = File.ReadAllBytes(_capFilePath);
+        var capFile = CapFileStructure.Parse(capFileData).Value;
+
+        var result = CapFileLoadingWorkflow.CreateLoadingCommands(
+            capFileData,
+            makeSelectableAfterInstall: false
+        );
+
+        Assert.That(result.IsSuccess, Is.True);
+        List<byte[]> installApdus =
+        [
+            .. result
+                .Value.Select(command => command.ToBytes())
+                .Where(apdu => apdu[1] == 0xE6 && apdu[2] != 0x02),
+        ];
+        Assert.That(installApdus.Count, Is.EqualTo(capFile.Applets.Count));
+        Assert.That(installApdus.All(apdu => apdu[2] == 0x04), Is.True);
+    }
+
     [Test]
     public void TraceComparison_LoadCommands_MatchExpectedStructure()
     {

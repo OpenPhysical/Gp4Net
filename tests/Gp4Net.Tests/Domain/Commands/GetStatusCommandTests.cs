@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
 using NUnit.Framework;
@@ -400,7 +401,7 @@ public class GetStatusCommandTests
 
         var app = result.Value.Applications[0];
         _ = app.Aid.Should().BeEquivalentTo(Convert.FromHexString("A0000000031010"));
-        _ = app.State.Should().Be(ApplicationStatusEntry.LifecycleState.Selectable);
+        _ = app.RawLifecycleState.Should().Be(0x07);
         _ = app.Privileges.Should().BeEquivalentTo(new byte[] { 0x80, 0x00, 0x00 });
     }
 
@@ -420,23 +421,22 @@ public class GetStatusCommandTests
 
         var app1 = result.Value.Applications[0];
         _ = app1.Aid.Should().BeEquivalentTo(Convert.FromHexString("A0000000031010"));
-        _ = app1.State.Should().Be(ApplicationStatusEntry.LifecycleState.Selectable);
+        _ = app1.RawLifecycleState.Should().Be(0x07);
 
         var app2 = result.Value.Applications[1];
         _ = app2.Aid.Should().BeEquivalentTo(Convert.FromHexString("A000000003101001"));
-        _ = app2.State.Should().Be(ApplicationStatusEntry.LifecycleState.Personalized);
+        _ = app2.RawLifecycleState.Should().Be(0x0F);
         _ = app2.Privileges.Should().BeEquivalentTo(new byte[] { 0xC0, 0x40, 0x00 });
     }
 
     [Test]
-    [TestCase(0x03, ApplicationStatusEntry.LifecycleState.Installed)]
-    [TestCase(0x07, ApplicationStatusEntry.LifecycleState.Selectable)]
-    [TestCase(0x0F, ApplicationStatusEntry.LifecycleState.Personalized)]
-    [TestCase(0x83, ApplicationStatusEntry.LifecycleState.Blocked)]
-    [TestCase(0x87, ApplicationStatusEntry.LifecycleState.Locked)]
-    public void GetStatusResponse_Parse_WithDifferentLifecycleStates_ParsesCorrectly(
-        byte stateValue,
-        ApplicationStatusEntry.LifecycleState expectedState
+    [TestCase(0x03)]
+    [TestCase(0x07)]
+    [TestCase(0x0F)]
+    [TestCase(0x83)]
+    [TestCase(0x87)]
+    public void GetStatusResponse_Parse_WithDifferentLifecycleStates_PreservesWireByte(
+        byte stateValue
     )
     {
         byte[] aid = Convert.FromHexString("A0000000031010");
@@ -444,7 +444,7 @@ public class GetStatusCommandTests
         Result<GetStatusResponse, SmartCardError> result = GetStatusResponse.Parse(e3);
 
         _ = result.IsSuccess.Should().BeTrue();
-        _ = result.Value.Applications[0].State.Should().Be(expectedState);
+        _ = result.Value.Applications[0].RawLifecycleState.Should().Be(stateValue);
     }
 
     [Test]
@@ -571,7 +571,7 @@ public class GetStatusCommandTests
 
         var entry = new ApplicationStatusEntry(
             originalAid,
-            ApplicationStatusEntry.LifecycleState.Selectable,
+            (byte)ApplicationLifecycleState.Selectable,
             originalPrivileges
         );
 
@@ -612,7 +612,7 @@ public class GetStatusCommandTests
         [
             new ApplicationStatusEntry(
                 Convert.FromHexString("A0000000031010"),
-                ApplicationStatusEntry.LifecycleState.Selectable,
+                (byte)ApplicationLifecycleState.Selectable,
                 [0x80]
             ),
         ];

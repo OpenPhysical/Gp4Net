@@ -10,7 +10,7 @@ namespace Gp4Net.Domain;
 /// </summary>
 public record ApplicationInfo(
     byte[] Aid,
-    LifecycleState LifecycleState,
+    byte RawLifecycleState,
     ImmutableList<Privilege> Privileges,
     ApplicationType Type,
     Maybe<string> Version = default,
@@ -31,7 +31,17 @@ public record ApplicationInfo(
     /// </summary>
     public string LifecycleStateString
     {
-        get { return LifecycleState.ToString(); }
+        get
+        {
+            return Type switch
+            {
+                ApplicationType.IssuerSecurityDomain
+                    => GlobalPlatformLifecycle.DescribeCardState(RawLifecycleState),
+                ApplicationType.SupplementarySecurityDomain
+                    => GlobalPlatformLifecycle.DescribeSecurityDomainState(RawLifecycleState),
+                _ => GlobalPlatformLifecycle.DescribeApplicationState(RawLifecycleState),
+            };
+        }
     }
 
     /// <summary>
@@ -55,7 +65,21 @@ public record ApplicationInfo(
     /// </summary>
     public bool IsSelectable
     {
-        get { return LifecycleState == LifecycleState.Selectable; }
+        get
+        {
+            return Type switch
+            {
+                ApplicationType.IssuerSecurityDomain
+                    => RawLifecycleState
+                        is (byte)CardLifecycleState.Initialized
+                            or (byte)CardLifecycleState.Secured,
+                ApplicationType.SupplementarySecurityDomain
+                    => RawLifecycleState
+                        is (byte)SecurityDomainLifecycleState.Selectable
+                            or (byte)SecurityDomainLifecycleState.Personalized,
+                _ => (RawLifecycleState & 0x87) == 0x07,
+            };
+        }
     }
 
     /// <summary>

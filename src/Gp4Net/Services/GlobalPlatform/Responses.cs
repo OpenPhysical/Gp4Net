@@ -187,24 +187,6 @@ public static class Responses
         [
             .. response.Applications.Select(entry =>
             {
-                // Map lifecycle state from GetStatusResponse to domain model
-                var lcState = entry.State switch
-                {
-                    ApplicationStatusEntry.LifecycleState.Loaded
-                        => Constants.Constants.GlobalPlatform.LifecycleState.Loaded,
-                    ApplicationStatusEntry.LifecycleState.Installed
-                        => Constants.Constants.GlobalPlatform.LifecycleState.Installed,
-                    ApplicationStatusEntry.LifecycleState.Selectable
-                        => Constants.Constants.GlobalPlatform.LifecycleState.Selectable,
-                    ApplicationStatusEntry.LifecycleState.Personalized
-                        => Constants.Constants.GlobalPlatform.LifecycleState.Personalized,
-                    ApplicationStatusEntry.LifecycleState.Blocked
-                        => Constants.Constants.GlobalPlatform.LifecycleState.Locked,
-                    ApplicationStatusEntry.LifecycleState.Locked
-                        => Constants.Constants.GlobalPlatform.LifecycleState.Locked,
-                    _ => Constants.Constants.GlobalPlatform.LifecycleState.Unknown,
-                };
-
                 // Parse privileges from up to 3 bytes (C5: 3 bytes)
                 var privilegesList =
                     entry.Privileges.Length > 0
@@ -220,7 +202,7 @@ public static class Responses
 
                 return new ApplicationInfo(
                     entry.Aid,
-                    lcState,
+                    entry.RawLifecycleState,
                     privilegesList,
                     appType,
                     Version: Maybe<string>.None,

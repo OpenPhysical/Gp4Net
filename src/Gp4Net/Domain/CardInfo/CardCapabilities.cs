@@ -58,6 +58,10 @@ public class CardCapabilities
         private set;
     } = ImmutableDictionary<CipherUsage, ImmutableList<CipherSuite>>.Empty;
 
+    public bool SupportsLfdbEncryptionIcv { get; private set; }
+
+    public ImmutableList<byte> KeyParameterReferences { get; private set; } = [];
+
     /// <summary>
     /// Gets a value indicating whether SCP02 is supported.
     /// </summary>
@@ -152,51 +156,49 @@ public class CardCapabilities
                         case 0xA0: // SCP options
                             capabilities.ParseScpOptions(element.TlvData.Bytes.ToArray());
                             break;
-                        case 0x80: // Security Domain privileges
+                        // GP Card Specification v2.3.1, Table H-5.
+                        case 0x81:
                             capabilities.SdPrivileges = Maybe<SecurityDomainPrivileges>.From(
                                 ParseSecurityDomainPrivileges(element.TlvData.Bytes.ToArray())
                             );
                             break;
-                        case 0x81: // Application privileges
+                        case 0x82:
                             capabilities.AppPrivileges = PrivilegeHelpers
                                 .FromBytes(element.TlvData.Bytes.ToArray())
                                 .Map(Maybe<Privilege>.From)
                                 .Match(success => success, _ => Maybe<Privilege>.None);
                             break;
-                        case 0x82: // Supported algorithms
+                        case 0x83:
                             capabilities.Algorithms = Maybe<SupportedAlgorithms>.From(
                                 ParseSupportedAlgorithms(element.TlvData.Bytes.ToArray())
                             );
                             break;
-                        case 0x83: // LFDB hash algorithms
+                        case 0x84:
                             capabilities.ParseCipherSuite(
-                                CipherUsage.LfdbHash,
+                                CipherUsage.LfdbEncryption,
                                 element.TlvData.Bytes.ToArray()
                             );
                             break;
-                        case 0x84: // Token verification ciphers
+                        case 0x85:
                             capabilities.ParseCipherSuite(
                                 CipherUsage.TokenVerification,
                                 element.TlvData.Bytes.ToArray()
                             );
                             break;
-                        case 0x85: // Receipt generation ciphers
+                        case 0x86:
                             capabilities.ParseCipherSuite(
                                 CipherUsage.ReceiptGeneration,
                                 element.TlvData.Bytes.ToArray()
                             );
                             break;
-                        case 0x86: // DAP verification ciphers
+                        case 0x87:
                             capabilities.ParseCipherSuite(
                                 CipherUsage.DapVerification,
                                 element.TlvData.Bytes.ToArray()
                             );
                             break;
-                        case 0x87: // Mandated DAP verification ciphers
-                            capabilities.ParseCipherSuite(
-                                CipherUsage.MandatedDapVerification,
-                                element.TlvData.Bytes.ToArray()
-                            );
+                        case 0x88:
+                            capabilities.KeyParameterReferences = [.. element.TlvData.Bytes];
                             break;
                     }
                     return UnitResult.Success<SmartCardError>();
@@ -346,12 +348,14 @@ public class CardCapabilities
 
     private static SupportedAlgorithms ParseSupportedAlgorithms(byte[] data)
     {
-        if (data.Length < 2)
+        byte hashAlgorithms = 0;
+        foreach (byte algorithm in data)
         {
-            return new SupportedAlgorithms(0, 0);
+            if (algorithm is >= 0x01 and <= 0x04)
+                hashAlgorithms |= (byte)(1 << (algorithm - 1));
         }
 
-        return new SupportedAlgorithms(data[0], data.Length > 1 ? data[1] : (byte)0);
+        return new SupportedAlgorithms(hashAlgorithms, 0);
     }
 
     private void ParseCipherSuite(CipherUsage usage, byte[] data)
@@ -361,19 +365,13 @@ public class CardCapabilities
             return;
         }
 
-        var allSuites = data.SelectMany<byte, CipherSuite>(dataByte =>
-            {
-                // Try individual cipher suite byte first
-                var individualSuite = ParseCipherSuiteByte(dataByte);
-                if (individualSuite != CipherSuite.Unknown)
-                {
-                    return ImmutableList.Create(individualSuite);
-                }
+        ImmutableList<CipherSuite> allSuites =
+            usage == CipherUsage.LfdbEncryption
+                ? ParseLfdbEncryptionSuites(data[0])
+                : ParseSignatureSuites(data);
 
-                // Handle multi-cipher bitmask values
-                return ParseCipherSuiteBitmask(dataByte);
-            })
-            .ToImmutableList();
+        if (usage == CipherUsage.LfdbEncryption)
+            SupportsLfdbEncryptionIcv = (data[0] & 0x80) != 0;
 
         if (allSuites.Count > 0)
         {
@@ -381,57 +379,50 @@ public class CardCapabilities
         }
     }
 
-    private static CipherSuite ParseCipherSuiteByte(byte value)
+    private static ImmutableList<CipherSuite> ParseLfdbEncryptionSuites(byte value)
     {
-        return value switch
-        {
-            0x01 => CipherSuite.Des3Mac,
-            0x02 => CipherSuite.AesCmac128,
-            0x03 => CipherSuite.AesCmac192,
-            0x04 => CipherSuite.AesCmac256,
-            0x11 => CipherSuite.Rsa1024Sha1,
-            0x12 => CipherSuite.Rsa1024Sha256,
-            0x13 => CipherSuite.Rsa2048Sha1,
-            0x14 => CipherSuite.Rsa2048Sha256,
-            0x15 => CipherSuite.RsaPssSha256,
-            0x21 => CipherSuite.EcdsaP256Sha256,
-            0x22 => CipherSuite.EcdsaP384Sha384,
-            0x23 => CipherSuite.EcdsaP521Sha512,
-            0x31 => CipherSuite.Sha1,
-            0x32 => CipherSuite.Sha256,
-            0x33 => CipherSuite.Sha384,
-            0x34 => CipherSuite.Sha512,
-            _ => CipherSuite.Unknown,
-        };
+        var suites = ImmutableList.CreateBuilder<CipherSuite>();
+        if ((value & 0x01) != 0)
+            suites.Add(CipherSuite.TripleDes16);
+        if ((value & 0x02) != 0)
+            suites.Add(CipherSuite.Aes128);
+        if ((value & 0x04) != 0)
+            suites.Add(CipherSuite.Aes192);
+        if ((value & 0x08) != 0)
+            suites.Add(CipherSuite.Aes256);
+        return suites.ToImmutable();
     }
 
-    /// <summary>
-    /// Parses cipher suite bitmask values used by some cards.
-    /// Based on observed card behavior where single bytes encode multiple cipher suites.
-    /// </summary>
-    private static ImmutableList<CipherSuite> ParseCipherSuiteBitmask(byte value)
+    private static ImmutableList<CipherSuite> ParseSignatureSuites(byte[] data)
     {
-        // Handle known composite values observed in real cards
-        return value switch
+        var suites = ImmutableList.CreateBuilder<CipherSuite>();
+        byte first = data[0];
+        if ((first & 0x01) != 0)
+            suites.Add(CipherSuite.Rsa1024Sha1);
+        if ((first & 0x02) != 0)
+            suites.Add(CipherSuite.RsaPssSha256);
+        if ((first & 0x04) != 0)
+            suites.Add(CipherSuite.Des3Mac);
+        if ((first & 0x08) != 0)
+            suites.Add(CipherSuite.AesCmac128);
+        if ((first & 0x10) != 0)
+            suites.Add(CipherSuite.AesCmac192);
+        if ((first & 0x20) != 0)
+            suites.Add(CipherSuite.AesCmac256);
+        if ((first & 0x40) != 0)
+            suites.Add(CipherSuite.EcdsaP256Sha256);
+        if ((first & 0x80) != 0)
+            suites.Add(CipherSuite.EcdsaP384Sha384);
+
+        if (data.Length > 1)
         {
-            0x7B
-                => // Receipt Generation: DES_MAC + CMAC_AES128
-                ImmutableList.Create(CipherSuite.Des3Mac, CipherSuite.AesCmac128),
+            if ((data[1] & 0x01) != 0)
+                suites.Add(CipherSuite.EcdsaP512Sha512);
+            if ((data[1] & 0x02) != 0)
+                suites.Add(CipherSuite.EcdsaP521Sha512);
+        }
 
-            0x0C
-                => // DAP Verification: Multiple RSA and ECDSA algorithms
-                ImmutableList.Create(
-                    CipherSuite.Rsa1024Sha1,
-                    CipherSuite.RsaPssSha256,
-                    CipherSuite.AesCmac128,
-                    CipherSuite.AesCmac192,
-                    CipherSuite.AesCmac256,
-                    CipherSuite.EcdsaP256Sha256
-                ),
-
-            // Add more composite values as discovered from other cards
-            _ => ImmutableList<CipherSuite>.Empty,
-        };
+        return suites.ToImmutable();
     }
 
     /// <summary>
@@ -495,11 +486,10 @@ public class CardCapabilities
     {
         return usage switch
         {
-            CipherUsage.LfdbHash => "LFDB hash",
+            CipherUsage.LfdbEncryption => "LFDB encryption",
             CipherUsage.TokenVerification => "Token Verification",
             CipherUsage.ReceiptGeneration => "Receipt Generation",
             CipherUsage.DapVerification => "DAP Verification",
-            CipherUsage.MandatedDapVerification => "Mandated DAP Verification",
             _ => usage.ToString(),
         };
     }
@@ -744,11 +734,10 @@ public record SupportedAlgorithms(byte HashAlgorithms, byte CipherAlgorithms)
 /// </summary>
 public enum CipherUsage
 {
-    LfdbHash,
+    LfdbEncryption,
     TokenVerification,
     ReceiptGeneration,
     DapVerification,
-    MandatedDapVerification,
 }
 
 /// <summary>
@@ -757,6 +746,10 @@ public enum CipherUsage
 public enum CipherSuite
 {
     Unknown,
+    TripleDes16,
+    Aes128,
+    Aes192,
+    Aes256,
     Des3Mac,
     AesCmac128,
     AesCmac192,
@@ -768,6 +761,7 @@ public enum CipherSuite
     RsaPssSha256,
     EcdsaP256Sha256,
     EcdsaP384Sha384,
+    EcdsaP512Sha512,
     EcdsaP521Sha512,
     Sha1,
     Sha256,
@@ -784,6 +778,10 @@ public static class CipherSuiteExtensions
     {
         return suite switch
         {
+            CipherSuite.TripleDes16 => "3DES-16",
+            CipherSuite.Aes128 => "AES-128",
+            CipherSuite.Aes192 => "AES-192",
+            CipherSuite.Aes256 => "AES-256",
             CipherSuite.Des3Mac => "DES_MAC",
             CipherSuite.AesCmac128 => "CMAC_AES128",
             CipherSuite.AesCmac192 => "CMAC_AES192",
@@ -795,6 +793,7 @@ public static class CipherSuiteExtensions
             CipherSuite.RsaPssSha256 => "RSAPSS_SHA256",
             CipherSuite.EcdsaP256Sha256 => "ECCP256_SHA256",
             CipherSuite.EcdsaP384Sha384 => "ECCP384_SHA384",
+            CipherSuite.EcdsaP512Sha512 => "ECCP512_SHA512",
             CipherSuite.EcdsaP521Sha512 => "ECCP521_SHA512",
             CipherSuite.Sha1 => "SHA-1",
             CipherSuite.Sha256 => "SHA-256",

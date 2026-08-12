@@ -215,7 +215,24 @@ public static partial class CryptoService
                     return Result.Success<byte[], SmartCardError>(command);
 
                 byte lc = command[4];
-                if (lc <= Scp.Scp02.MAC_SIZE || command.Length < 5 + lc)
+                if (lc == 0)
+                {
+                    return Result.Failure<byte[], SmartCardError>(
+                        SmartCardError.InvalidArgument(
+                            "SCP02 command encryption requires a short-Lc APDU."
+                        )
+                    );
+                }
+
+                bool hasLe = command.Length == 6 + lc;
+                if (command.Length != 5 + lc && !hasLe)
+                {
+                    return Result.Failure<byte[], SmartCardError>(
+                        SmartCardError.InvalidData("Invalid short-Lc command structure.")
+                    );
+                }
+
+                if (lc <= Scp.Scp02.MAC_SIZE)
                     return Result.Success<byte[], SmartCardError>(command);
 
                 // GP Card Spec 2.3.1, E.4.6: calculate and append C-MAC first,
@@ -228,10 +245,18 @@ public static partial class CryptoService
                 // For SCP02 C-ENC, use zero IV with automatic padding
                 return Cipher
                     .Encrypt3DesCbcWithPadding(sEncKey, Scp.Common.ZeroIv8, dataToEncrypt)
-                    .Map(encryptedData =>
+                    .Bind(encryptedData =>
                     {
+                        if (encryptedData.Length + mac.Length > byte.MaxValue)
+                        {
+                            return Result.Failure<byte[], SmartCardError>(
+                                SmartCardError.InvalidArgument(
+                                    "SCP02 encrypted command data exceeds short-Lc capacity."
+                                )
+                            );
+                        }
+
                         // Build new command with encrypted data
-                        bool hasLe = command.Length > 5 + lc;
                         byte[] newCommand = new byte[
                             5 + encryptedData.Length + mac.Length + (hasLe ? 1 : 0)
                         ];
@@ -245,7 +270,7 @@ public static partial class CryptoService
                         if (hasLe)
                             newCommand[^1] = command[^1];
 
-                        return newCommand;
+                        return Result.Success<byte[], SmartCardError>(newCommand);
                     });
             }
 

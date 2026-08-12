@@ -335,50 +335,9 @@ public class GetStatusCommand : IApduCommand
 public class ApplicationStatusEntry
 {
     /// <summary>
-    /// Application lifecycle states.
-    /// </summary>
-    public enum LifecycleState : byte
-    {
-        /// <summary>
-        /// Application is loaded (for load files and apps reporting 0x01).
-        /// </summary>
-        Loaded = 0x01,
-
-        /// <summary>
-        /// Application is installed.
-        /// </summary>
-        Installed = 0x03,
-
-        /// <summary>
-        /// Application is selectable.
-        /// </summary>
-        Selectable = 0x07,
-
-        /// <summary>
-        /// Application is personalized.
-        /// </summary>
-        Personalized = 0x0F,
-
-        /// <summary>
-        /// Application is blocked.
-        /// </summary>
-        Blocked = 0x83,
-
-        /// <summary>
-        /// Application is locked.
-        /// </summary>
-        Locked = 0x87,
-    }
-
-    /// <summary>
     /// Gets the application AID.
     /// </summary>
     public byte[] Aid { get; }
-
-    /// <summary>
-    /// Gets the application lifecycle state.
-    /// </summary>
-    public LifecycleState State { get; }
 
     /// <summary>Lifecycle byte returned by GET STATUS.</summary>
     public byte RawLifecycleState { get; }
@@ -394,15 +353,12 @@ public class ApplicationStatusEntry
     public Maybe<byte[]> ExecutableLoadFileAid { get; }
 
     /// <summary>
-    /// Initializes a new instance of the ApplicationStatusEntry class.
+    /// Preserves the lifecycle byte returned by GET STATUS.
+    /// GP Card Specification v2.3.1, Tables 11-3 through 11-6.
     /// </summary>
-    /// <param name="aid">The application AID.</param>
-    /// <param name="state">The lifecycle state.</param>
-    /// <param name="privileges">The application privileges.</param>
-    /// <param name="executableLoadFileAid">The executable load file AID (optional).</param>
     public ApplicationStatusEntry(
         byte[] aid,
-        LifecycleState state,
+        byte rawLifecycleState,
         byte[] privileges,
         Maybe<byte[]> executableLoadFileAid = default
     )
@@ -411,8 +367,7 @@ public class ApplicationStatusEntry
         ArgumentNullException.ThrowIfNull(privileges);
 
         Aid = aid.Length == 0 ? Array.Empty<byte>() : (byte[])aid.Clone();
-        State = state;
-        RawLifecycleState = (byte)state;
+        RawLifecycleState = rawLifecycleState;
         Privileges = privileges.Length == 0 ? Array.Empty<byte>() : (byte[])privileges.Clone();
         ExecutableLoadFileAid = executableLoadFileAid.Map(value =>
             value.Length == 0 ? Array.Empty<byte>() : (byte[])value.Clone()

@@ -6,6 +6,7 @@ using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
 using NUnit.Framework;
+using GpConstants = Gp4Net.Constants.Constants;
 
 namespace Gp4Net.Tests.Domain.Commands;
 
@@ -17,6 +18,25 @@ namespace Gp4Net.Tests.Domain.Commands;
 [Category("Unit")]
 public class InstallCommandTests
 {
+    /// <summary>GP Card Specification v2.3.1, Table 11-41.</summary>
+    [Test]
+    public void InstallParameters_Should_Match_Install_Command_Types()
+    {
+        Assert.That(
+            GpConstants.GlobalPlatform.InstallParameters.INSTALL_FOR_LOAD,
+            Is.EqualTo(0x02)
+        );
+        Assert.That(
+            GpConstants.GlobalPlatform.InstallParameters.INSTALL_FOR_INSTALL,
+            Is.EqualTo(0x04)
+        );
+        Assert.That(
+            GpConstants.GlobalPlatform.InstallParameters.INSTALL_AND_MAKE_SELECTABLE,
+            Is.EqualTo(0x0C)
+        );
+        Assert.That(GpConstants.GlobalPlatform.InstallParameters.MAKE_SELECTABLE, Is.EqualTo(0x08));
+    }
+
     private readonly byte[] _validPackageAid = Convert.FromHexString("A000000003000000");
     private readonly byte[] _validModuleAid = Convert.FromHexString("A000000003000001");
     private readonly byte[] _validAppletAid = Convert.FromHexString("A000000003000002");

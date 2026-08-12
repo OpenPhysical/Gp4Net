@@ -5,236 +5,200 @@
 
 using System;
 using System.Collections.Immutable;
-using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Cryptography;
 using JetBrains.Annotations;
 
 namespace Gp4Net.CardEmulator.Functional;
 
 /// <summary>
-/// Pure functional processor for DAP (Data Authentication Pattern) verification.
-/// Handles cryptographic verification of CAP file signatures according to GlobalPlatform specification.
+/// Parses Data Authentication Pattern blocks from a GlobalPlatform Load File.
 /// </summary>
 [PublicAPI]
 public static class DapProcessor
 {
     /// <summary>
-    /// Verifies the DAP signature in a CAP file if present.
+    /// Verifies DAP blocks when present.
     /// </summary>
-    /// <param name="capFileData">The complete CAP file data.</param>
-    /// <param name="config">Card configuration with DAP verification settings.</param>
-    /// <returns>True if DAP verification passes or no DAP present, false otherwise.</returns>
-    public static Result<bool, SmartCardError> VerifyDapSignature(
-        byte[] capFileData,
-        CardConfiguration config
-    )
+    public static Result<bool, SmartCardError> VerifyDapSignature(byte[] loadFileData)
     {
-        return ExtractDapBlock(capFileData)
-            .Match(
-                dapBlock => PerformDapVerification(dapBlock, capFileData, config),
-                () => Result.Success<bool, SmartCardError>(true) // No DAP verification required when DAP not present
+        return ParseDapBlocks(loadFileData)
+            .Bind(blocks =>
+                blocks.IsEmpty
+                    ? Result.Success<bool, SmartCardError>(true)
+                    : MissingVerificationKey(blocks[0])
             );
     }
 
     /// <summary>
-    /// Extracts the DAP block from CAP file data if present.
+    /// GP Card Specification v2.3.1, Table 11-58: DAP Blocks are E2 BER-TLVs at
+    /// the beginning of the Load File, each containing one 4F and one C3 object.
     /// </summary>
-    /// <param name="capFileData">The CAP file data to search.</param>
-    /// <returns>DAP block if found, None if not present.</returns>
-    private static Maybe<DapBlock> ExtractDapBlock(byte[] capFileData)
-    {
-        return FindDapTag(capFileData, 0xE2) // DAP block tag
-            .Match(
-                onSuccess: tagPosition =>
-                    Maybe<DapBlock>.From(CreateDapBlock(capFileData, tagPosition)),
-                onFailure: _ => Maybe<DapBlock>.None
-            );
-    }
-
-    /// <summary>
-    /// Finds the position of a DAP tag in the CAP file data.
-    /// </summary>
-    /// <param name="data">The data to search.</param>
-    /// <param name="dapTag">The DAP tag to find.</param>
-    /// <returns>Position of the tag if found, error otherwise.</returns>
-    private static Result<int, SmartCardError> FindDapTag(byte[] data, byte dapTag)
-    {
-        var tagPositions = data.Select((value, index) => new { Value = value, Index = index })
-            .Where(item => item.Value == dapTag)
-            .Select(item => item.Index);
-
-        return tagPositions.Any()
-            ? Result.Success<int, SmartCardError>(tagPositions.First())
-            : Result.Failure<int, SmartCardError>(SmartCardError.ReferencedDataNotFound());
-    }
-
-    /// <summary>
-    /// Creates a DAP block from CAP file data starting at the specified position.
-    /// </summary>
-    /// <param name="capFileData">The CAP file data.</param>
-    /// <param name="tagPosition">The position of the DAP tag.</param>
-    /// <returns>The created DAP block.</returns>
-    private static DapBlock CreateDapBlock(byte[] capFileData, int tagPosition)
-    {
-        // Simplified DAP block extraction for emulation
-        int blockLength = Math.Min(256, capFileData.Length - tagPosition);
-        var blockData = ImmutableArray.Create(capFileData, tagPosition, blockLength);
-
-        return new DapBlock(
-            SecurityDomainAid: ImmutableArray<byte>.Empty,
-            DapSignature: blockData[..Math.Min(64, blockData.Length)],
-            CertificateChain: ImmutableArray<ImmutableArray<byte>>.Empty,
-            SignatureAlgorithm: 0x01 // RSA-SHA1 for simplicity
-        );
-    }
-
-    /// <summary>
-    /// Performs complete DAP verification including algorithm validation, certificate chain, and signature.
-    /// </summary>
-    /// <param name="dapBlock">The DAP block to verify.</param>
-    /// <param name="capFileData">The original CAP file data.</param>
-    /// <param name="config">Card configuration.</param>
-    /// <returns>True if verification passes, false otherwise.</returns>
-    private static Result<bool, SmartCardError> PerformDapVerification(
-        DapBlock dapBlock,
-        byte[] capFileData,
-        CardConfiguration config
+    public static Result<ImmutableArray<DapBlock>, SmartCardError> ParseDapBlocks(
+        byte[] loadFileData
     )
     {
-        return ValidateDapAlgorithm(dapBlock)
-            .Bind(validBlock => VerifyDapCertificateChain(validBlock, config))
-            .Bind(certValidBlock => VerifyDapDataSignature(certValidBlock, capFileData))
-            .Map(_ => true);
-    }
-
-    /// <summary>
-    /// Validates that the DAP signature algorithm is supported.
-    /// </summary>
-    /// <param name="dapBlock">The DAP block to validate.</param>
-    /// <returns>Validated DAP block or error.</returns>
-    private static Result<DapBlock, SmartCardError> ValidateDapAlgorithm(DapBlock dapBlock)
-    {
-        return dapBlock.SignatureAlgorithm switch
+        if (loadFileData is null)
         {
-            0x01 => Result.Success<DapBlock, SmartCardError>(dapBlock), // RSA-SHA1
-            0x02 => Result.Success<DapBlock, SmartCardError>(dapBlock), // RSA-SHA256
-            0x03 => Result.Success<DapBlock, SmartCardError>(dapBlock), // ECDSA-SHA256
-            _
-                => Result.Failure<DapBlock, SmartCardError>(
-                    SmartCardError.SecurityStatusNotSatisfied(
-                        $"Unsupported DAP algorithm: {dapBlock.SignatureAlgorithm:X2}"
-                    )
-                ),
-        };
-    }
-
-    /// <summary>
-    /// Verifies the certificate chain in the DAP block.
-    /// </summary>
-    /// <param name="dapBlock">The DAP block with certificate chain.</param>
-    /// <param name="config">Card configuration with trusted roots.</param>
-    /// <returns>Verified DAP block or error.</returns>
-    private static Result<DapBlock, SmartCardError> VerifyDapCertificateChain(
-        DapBlock dapBlock,
-        CardConfiguration config
-    )
-    {
-        if (!dapBlock.CertificateChain.Any())
-        {
-            return Result.Failure<DapBlock, SmartCardError>(
-                SmartCardError.SecurityStatusNotSatisfied("No certificate chain provided")
+            return Result.Failure<ImmutableArray<DapBlock>, SmartCardError>(
+                SmartCardError.InvalidData("Load File data is required")
             );
         }
 
-        // Validate the certificate chain and return the validated DAP block
-        return CryptoService
-            .Signature.ValidateCertificateChain(
-                dapBlock.CertificateChain.Select(cert => cert.ToArray()).ToArray()
-            )
-            .Map(_ => dapBlock);
-    }
+        var blocks = ImmutableArray.CreateBuilder<DapBlock>();
+        int offset = 0;
 
-    /// <summary>
-    /// Verifies the DAP signature against the signed data.
-    /// </summary>
-    /// <param name="dapBlock">The DAP block with signature.</param>
-    /// <param name="capFileData">The CAP file data to verify.</param>
-    /// <returns>Verified DAP block or error.</returns>
-    private static Result<DapBlock, SmartCardError> VerifyDapDataSignature(
-        DapBlock dapBlock,
-        byte[] capFileData
-    )
-    {
-        // First extract the public key from the validated certificate chain
-        return CryptoService
-            .Signature.ValidateCertificateChain(
-                dapBlock.CertificateChain.Select(cert => cert.ToArray()).ToArray()
-            )
-            .Bind(publicKey =>
-                ExtractSignedData(capFileData)
-                    .Bind(signedData =>
-                        VerifySignature(
-                            signedData,
-                            dapBlock.DapSignature.ToArray(),
-                            publicKey,
-                            dapBlock.SignatureAlgorithm
-                        )
-                    )
-            )
-            .Map(_ => dapBlock);
-    }
-
-    /// <summary>
-    /// Extracts the data that was signed for DAP verification.
-    /// </summary>
-    /// <param name="capFileData">The CAP file data.</param>
-    /// <returns>The signed data portion.</returns>
-    private static Result<byte[], SmartCardError> ExtractSignedData(byte[] capFileData)
-    {
-        // In a real implementation, this would extract the specific portions
-        // of the CAP file that are covered by the DAP signature
-        // For emulation, use the first portion of the file
-        int signedDataLength = Math.Min(1024, capFileData.Length);
-        return Result.Success<byte[], SmartCardError>(capFileData[..signedDataLength]);
-    }
-
-    /// <summary>
-    /// Verifies a cryptographic signature against data.
-    /// </summary>
-    /// <param name="data">The data that was signed.</param>
-    /// <param name="signature">The signature to verify.</param>
-    /// <param name="publicKey">The public key for verification.</param>
-    /// <param name="algorithm">The signature algorithm identifier.</param>
-    /// <returns>True if signature is valid, false otherwise.</returns>
-    private static Result<bool, SmartCardError> VerifySignature(
-        byte[] data,
-        byte[] signature,
-        byte[] publicKey,
-        byte algorithm
-    )
-    {
-        return algorithm switch
+        while (offset < loadFileData.Length && loadFileData[offset] == 0xE2)
         {
-            0x01 => CryptoService.Signature.VerifyRsaSha1(data, signature, publicKey),
-            0x02 => CryptoService.Signature.VerifyRsaSha256(data, signature, publicKey),
-            0x03 => CryptoService.Signature.VerifyEcdsaSha256(data, signature, publicKey),
-            _ => Result.Failure<bool, SmartCardError>(SmartCardError.AlgorithmNotSupported()),
-        };
+            var outer = ReadTlv(loadFileData, offset, 0xE2, 1, int.MaxValue, loadFileData.Length);
+            if (outer.IsFailure)
+            {
+                return Result.Failure<ImmutableArray<DapBlock>, SmartCardError>(outer.Error);
+            }
+
+            var parsedBlock = ParseDapBlock(outer.Value.Value);
+            if (parsedBlock.IsFailure)
+            {
+                return Result.Failure<ImmutableArray<DapBlock>, SmartCardError>(parsedBlock.Error);
+            }
+
+            blocks.Add(parsedBlock.Value);
+            offset = outer.Value.NextOffset;
+        }
+
+        return Result.Success<ImmutableArray<DapBlock>, SmartCardError>(blocks.ToImmutable());
     }
 
-    /// <summary>
-    /// Immutable DAP (Data Authentication Pattern) block structure.
-    /// </summary>
-    /// <param name="SecurityDomainAid">AID of the Security Domain that created the DAP.</param>
-    /// <param name="DapSignature">The cryptographic signature over the signed data.</param>
-    /// <param name="CertificateChain">X.509 certificate chain for signature verification.</param>
-    /// <param name="SignatureAlgorithm">Algorithm identifier for the signature.</param>
-    public record DapBlock(
+    private static Result<DapBlock, SmartCardError> ParseDapBlock(byte[] value)
+    {
+        var aid = ReadTlv(value, 0, 0x4F, 5, 16, value.Length);
+        if (aid.IsFailure)
+        {
+            return Result.Failure<DapBlock, SmartCardError>(aid.Error);
+        }
+
+        var signature = ReadTlv(value, aid.Value.NextOffset, 0xC3, 1, int.MaxValue, value.Length);
+        if (signature.IsFailure)
+        {
+            return Result.Failure<DapBlock, SmartCardError>(signature.Error);
+        }
+
+        if (signature.Value.NextOffset != value.Length)
+        {
+            return Result.Failure<DapBlock, SmartCardError>(
+                SmartCardError.InvalidData("DAP Block contains data after the C3 object")
+            );
+        }
+
+        return Result.Success<DapBlock, SmartCardError>(
+            new DapBlock(
+                aid.Value.Value.ToImmutableArray(),
+                signature.Value.Value.ToImmutableArray()
+            )
+        );
+    }
+
+    private static Result<Tlv, SmartCardError> ReadTlv(
+        byte[] data,
+        int offset,
+        byte expectedTag,
+        int minimumLength,
+        int maximumLength,
+        int limit
+    )
+    {
+        if (offset >= limit || data[offset] != expectedTag)
+        {
+            return Result.Failure<Tlv, SmartCardError>(
+                SmartCardError.InvalidData($"Expected DAP tag {expectedTag:X2}")
+            );
+        }
+
+        var length = ReadBerLength(data, offset + 1, limit);
+        if (length.IsFailure)
+        {
+            return Result.Failure<Tlv, SmartCardError>(length.Error);
+        }
+
+        int valueOffset = length.Value.ValueOffset;
+        int valueLength = length.Value.Length;
+        if (
+            valueLength < minimumLength
+            || valueLength > maximumLength
+            || valueOffset > limit - valueLength
+        )
+        {
+            return Result.Failure<Tlv, SmartCardError>(
+                SmartCardError.InvalidData($"Invalid length for DAP tag {expectedTag:X2}")
+            );
+        }
+
+        byte[] value = new byte[valueLength];
+        Array.Copy(data, valueOffset, value, 0, valueLength);
+        return Result.Success<Tlv, SmartCardError>(new Tlv(value, valueOffset + valueLength));
+    }
+
+    private static Result<BerLength, SmartCardError> ReadBerLength(
+        byte[] data,
+        int offset,
+        int limit
+    )
+    {
+        if (offset >= limit)
+        {
+            return Result.Failure<BerLength, SmartCardError>(
+                SmartCardError.InvalidData("DAP TLV length is missing")
+            );
+        }
+
+        byte first = data[offset];
+        if ((first & 0x80) == 0)
+        {
+            return Result.Success<BerLength, SmartCardError>(new BerLength(first, offset + 1));
+        }
+
+        int lengthBytes = first & 0x7F;
+        if (lengthBytes is 0 or > 4 || offset + lengthBytes >= limit)
+        {
+            return Result.Failure<BerLength, SmartCardError>(
+                SmartCardError.InvalidData("Invalid DAP TLV BER length")
+            );
+        }
+
+        int length = 0;
+        for (int index = 0; index < lengthBytes; index++)
+        {
+            if (length > (int.MaxValue >> 8))
+            {
+                return Result.Failure<BerLength, SmartCardError>(
+                    SmartCardError.InvalidData("DAP TLV length is too large")
+                );
+            }
+
+            length = length << 8 | data[offset + 1 + index];
+        }
+
+        return Result.Success<BerLength, SmartCardError>(
+            new BerLength(length, offset + 1 + lengthBytes)
+        );
+    }
+
+    private static Result<bool, SmartCardError> MissingVerificationKey(DapBlock block)
+    {
+        return Result.Failure<bool, SmartCardError>(
+            SmartCardError.SecurityStatusNotSatisfied(
+                $"No DAP verification key is configured for Security Domain {Convert.ToHexString(block.SecurityDomainAid.AsSpan())}"
+            )
+        );
+    }
+
+    private readonly record struct Tlv(byte[] Value, int NextOffset);
+
+    private readonly record struct BerLength(int Length, int ValueOffset);
+
+    /// <summary>GP Card Specification v2.3.1, Table 11-58.</summary>
+    public sealed record DapBlock(
         ImmutableArray<byte> SecurityDomainAid,
-        ImmutableArray<byte> DapSignature,
-        ImmutableArray<ImmutableArray<byte>> CertificateChain,
-        byte SignatureAlgorithm
+        ImmutableArray<byte> LoadFileDataBlockSignature
     );
 }

@@ -213,12 +213,6 @@ public static partial class Constants
                 /// Used for deriving the session response MAC key.
                 /// </summary>
                 SRMac = 0x07,
-
-                /// <summary>
-                /// S-DEK key derivation label.
-                /// Used for deriving the session data encryption key.
-                /// </summary>
-                SDek = 0x08,
             }
 
             /// <summary>

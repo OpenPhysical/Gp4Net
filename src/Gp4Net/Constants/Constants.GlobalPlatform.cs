@@ -149,56 +149,6 @@ public static partial class Constants
         // Reference: GP SCP02, GP SCP03 specifications
 
         /// <summary>
-        /// Application lifecycle states per GlobalPlatform specification.
-        /// Reference: GP Card Specification v2.3.1, Section 3.2
-        /// </summary>
-        public static class LifecycleStates
-        {
-            /// <summary>LOADED state - application installed but not selectable (0x01).</summary>
-            public const byte LOADED = 0x01;
-
-            /// <summary>INSTALLED state - application selectable but not active (0x03).</summary>
-            public const byte INSTALLED = 0x03;
-
-            /// <summary>SELECTABLE state - application can be selected and executed (0x07).</summary>
-            public const byte SELECTABLE = 0x07;
-
-            /// <summary>LOCKED state - application locked and non-functional (0x83).</summary>
-            public const byte LOCKED = 0x83;
-        }
-
-        /// <summary>
-        /// Privilege bits for GlobalPlatform applications and security domains.
-        /// Reference: GP Card Specification v2.3.1, Section 5.1.1
-        /// </summary>
-        public static class Privileges
-        {
-            /// <summary>Security Domain privilege (0x80).</summary>
-            public const byte SECURITY_DOMAIN = 0x80;
-
-            /// <summary>DAP Verification privilege (0x40).</summary>
-            public const byte DAP_VERIFICATION = 0x40;
-
-            /// <summary>Delegated Management privilege (0x20).</summary>
-            public const byte DELEGATED_MANAGEMENT = 0x20;
-
-            /// <summary>Card Lock privilege (0x10).</summary>
-            public const byte CARD_LOCK = 0x10;
-
-            /// <summary>Card Terminate privilege (0x08).</summary>
-            public const byte CARD_TERMINATE = 0x08;
-
-            /// <summary>Card Reset privilege (0x04).</summary>
-            public const byte CARD_RESET = 0x04;
-
-            /// <summary>CVM Management privilege (0x02).</summary>
-            public const byte CVM_MANAGEMENT = 0x02;
-
-            /// <summary>Mandated DAP Verification privilege (0x01).</summary>
-            public const byte MANDATED_DAP_VERIFICATION = 0x01;
-        }
-
-        /// <summary>
         /// Cryptographic constants for GlobalPlatform operations.
         /// Reference: GP SCP02, GP SCP03 specifications
         /// </summary>
@@ -272,8 +222,11 @@ public static partial class Constants
             /// <summary>Install for load P1 parameter (0x02).</summary>
             public const byte INSTALL_FOR_LOAD = 0x02;
 
-            /// <summary>Install for install P1 parameter (0x0C).</summary>
-            public const byte INSTALL_FOR_INSTALL = 0x0C;
+            /// <summary>INSTALL [for install] P1 parameter (0x04), Table 11-41.</summary>
+            public const byte INSTALL_FOR_INSTALL = 0x04;
+
+            /// <summary>INSTALL [for install and make selectable] P1 parameter (0x0C), Table 11-41.</summary>
+            public const byte INSTALL_AND_MAKE_SELECTABLE = 0x0C;
 
             /// <summary>Make selectable P1 parameter (0x08).</summary>
             public const byte MAKE_SELECTABLE = 0x08;
@@ -471,48 +424,6 @@ public static partial class Constants
 
             /// <summary>P1 parameter for END R-MAC SESSION command (0x00).</summary>
             public const byte P1_END_SESSION = 0x00;
-        }
-
-        /// <summary>
-        /// GlobalPlatform application lifecycle states.
-        /// Reference: GP Card Specification v2.3.1, Section 6.3
-        /// </summary>
-        public enum LifecycleState : byte
-        {
-            /// <summary>
-            /// Loaded state - application loaded but not installed.
-            /// </summary>
-            Loaded = 0x01,
-
-            /// <summary>
-            /// Installed state - application installed but not selectable.
-            /// </summary>
-            Installed = 0x03,
-
-            /// <summary>
-            /// Selectable state - application can be selected.
-            /// </summary>
-            Selectable = 0x07,
-
-            /// <summary>
-            /// Personalized state - application is personalized.
-            /// </summary>
-            Personalized = 0x0F,
-
-            /// <summary>
-            /// Locked state - application is locked.
-            /// </summary>
-            Locked = 0x7F,
-
-            /// <summary>
-            /// Terminated state - application is terminated.
-            /// </summary>
-            Terminated = 0xFF,
-
-            /// <summary>
-            /// Unknown state.
-            /// </summary>
-            Unknown = 0x00,
         }
 
         /// <summary>

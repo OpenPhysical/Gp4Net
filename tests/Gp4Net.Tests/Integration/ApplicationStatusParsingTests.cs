@@ -45,7 +45,9 @@ public class ApplicationStatusParsingTests
         // Should include ISD AID with lifecycle (0x01) and privileges (C5: 03 9E FE)
         var isd = list.FirstOrDefault(static x => Convert.ToHexString(x.Aid) == "A000000151000000");
         _ = isd.Should().NotBeNull();
-        _ = isd!.LifecycleState.Should().Be(LifecycleState.Loaded);
+        // GP Card Specification v2.3.1, Table 11-6: ISD 0x01 is OP_READY.
+        _ = isd!.RawLifecycleState.Should().Be(0x01);
+        _ = isd.LifecycleStateString.Should().Be("OpReady");
         _ = isd.Privileges.Should().NotBeEmpty();
         _ = isd.Privileges.Contains(Privilege.SecurityDomain).Should().BeTrue();
 

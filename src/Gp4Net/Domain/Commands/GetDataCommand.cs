@@ -101,20 +101,25 @@ public class GetDataCommand : IApduCommand
         public static readonly ushort SecurityDomainManagerUrl = 0x5F50;
 
         /// <summary>
-        /// Application Production Life Cycle Data (tag 0x009F70).
+        /// Application Production Life Cycle Data (tag 0x9F70).
         /// </summary>
-        public static readonly uint ApplicationProductionLifeCycleData = 0x009F70;
+        public static readonly ushort ApplicationProductionLifeCycleData = 0x9F70;
 
         /// <summary>
-        /// Maximum number of APDU bytes (tag 0x009F65).
+        /// Maximum number of APDU bytes (tag 0x9F65).
         /// </summary>
-        public static readonly uint MaximumApduBytes = 0x009F65;
+        public static readonly ushort MaximumApduBytes = 0x9F65;
 
         /// <summary>
-        /// Extended Card Resources Information (tag 0x00FF21).
+        /// Extended Card Resources Information (tag 0xFF21).
         /// </summary>
-        public static readonly uint ExtendedCardResourcesInformation = 0x00FF21;
+        public static readonly ushort ExtendedCardResourcesInformation = 0xFF21;
+
+        /// <summary>List of Applications (tag 0x2F00).</summary>
+        public static readonly ushort ApplicationList = 0x2F00;
     }
+
+    private readonly byte[] _data;
 
     /// <summary>
     /// Gets the data object identifier.
@@ -141,9 +146,11 @@ public class GetDataCommand : IApduCommand
     /// Initializes a new instance of the GetDataCommand class.
     /// </summary>
     /// <param name="dataObjectIdentifier">The data object identifier (2 bytes).</param>
-    private GetDataCommand(ushort dataObjectIdentifier)
+    /// <param name="data">The command data.</param>
+    private GetDataCommand(ushort dataObjectIdentifier, byte[] data)
     {
         DataObjectIdentifier = dataObjectIdentifier;
+        _data = (byte[])data.Clone();
     }
 
     /// <summary>
@@ -153,52 +160,17 @@ public class GetDataCommand : IApduCommand
     /// <returns>A Result containing the command or an error.</returns>
     public static Result<GetDataCommand, SmartCardError> Create(ushort dataObject)
     {
-        return Result.Success<GetDataCommand, SmartCardError>(new GetDataCommand(dataObject));
+        return Result.Success<GetDataCommand, SmartCardError>(new GetDataCommand(dataObject, []));
     }
 
     /// <summary>
-    /// Creates a GET DATA command for a 3-byte data object identifier.
+    /// Creates GET DATA for the List of Applications.
+    /// GP Card Specification v2.3.1, §11.3.2.2.
     /// </summary>
-    /// <param name="identifier">The 3-byte data object identifier.</param>
-    /// <returns>A Result containing the command or an error.</returns>
-    public static Result<GetDataCommand, SmartCardError> CreateFor3ByteIdentifier(byte[] identifier)
-    {
-        return Maybe<byte[]>
-            .From(identifier)
-            .Match(
-                Some: identifierValue => ValidateAndCreateFor3Byte(identifierValue),
-                None: () =>
-                    Result.Failure<GetDataCommand, SmartCardError>(
-                        SmartCardError.InvalidArgument("Identifier cannot be null")
-                    )
-            );
-    }
-
-    /// <summary>
-    /// Validates the identifier and creates the command for 3-byte identifier.
-    /// </summary>
-    /// <param name="identifier">The validated identifier.</param>
-    /// <returns>A Result containing the command or an error.</returns>
-    private static Result<GetDataCommand, SmartCardError> ValidateAndCreateFor3Byte(
-        byte[] identifier
-    )
-    {
-        if (identifier.Length != 3)
-        {
-            return Result.Failure<GetDataCommand, SmartCardError>(
-                SmartCardError.InvalidArgument(
-                    $"Identifier must be exactly 3 bytes, but was {identifier.Length} bytes"
-                )
-            );
-        }
-
-        // For 3-byte identifiers, we use the first two bytes as the identifier
-        // This is a simplified approach - full implementation would handle 3-byte tags properly
-        ushort twoByteIdentifier = (ushort)(identifier[0] << 8 | identifier[1]);
-        return Result.Success<GetDataCommand, SmartCardError>(
-            new GetDataCommand(twoByteIdentifier)
+    public static Result<GetDataCommand, SmartCardError> CreateApplicationList() =>
+        Result.Success<GetDataCommand, SmartCardError>(
+            new GetDataCommand(DataObjects.ApplicationList, [0x5C, 0x00])
         );
-    }
 
     /// <summary>
     /// Gets the class byte.
@@ -213,7 +185,7 @@ public class GetDataCommand : IApduCommand
     /// <summary>
     /// Gets the command data.
     /// </summary>
-    public byte[] Data => [];
+    public byte[] Data => (byte[])_data.Clone();
 
     /// <summary>
     /// Gets the expected response length.
@@ -231,34 +203,21 @@ public class GetDataCommand : IApduCommand
     /// <returns>A Result containing the CommandAPDU.</returns>
     public Result<CommandAPDU, SmartCardError> ToCommandApdu()
     {
-        // GET DATA is Case 2 APDU: CLA INS P1 P2 Le (5 bytes)
-        // Le=0 means expect up to 256 bytes in short APDU format
-        // Use byte array constructor to ensure correct Case 2 format
-        byte[] apduBytes = new byte[] { Cla, Ins, P1, P2, 0x00 };
-        return Result.Success<CommandAPDU, SmartCardError>(new CommandAPDU(apduBytes));
+        return Result.Success<CommandAPDU, SmartCardError>(new CommandAPDU(ToBytes()));
     }
 
     /// <inheritdoc/>
     public CommandAPDU ToApdu()
     {
-        // GET DATA is Case 2 APDU with no command data, only Le
-        // Use byte array constructor to ensure correct format
-        return ExpectedResponseLength.Match(
-            Some: le => new CommandAPDU(
-                new byte[] { Cla, Ins, P1, P2, (byte)(le == 256 ? 0 : le) }
-            ),
-            None: () => new CommandAPDU(new byte[] { Cla, Ins, P1, P2 })
-        );
+        return new CommandAPDU(ToBytes());
     }
 
     /// <inheritdoc/>
     public byte[] ToBytes()
     {
-        // Create APDU bytes: CLA INS P1 P2 [Lc Data] [Le]
-        return ExpectedResponseLength.Match(
-            Some: le => [Cla, Ins, P1, P2, (byte)(le == 256 ? 0 : le)],
-            None: () => new byte[] { Cla, Ins, P1, P2 }
-        );
+        return _data.Length == 0
+            ? [Cla, Ins, P1, P2, 0x00]
+            : [Cla, Ins, P1, P2, (byte)_data.Length, .. _data, 0x00];
     }
 
     /// <summary>

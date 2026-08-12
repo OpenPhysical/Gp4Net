@@ -55,11 +55,11 @@ public class CardCapabilitiesTests
     [Test]
     public void Parse_WithSecurityDomainPrivileges_ParsesCorrectly()
     {
-        // Arrange
+        // GP Card Specification v2.3.1, Table H-5: tag 81 contains SSD privileges.
         byte[] data =
         [
-            0x80,
-            0x03, // Tag 80, length 3
+            0x81,
+            0x03,
             0xC0,
             0x00,
             0x00, // SD privileges
@@ -82,11 +82,11 @@ public class CardCapabilitiesTests
     [Test]
     public void Parse_WithApplicationPrivileges_ParsesCorrectly()
     {
-        // Arrange
+        // GP Card Specification v2.3.1, Table H-5: tag 82 contains Application privileges.
         byte[] data =
         [
-            0x81,
-            0x03, // Tag 81, length 3
+            0x82,
+            0x03,
             0x00,
             0x02,
             0x00, // App privileges with FinalApplication
@@ -115,14 +115,9 @@ public class CardCapabilitiesTests
     [Test]
     public void Parse_WithSupportedAlgorithms_ParsesCorrectly()
     {
-        // Arrange
-        byte[] data =
-        [
-            0x82,
-            0x02, // Tag 82, length 2
-            0x03,
-            0x00, // SHA-1 and SHA-256 supported
-        ];
+        // GP Card Specification v2.3.1, Table H-5: tag 83 is a sequence of
+        // LFDBH algorithm identifiers, where 01 is SHA-1 and 02 is SHA-256.
+        byte[] data = [0x83, 0x02, 0x01, 0x02,];
 
         // Act
         Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(
@@ -141,14 +136,9 @@ public class CardCapabilitiesTests
     [Test]
     public void Parse_WithCipherSuites_ParsesCorrectly()
     {
-        // Arrange
-        byte[] data =
-        [
-            0x86,
-            0x02, // Tag 86 (DAP verification), length 2
-            0x01,
-            0x02, // DES_MAC and AES_CMAC_128
-        ];
+        // GP Card Specification v2.3.1, Tables H-5 and H-9: tag 87 contains
+        // the DAP signature-suite bitmap; b3 is DES MAC and b4 is AES-128 CMAC.
+        byte[] data = [0x87, 0x01, 0x0C,];
 
         // Act
         Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(
@@ -162,6 +152,42 @@ public class CardCapabilitiesTests
         var ciphers = capabilities.CipherSuites[CipherUsage.DapVerification];
         _ = ciphers.Should().Contain(CipherSuite.Des3Mac);
         _ = ciphers.Should().Contain(CipherSuite.AesCmac128);
+    }
+
+    [Test]
+    public void Parse_CipherSuiteBitmapsAndKeyReferences_UsesTablesH8ThroughH10()
+    {
+        // GP Card Specification v2.3.1, Tables H-5 and H-8 through H-10.
+        byte[] data = [0x84, 0x01, 0x8F, 0x85, 0x02, 0xC0, 0x03, 0x88, 0x02, 0x01, 0x02,];
+
+        var result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
+
+        _ = result.IsSuccess.Should().BeTrue();
+        var capabilities = result.Value;
+        _ = capabilities.SupportsLfdbEncryptionIcv.Should().BeTrue();
+        _ = capabilities
+            .CipherSuites[CipherUsage.LfdbEncryption]
+            .Should()
+            .Contain(
+                [
+                    CipherSuite.TripleDes16,
+                    CipherSuite.Aes128,
+                    CipherSuite.Aes192,
+                    CipherSuite.Aes256,
+                ]
+            );
+        _ = capabilities
+            .CipherSuites[CipherUsage.TokenVerification]
+            .Should()
+            .Contain(
+                [
+                    CipherSuite.EcdsaP256Sha256,
+                    CipherSuite.EcdsaP384Sha384,
+                    CipherSuite.EcdsaP512Sha512,
+                    CipherSuite.EcdsaP521Sha512,
+                ]
+            );
+        _ = capabilities.KeyParameterReferences.Should().Equal(0x01, 0x02);
     }
 
     [Test]
@@ -183,29 +209,28 @@ public class CardCapabilitiesTests
             0x01,
             0x07,
             // SD privileges
-            0x80,
+            0x81,
             0x03,
             0xFF,
             0xFF,
             0xE0,
             // App privileges
-            0x81,
+            0x82,
             0x03,
             0x00,
             0x00,
             0x02,
             // Supported algorithms
-            0x82,
-            0x02,
-            0x0F,
-            0x00,
-            // Cipher suites
-            0x86,
+            0x83,
             0x04,
             0x01,
             0x02,
             0x03,
             0x04,
+            // Cipher suites
+            0x87,
+            0x01,
+            0x0F,
         ];
 
         // Act
@@ -247,7 +272,7 @@ public class CardCapabilitiesTests
             0x82,
             0x01,
             0x07,
-            0x80,
+            0x81,
             0x03,
             0xC0,
             0x00,

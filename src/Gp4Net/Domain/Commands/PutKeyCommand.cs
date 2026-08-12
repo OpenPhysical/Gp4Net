@@ -361,7 +361,7 @@ public class KeyDataBlock
     /// <summary>
     /// Gets the key length.
     /// </summary>
-    public byte Length { get; }
+    public int Length { get; }
 
     /// <summary>
     /// Gets the key value.
@@ -383,7 +383,7 @@ public class KeyDataBlock
     {
         ArgumentNullException.ThrowIfNull(value);
         Type = type;
-        Length = (byte)value.Length;
+        Length = value.Length;
         Value = (byte[])value.Clone();
         KeyCheckValue = keyCheckValue.Map(kcv => (byte[])kcv.Clone());
     }
@@ -394,7 +394,8 @@ public class KeyDataBlock
     /// <returns>The byte representation.</returns>
     public byte[] ToBytes()
     {
-        List<byte> result = [(byte)Type, Length];
+        List<byte> result = [(byte)Type];
+        result.AddRange(GlobalPlatformLengthEncoding.EncodeBerLength(Length));
 
         result.AddRange(Value);
 
@@ -433,7 +434,7 @@ public class KeyDataBlock
             .From(componentBlock)
             .ToResult(SmartCardError.InvalidArgument("Key component block cannot be null."))
             .Bind(block =>
-                block.Length is > 0 and <= 255
+                block.Length is > 0 and <= 0xFFFF
                     ? ValidateKeyCheckValue(Maybe<byte[]>.From(keyCheckValue), keyType.ToString())
                         .Bind(kcv =>
                             Result.Success<KeyDataBlock, SmartCardError>(
@@ -442,7 +443,7 @@ public class KeyDataBlock
                         )
                     : Result.Failure<KeyDataBlock, SmartCardError>(
                         SmartCardError.InvalidArgument(
-                            "Key component block must contain 1 to 255 bytes."
+                            "Key component block must contain 1 to 65535 bytes."
                         )
                     )
             );

@@ -370,11 +370,12 @@ public class CapFileService : ICapFileService
     /// <inheritdoc />
     public Result<bool, SmartCardError> VerifyDapSignature(byte[] capFileData, byte[] dapSignature)
     {
-        return ExtractDapBlock(capFileData)
-            .Bind(dapBlock => ValidateDapAlgorithm(dapBlock))
-            .Bind(dapBlock => VerifyDapCertificateChain(dapBlock))
-            .Bind(dapBlock => VerifyDapDataSignature(dapBlock, capFileData))
-            .Map(_ => true);
+        _ = capFileData;
+        _ = dapSignature;
+
+        // GP Card Specification v2.3.1, Appendix C.3: the verifying Security Domain's
+        // key and algorithm are required to verify a Load File Data Block Signature.
+        return Result.Failure<bool, SmartCardError>(SmartCardError.AlgorithmNotSupported());
     }
 
     /// <inheritdoc />
@@ -383,8 +384,8 @@ public class CapFileService : ICapFileService
         byte[] expectedHash
     )
     {
-        return CryptoService
-            .Hash.Sha256(capFileData)
+        // GP Card Specification v2.3.1, Appendix C.2: OPEN may detect the LFDBH algorithm by length.
+        return ComputeLoadFileDataBlockHash(capFileData, expectedHash.Length)
             .Map(actualHash => actualHash.SequenceEqual(expectedHash))
             .Ensure(
                 isMatch => isMatch,
@@ -394,165 +395,21 @@ public class CapFileService : ICapFileService
             );
     }
 
-    // ================================================================================================
-    // Private DAP Processing Methods (extracted from VirtualCard)
-    // ================================================================================================
-
-    /// <summary>
-    /// Extracts DAP block from CAP file data per GP specification Section 9.7.2.
-    /// </summary>
-    private static Result<DapBlock, SmartCardError> ExtractDapBlock(byte[] capFileData)
-    {
-        const byte dapTag = 0xC4; // Per GP Card Specification Table E-1
-
-        return Maybe
-            .From(capFileData)
-            .ToResult(SmartCardError.InvalidData("CAP file data required"))
-            .Ensure(
-                data => data.Length >= 100,
-                SmartCardError.InvalidData("CAP file too small for DAP verification")
-            )
-            .Bind(data => FindDapTag(data, dapTag))
-            .Map(tagPosition => CreateDapBlock(capFileData, tagPosition));
-    }
-
-    /// <summary>
-    /// Locates DAP tag in CAP file data.
-    /// </summary>
-    private static Result<int, SmartCardError> FindDapTag(byte[] data, byte dapTag)
-    {
-        var tagPositions = data.Select((b, index) => new { Byte = b, Index = index })
-            .Where(item => item.Byte == dapTag)
-            .ToList();
-
-        return tagPositions.Any()
-            ? Result.Success<int, SmartCardError>(tagPositions.First().Index)
-            : Result.Failure<int, SmartCardError>(
-                SmartCardError.SecurityError("DAP block required but not found")
-            );
-    }
-
-    /// <summary>
-    /// Creates DAP block from CAP file data.
-    /// </summary>
-    private static DapBlock CreateDapBlock(byte[] capFileData, int tagPosition)
-    {
-        byte[] signature = capFileData.Skip(capFileData.Length - 64).Take(64).ToArray();
-        byte[] certificate = capFileData.Skip(tagPosition + 10).Take(256).ToArray();
-
-        return new DapBlock(
-            Algorithm: "RSA_SHA256",
-            Signature: signature,
-            CertificateChain: [certificate]
-        );
-    }
-
-    /// <summary>
-    /// Validates DAP algorithm against supported algorithms.
-    /// </summary>
-    private static Result<DapBlock, SmartCardError> ValidateDapAlgorithm(DapBlock dapBlock)
-    {
-        return dapBlock.Algorithm == "RSA_SHA256" || dapBlock.Algorithm == "ECDSA-P256"
-            ? Result.Success<DapBlock, SmartCardError>(dapBlock)
-            : Result.Failure<DapBlock, SmartCardError>(SmartCardError.AlgorithmNotSupported());
-    }
-
-    /// <summary>
-    /// Verifies DAP certificate chain.
-    /// </summary>
-    private static Result<DapBlock, SmartCardError> VerifyDapCertificateChain(DapBlock dapBlock)
-    {
-        return dapBlock.CertificateChain.Any()
-            ? dapBlock.CertificateChain.First().Length >= 100
-                ? Result.Success<DapBlock, SmartCardError>(dapBlock)
-                : Result.Failure<DapBlock, SmartCardError>(
-                    SmartCardError.SecurityStatusNotSatisfied("Invalid DAP certificate format")
-                )
-            : Result.Failure<DapBlock, SmartCardError>(
-                SmartCardError.SecurityStatusNotSatisfied("DAP certificate chain empty")
-            );
-    }
-
-    /// <summary>
-    /// Verifies DAP signature against load file data.
-    /// </summary>
-    private static Result<DapBlock, SmartCardError> VerifyDapDataSignature(
-        DapBlock dapBlock,
-        byte[] capFileData
+    private static Result<byte[], SmartCardError> ComputeLoadFileDataBlockHash(
+        byte[] data,
+        int hashLength
     )
     {
-        return ExtractSignedData(capFileData)
-            .Bind(signedData => VerifySignature(signedData, dapBlock.Signature))
-            .Map(_ => dapBlock);
-    }
-
-    /// <summary>
-    /// Extracts signed data portion from CAP file.
-    /// </summary>
-    private static Result<byte[], SmartCardError> ExtractSignedData(byte[] capFileData)
-    {
-        int signedDataLength = (int)(capFileData.Length * 0.8);
-        return signedDataLength > 0
-            ? Result.Success<byte[], SmartCardError>(capFileData.Take(signedDataLength).ToArray())
-            : Result.Failure<byte[], SmartCardError>(
-                SmartCardError.InvalidData("No signed data available")
-            );
-    }
-
-    /// <summary>
-    /// Performs cryptographic signature verification.
-    /// </summary>
-    private static Result<bool, SmartCardError> VerifySignature(byte[] data, byte[] signature)
-    {
-        // Virtual card emulator uses test keys for DAP verification
-        // Production systems would extract public key from certificate chain
-
-        return GenerateTestPublicKey()
-            .Bind(publicKey =>
-                CryptoService
-                    .Hash.Sha256(data)
-                    .Bind(hash =>
-                        CryptoService.Signature.VerifyRsaSha256(hash, signature, publicKey)
-                    )
-            )
-            .Bind(isValid =>
-                isValid
-                    ? Result.Success<bool, SmartCardError>(true)
-                    : Result.Failure<bool, SmartCardError>(
-                        SmartCardError.SecurityStatusNotSatisfied(
-                            "DAP signature verification failed - invalid signature"
-                        )
-                    )
-            );
-    }
-
-    /// <summary>
-    /// Generates deterministic test RSA public key for virtual card DAP verification.
-    /// </summary>
-    private static Result<byte[], SmartCardError> GenerateTestPublicKey()
-    {
-        // Generate deterministic test RSA public key for virtual card DAP verification
-        byte[] exponent = [0x01, 0x00, 0x01]; // 65537
-
-        // Create modulus using functional pattern
-        byte[] modulus = Enumerable
-            .Range(0, 256)
-            .Select(i => (byte)((i * 17 + 53) % 256))
-            .Select((b, i) => i == 0 ? (byte)(b | 0x80) : b) // Ensure high bit is set
-            .ToArray();
-
-        // Encode as SubjectPublicKeyInfo
-        return Result.Try(
-            () =>
-            {
-                using var ms = new MemoryStream();
-                using var writer = new BinaryWriter(ms);
-                writer.Write(modulus);
-                writer.Write(exponent);
-                return ms.ToArray();
-            },
-            ex =>
-                SmartCardError.CryptographicError($"Failed to encode test public key: {ex.Message}")
-        );
+        return hashLength switch
+        {
+            20 => CryptoService.Hash.Sha1(data),
+            32 => CryptoService.Hash.Sha256(data),
+            48 => CryptoService.Hash.Sha384(data),
+            64 => CryptoService.Hash.Sha512(data),
+            _
+                => Result.Failure<byte[], SmartCardError>(
+                    SmartCardError.InvalidData($"Unsupported LFDBH length: {hashLength}")
+                ),
+        };
     }
 }

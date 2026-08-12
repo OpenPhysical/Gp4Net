@@ -128,7 +128,7 @@ public static class CardInformationGatherer
 
     /// <summary>
     /// Retrieves CPLC (Card Production Life Cycle) data using GET DATA(0x9F7F).
-    /// Reference: GlobalPlatform Card Specification v2.3.1 Section E.1.1
+    /// CPLC is an industry data object, not defined by GP Card Specification v2.3.1.
     /// </summary>
     private static async Task<Result<CplcData, SmartCardError>> GetCplcDataAsync(
         Func<

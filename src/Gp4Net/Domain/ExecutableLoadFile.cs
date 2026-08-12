@@ -11,7 +11,7 @@ namespace Gp4Net.Domain;
 /// </summary>
 public record ExecutableLoadFile(
     byte[] Aid,
-    LifecycleState LifecycleState,
+    ExecutableLoadFileLifecycleState LifecycleState,
     Maybe<string> Version,
     ImmutableList<ExecutableModule> ExecutableModules,
     Maybe<byte[]> AssociatedSecurityDomainAid = default

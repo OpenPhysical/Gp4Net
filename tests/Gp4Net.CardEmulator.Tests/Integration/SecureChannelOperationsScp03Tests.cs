@@ -2,8 +2,12 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Gp4Net.CardEmulator.Functional;
+using Gp4Net.CardEmulator.Profiles;
 using Gp4Net.CardEmulator.Tests.TestHelpers;
+using Gp4Net.Constants;
 using Gp4Net.Core;
+using Gp4Net.Cryptography;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Services;
@@ -111,6 +115,119 @@ public class SecureChannelOperationsScp03Tests
             "Establishment should fail with unknown key version"
         );
         Assert.That(establishResult.Error.Code, Is.EqualTo("SECURITY_ERROR"));
+    }
+
+    [Test]
+    public void Should_Increment_PseudoRandom_Counter_Before_Each_Challenge()
+    {
+        // SCP03 Amendment D v1.1.2 §6.2.2.1: increment first, then derive with the new value.
+        var config = CardProfileLoader
+            .LoadFromFile(Scp03ProfilePath.Value)
+            .Value.WithScpDefaults(0x03, ScpImplementation.Scp03I10);
+        var state = CardState.Create().Value with
+        {
+            ScpVersion = 0x03,
+            ScpImplementation = ScpImplementation.Scp03I10,
+        };
+        byte[] command = Convert.FromHexString("8050000008000102030405060700");
+        var rng = CryptoService.Rng.CreateSecureContext();
+
+        var first = Scp03CommandProcessors.ProcessScp03InitializeUpdate(
+            command,
+            state,
+            config,
+            rng
+        );
+        Assert.That(first.IsSuccess, Is.True, () => first.Error.ToString());
+        var second = Scp03CommandProcessors.ProcessScp03InitializeUpdate(
+            command,
+            first.Value.Item2,
+            config,
+            rng
+        );
+
+        Assert.That(second.IsSuccess, Is.True, () => second.Error.ToString());
+        Assert.That(first.Value.Item1.Data[^3..], Is.EqualTo(new byte[] { 0x00, 0x00, 0x01 }));
+        Assert.That(second.Value.Item1.Data[^3..], Is.EqualTo(new byte[] { 0x00, 0x00, 0x02 }));
+        Assert.That(
+            second.Value.Item1.Data[13..21],
+            Is.Not.EqualTo(first.Value.Item1.Data[13..21])
+        );
+    }
+
+    [Test]
+    public void Should_Accept_I30_As_Table_5_1_Bitmap()
+    {
+        // SCP03 Amendment D v1.1.2 Table 5-1: i=30 is pseudo-random challenge plus R-MAC.
+        var config = CardProfileLoader
+            .LoadFromFile(Scp03ProfilePath.Value)
+            .Value.WithScpDefaults(0x03, ScpImplementation.Scp03I30);
+        var state = CardState.Create().Value with
+        {
+            ScpVersion = 0x03,
+            ScpImplementation = ScpImplementation.Scp03I30,
+        };
+
+        var result = Scp03CommandProcessors.ProcessScp03InitializeUpdate(
+            Convert.FromHexString("8050010008000102030405060700"),
+            state,
+            config,
+            CryptoService.Rng.CreateSecureContext()
+        );
+
+        Assert.That(result.IsSuccess, Is.True, () => result.Error.ToString());
+        Assert.That(result.Value.Item1.Data[12], Is.EqualTo(0x30));
+        Assert.That(result.Value.Item1.Data[^3..], Is.EqualTo(new byte[] { 0x00, 0x00, 0x01 }));
+    }
+
+    [Test]
+    public void Should_Omit_Sequence_Counter_For_Random_Challenge()
+    {
+        // SCP03 Amendment D v1.1.2 Table 7-3: the counter is present only for pseudo-random mode.
+        var config = CardProfileLoader
+            .LoadFromFile(Scp03ProfilePath.Value)
+            .Value.WithScpDefaults(0x03, ScpImplementation.Scp03I00);
+        var state = CardState.Create().Value with
+        {
+            ScpVersion = 0x03,
+            ScpImplementation = ScpImplementation.Scp03I00,
+        };
+
+        var result = Scp03CommandProcessors.ProcessScp03InitializeUpdate(
+            Convert.FromHexString("8050010008000102030405060700"),
+            state,
+            config,
+            CryptoService.Rng.CreateSecureContext()
+        );
+
+        Assert.That(result.IsSuccess, Is.True, () => result.Error.ToString());
+        Assert.That(result.Value.Item1.Data, Has.Length.EqualTo(29));
+    }
+
+    [Test]
+    public void Should_Reject_Exhausted_PseudoRandom_Counter()
+    {
+        // SCP03 Amendment D v1.1.2 §6.2.2.1 requires rejection at the maximum value.
+        var config = CardProfileLoader
+            .LoadFromFile(Scp03ProfilePath.Value)
+            .Value.WithScpDefaults(0x03, ScpImplementation.Scp03I10);
+        var state = (
+            CardState.Create().Value with
+            {
+                ScpVersion = 0x03,
+                ScpImplementation = ScpImplementation.Scp03I10,
+            }
+        ).WithSequenceCounter(0x01, [0xFF, 0xFF, 0xFF]);
+
+        var result = Scp03CommandProcessors.ProcessScp03InitializeUpdate(
+            Convert.FromHexString("8050010008000102030405060700"),
+            state,
+            config,
+            CryptoService.Rng.CreateSecureContext()
+        );
+
+        Assert.That(result.IsFailure, Is.True);
+        Assert.That(result.Error.Code, Is.EqualTo("CONDITIONS_NOT_SATISFIED"));
     }
 
     // SCP03 Amendment D v1.1.2, Sections 6.2.3 and 7.1.2.

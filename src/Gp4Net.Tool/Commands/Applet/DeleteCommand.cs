@@ -321,7 +321,7 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
                             )
                             .AddChoices(applications)
                             .UseConverter(app =>
-                                $"{Convert.ToHexString(app.Aid)} ({app.Type}) - {app.LifecycleState}"
+                                $"{Convert.ToHexString(app.Aid)} ({app.Type}) - {app.LifecycleStateString}"
                             );
 
                         var selected = AnsiConsole.Prompt(prompt);

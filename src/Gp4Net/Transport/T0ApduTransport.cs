@@ -106,7 +106,6 @@ public class T0ApduTransport : IApduTransport
 
         // Process the response
         return await ProcessResponseAsync(
-                command,
                 responseResult.Value,
                 channel,
                 apduBytes,
@@ -122,7 +121,6 @@ public class T0ApduTransport : IApduTransport
     }
 
     private async Task<Result<ApduResponse, SmartCardError>> ProcessResponseAsync(
-        IApduCommand command,
         byte[] response,
         ICardChannel channel,
         byte[] originalApduBytes,
@@ -150,8 +148,12 @@ public class T0ApduTransport : IApduTransport
             // Handle T=0 specific status words
             case 0x61:
             {
-                // More data available, send GET RESPONSE
-                var remainingData = await GetResponseAsync(sw2, channel, cancellationToken)
+                var remainingData = await GetResponseAsync(
+                        originalApduBytes[0],
+                        sw2,
+                        channel,
+                        cancellationToken
+                    )
                     .ConfigureAwait(false);
 
                 // Combine data
@@ -172,26 +174,12 @@ public class T0ApduTransport : IApduTransport
             }
             case 0x6C:
             {
-                // Wrong Le, retry with correct length
                 _logger.LogDebug("Wrong Le, retrying with Le={Le}", sw2);
 
-                // For T=0 retry, we need to rebuild the command with the correct Le
-                // This is a simplified approach - in practice would need to parse original command
-                if (originalApduBytes.Length >= 4)
+                var retryBytes = CreateShortLeRetry(originalApduBytes, sw2);
+                if (retryBytes.HasValue)
                 {
-                    var retryBytes = new byte[
-                        originalApduBytes.Length >= 5 ? originalApduBytes.Length : 5
-                    ];
-                    Array.Copy(
-                        originalApduBytes,
-                        retryBytes,
-                        Math.Min(4, originalApduBytes.Length)
-                    );
-                    if (retryBytes.Length == 5)
-                    {
-                        retryBytes[4] = sw2; // Set correct Le
-                    }
-                    var retryCommand = new WrappedApduCommand(new CommandAPDU(retryBytes));
+                    var retryCommand = new WrappedApduCommand(new CommandAPDU(retryBytes.Value));
                     return await TransmitAsync(retryCommand, channel, cancellationToken)
                         .ConfigureAwait(false);
                 }
@@ -208,7 +196,39 @@ public class T0ApduTransport : IApduTransport
         }
     }
 
+    private static Maybe<byte[]> CreateShortLeRetry(byte[] command, byte le)
+    {
+        // ISO/IEC 7816-4:2020 §5.6 requires the same command with SW2 as the short Le.
+        if (command.Length == 4)
+        {
+            return Maybe<byte[]>.From([.. command, le]);
+        }
+
+        if (command.Length == 5)
+        {
+            byte[] retry = (byte[])command.Clone();
+            retry[4] = le;
+            return Maybe<byte[]>.From(retry);
+        }
+
+        int dataLength = command[4];
+        if (command.Length == 5 + dataLength)
+        {
+            return Maybe<byte[]>.From([.. command, le]);
+        }
+
+        if (command.Length == 6 + dataLength)
+        {
+            byte[] retry = (byte[])command.Clone();
+            retry[^1] = le;
+            return Maybe<byte[]>.From(retry);
+        }
+
+        return Maybe<byte[]>.None;
+    }
+
     private async Task<ApduResponse> GetResponseAsync(
+        byte cla,
         byte length,
         ICardChannel channel,
         CancellationToken cancellationToken
@@ -217,14 +237,13 @@ public class T0ApduTransport : IApduTransport
         List<byte> allData = [];
         byte currentLength = length;
         int chainCount = 0;
-        int totalSize = 0;
         ushort finalStatusWord = 0;
 
         // Iterative approach to prevent stack overflow from malicious cards
         while (true)
         {
-            // GET RESPONSE: CLA=00 INS=C0 P1=00 P2=00 Le=currentLength
-            byte[] getResponse = [0x00, 0xC0, 0x00, 0x00, currentLength];
+            // ISO/IEC 7816-4:2020 §5.3.4 requires the same CLA throughout response chaining.
+            byte[] getResponse = [cla, 0xC0, 0x00, 0x00, currentLength];
 
             _logger.LogDebug(
                 "T=0 GET RESPONSE for {Length} bytes (chain {ChainCount})",
@@ -258,7 +277,6 @@ public class T0ApduTransport : IApduTransport
                 {
                     allData.Add(response[i]);
                 }
-                totalSize += dataLength;
             }
 
             // Check if more data is available

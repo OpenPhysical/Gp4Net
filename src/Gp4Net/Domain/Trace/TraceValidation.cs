@@ -805,21 +805,13 @@ public static class TraceValidation
             cardChallenge
         );
 
-        var sDekResult = CryptoService.KeyDerivation.DeriveScp03SessionKey(
-            baseKeys.DekKey,
-            hostChallenge,
-            cardChallenge,
-            0x08 // S-DEK label for SCP03
-        );
-
         return sEncResult.Bind(sEnc =>
             sMacResult.Bind(sMac =>
                 sRmacResult.Bind(sRmac =>
-                    sDekResult.Bind(sDek =>
-                    {
-                        var sessionKeys = new SessionKeys(sEnc, sMac, sRmac, sDek);
-                        return Result.Success<SessionKeys, SmartCardError>(sessionKeys);
-                    })
+                    // SCP03 v1.1.2, §6.1 and Table 6-2: Key-DEK remains static.
+                    Result.Success<SessionKeys, SmartCardError>(
+                        new SessionKeys(sEnc, sMac, sRmac, baseKeys.DekKey)
+                    )
                 )
             )
         );

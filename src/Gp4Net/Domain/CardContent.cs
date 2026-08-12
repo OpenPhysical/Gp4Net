@@ -80,15 +80,17 @@ public record CardContent(
     /// <summary>
     /// Gets applications by their lifecycle state.
     /// </summary>
-    public ImmutableList<ApplicationInfo> GetApplicationsByState(LifecycleState state)
+    public ImmutableList<ApplicationInfo> GetApplicationsByState(byte rawLifecycleState)
     {
-        return [.. AllApplications.Where(app => app.LifecycleState == state)];
+        return [.. AllApplications.Where(app => app.RawLifecycleState == rawLifecycleState)];
     }
 
     /// <summary>
     /// Gets executable load files by their lifecycle state.
     /// </summary>
-    public ImmutableList<ExecutableLoadFile> GetLoadFilesByState(LifecycleState state)
+    public ImmutableList<ExecutableLoadFile> GetLoadFilesByState(
+        ExecutableLoadFileLifecycleState state
+    )
     {
         return [.. ExecutableLoadFiles.Where(lf => lf.LifecycleState == state)];
     }
@@ -96,8 +98,7 @@ public record CardContent(
     /// <summary>
     /// Checks if the card has any selectable applications.
     /// </summary>
-    public bool HasSelectableApplications =>
-        AllApplications.Any(app => app.LifecycleState == LifecycleState.Selectable);
+    public bool HasSelectableApplications => AllApplications.Any(app => app.IsSelectable);
 
     /// <summary>
     /// Creates an empty CardContent instance.

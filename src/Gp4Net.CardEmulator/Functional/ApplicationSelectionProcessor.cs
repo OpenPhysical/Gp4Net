@@ -6,6 +6,7 @@ using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.Constants;
 using Gp4Net.Core;
+using Gp4Net.Domain;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
 using static Gp4Net.Services.TlvService;
 
@@ -315,8 +316,8 @@ public static class ApplicationSelectionProcessor
     /// </summary>
     private static byte[] BuildProprietaryData()
     {
-        // Life cycle state: SELECTABLE (INITIALIZED)
-        byte[] lifecycleState = [LifecycleStates.SELECTABLE];
+        // GP Card Specification v2.3.1, Table 11-4.
+        byte[] lifecycleState = [(byte)ApplicationLifecycleState.Selectable];
         var lifecycleTlvResult = TlvEncoder.EncodeSimple(0x9F70, [.. lifecycleState]);
         var lifecycleTlv = lifecycleTlvResult.Match(
             success => success.ToArray(),

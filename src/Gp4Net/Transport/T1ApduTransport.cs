@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
@@ -108,8 +109,22 @@ public class T1ApduTransport : IApduTransport
             return Result.Failure<ApduResponse, SmartCardError>(responseResult.Error);
         }
 
-        // Process the response
-        return Result.Success<ApduResponse, SmartCardError>(ProcessResponse(responseResult.Value));
+        var response = ProcessResponse(responseResult.Value);
+        if ((response.StatusWord >> 8) != 0x61)
+        {
+            return Result.Success<ApduResponse, SmartCardError>(response);
+        }
+
+        return Result.Success<ApduResponse, SmartCardError>(
+            await GetResponseAsync(
+                    apduBytes[0],
+                    (byte)response.StatusWord,
+                    response.Data,
+                    channel,
+                    cancellationToken
+                )
+                .ConfigureAwait(false)
+        );
     }
 
     private static byte GetLeByte(int expectedLength)
@@ -135,8 +150,36 @@ public class T1ApduTransport : IApduTransport
             Array.Copy(response, 0, data, 0, data.Length);
         }
 
-        // T=1 handles all chaining at protocol level
-        // No need for GET RESPONSE
         return new ApduResponse(data, statusWord);
+    }
+
+    private async Task<ApduResponse> GetResponseAsync(
+        byte cla,
+        byte length,
+        byte[] initialData,
+        ICardChannel channel,
+        CancellationToken cancellationToken
+    )
+    {
+        List<byte> data = [.. initialData];
+        byte currentLength = length;
+
+        while (true)
+        {
+            // ISO/IEC 7816-4:2020 §5.3.4 requires the same CLA throughout response chaining.
+            byte[] getResponse = [cla, 0xC0, 0x00, 0x00, currentLength];
+            byte[] rawResponse = await channel
+                .TransmitAsync(getResponse, cancellationToken)
+                .ConfigureAwait(false);
+            var response = ProcessResponse(rawResponse);
+            data.AddRange(response.Data);
+
+            if ((response.StatusWord >> 8) != 0x61)
+            {
+                return new ApduResponse([.. data], response.StatusWord);
+            }
+
+            currentLength = (byte)response.StatusWord;
+        }
     }
 }

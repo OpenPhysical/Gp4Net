@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using AwesomeAssertions;
 using Gp4Net.Domain.Commands;
 using NUnit.Framework;
@@ -98,5 +99,48 @@ public class InstallCommandConformanceTests
             .Value;
 
         _ = command.P1.Should().Be(0xA0);
+    }
+
+    /// <summary>GP Card Specification v2.3.1, Table 11-42.</summary>
+    [Test]
+    public void ForLoad_Should_Encode_LoadParameter_Length_As_Ber()
+    {
+        var command = InstallCommand
+            .InstallForLoadCommand.Create(ApplicationAid, loadParameters: new byte[129])
+            .Value;
+
+        _ = command.Data.Skip(10).Take(2).Should().Equal(0x81, 0x81);
+    }
+
+    /// <summary>GP Card Specification v2.3.1, Table 11-43.</summary>
+    [Test]
+    public void ForInstall_Should_Encode_InstallParameter_Length_As_Ber()
+    {
+        var command = InstallCommand
+            .InstallForInstallCommand.Create(
+                ApplicationAid,
+                ApplicationAid,
+                ApplicationAid,
+                [0x00],
+                installParameters: new byte[129]
+            )
+            .Value;
+
+        _ = command.Data.Skip(26).Take(2).Should().Equal(0x81, 0x81);
+    }
+
+    /// <summary>GP Card Specification v2.3.1, Table 11-44.</summary>
+    [Test]
+    public void MakeSelectable_Should_Encode_Parameter_Length_As_Ber()
+    {
+        var command = InstallCommand
+            .InstallForManagementCommand.CreateForMakeSelectable(
+                ApplicationAid,
+                [0x00],
+                parameters: new byte[129]
+            )
+            .Value;
+
+        _ = command.Data.Skip(12).Take(2).Should().Equal(0x81, 0x81);
     }
 }

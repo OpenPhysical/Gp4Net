@@ -93,9 +93,74 @@ public class CapFileLoadingWorkflow
         int maxLoadBlockSize = Constants.Constants.GlobalPlatform.ApduLimits.DEFAULT_LOAD_BLOCK_SIZE
     )
     {
-        return Result.Failure<IList<CommandAPDU>, SmartCardError>(
-            SmartCardError.NotImplemented("This method requires refactoring after WSCT migration")
+        var validation = ValidateCapFile(capFileData);
+        if (!validation.IsValid)
+        {
+            string message = validation.ErrorMessage.GetValueOrDefault(
+                "CAP file validation failed"
+            );
+            return Result.Failure<IList<CommandAPDU>, SmartCardError>(
+                SmartCardError.InvalidData(message)
+            );
+        }
+
+        return validation
+            .CapFile.ToResult(SmartCardError.InvalidData("CAP file was not parsed"))
+            .Bind(capFile =>
+                BuildLoadingCommands(
+                    capFile,
+                    securityDomainAid,
+                    installApplets,
+                    makeSelectableAfterInstall,
+                    maxLoadBlockSize
+                )
+            );
+    }
+
+    private static Result<IList<CommandAPDU>, SmartCardError> BuildLoadingCommands(
+        CapFileStructure capFile,
+        Maybe<byte[]> securityDomainAid,
+        bool installApplets,
+        bool makeSelectableAfterInstall,
+        int maxLoadBlockSize
+    )
+    {
+        // GP Card Specification v2.3.1, §§9.3.2, 9.3.5 and Tables 11-42, 11-56 through 11-58.
+        var installForLoadResult = InstallCommandBuilder.CreateForLoad(
+            capFile.PackageAid,
+            securityDomainAid
         );
+        if (installForLoadResult.IsFailure)
+            return Result.Failure<IList<CommandAPDU>, SmartCardError>(installForLoadResult.Error);
+
+        var loadResult = LoadCommand.CreateFromCapFile(capFile, maxLoadBlockSize);
+        if (loadResult.IsFailure)
+            return Result.Failure<IList<CommandAPDU>, SmartCardError>(loadResult.Error);
+
+        List<CommandAPDU> commands = [installForLoadResult.Value.ToApdu()];
+        commands.AddRange(loadResult.Value.Select(command => command.ToApdu()));
+
+        if (!installApplets)
+            return Result.Success<IList<CommandAPDU>, SmartCardError>(commands);
+
+        // GP Card Specification v2.3.1, §§9.3.3, 9.3.6 and Tables 11-41, 11-43.
+        foreach (var applet in capFile.Applets)
+        {
+            Maybe<byte[]> moduleAid = Maybe<byte[]>.From(applet.Aid);
+            var installResult = makeSelectableAfterInstall
+                ? InstallCommandBuilder.CreateForInstallAndMakeSelectable(
+                    capFile.PackageAid,
+                    applet.Aid,
+                    moduleAid
+                )
+                : InstallCommandBuilder.CreateForInstall(capFile.PackageAid, applet.Aid, moduleAid);
+            if (installResult.IsFailure)
+                return Result.Failure<IList<CommandAPDU>, SmartCardError>(installResult.Error);
+
+            commands.Add(installResult.Value.ToApdu());
+        }
+
+        return Result.Success<IList<CommandAPDU>, SmartCardError>(commands);
     }
 
     /// <summary>

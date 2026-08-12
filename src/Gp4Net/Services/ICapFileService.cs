@@ -47,7 +47,7 @@ public interface ICapFileService
 
     /// <summary>
     /// Verifies the Data Authentication Pattern (DAP) signature for a CAP file.
-    /// Validates the cryptographic signature per GlobalPlatform Card Specification v2.3.1 Section 9.7.
+    /// Requires the verifying Security Domain's DAP key and algorithm per Appendix C.3.
     /// </summary>
     /// <param name="capFileData">The complete CAP file data bytes.</param>
     /// <param name="dapSignature">The DAP signature bytes to verify.</param>
@@ -59,7 +59,7 @@ public interface ICapFileService
 
     /// <summary>
     /// Verifies the Load File Data Block Hash (LFDBH) for integrity checking.
-    /// Computes and compares SHA-256 hash of CAP file data against expected hash.
+    /// Selects SHA-1, SHA-256, SHA-384, or SHA-512 from the expected hash length.
     /// </summary>
     /// <param name="capFileData">The complete CAP file data bytes.</param>
     /// <param name="expectedHash">The expected LFDBH bytes from INSTALL [for load] command.</param>

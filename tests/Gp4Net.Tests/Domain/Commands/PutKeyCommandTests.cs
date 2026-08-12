@@ -1116,6 +1116,30 @@ public class PutKeyCommandTests
         _ = kcvData.Should().BeEquivalentTo(ValidKeyCheckValue);
     }
 
+    /// <summary>
+    /// GP Card Specification v2.3.1, section 11.8.2.3.1 and Tables 11-68 and 11-69.
+    /// </summary>
+    [TestCase(128, "8180")]
+    [TestCase(129, "8181")]
+    [TestCase(256, "820100")]
+    public void KeyDataBlock_Should_Encode_Component_Length_As_Ber(
+        int componentLength,
+        string encodedLength
+    )
+    {
+        var block = KeyDataBlock
+            .CreatePrepared(KeyDataBlock.KeyType.RsaPublic, new byte[componentLength], [1, 2, 3])
+            .Value;
+
+        byte[] encoded = block.ToBytes();
+
+        _ = encoded
+            .Skip(1)
+            .Take(encodedLength.Length / 2)
+            .Should()
+            .Equal(Convert.FromHexString(encodedLength));
+    }
+
     [Test]
     public void KeyDataBlock_PreservesKeyDataImmutability()
     {

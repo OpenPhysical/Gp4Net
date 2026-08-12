@@ -50,7 +50,7 @@ public static class Scp03CommandProcessors
             .Bind(data =>
             {
                 logger.Match(l => l.LogDebug("GenerateScp03CardChallenge succeeded"), () => { });
-                return CalculateScp03CardCryptogram(data, state, config, rngContext);
+                return CalculateScp03CardCryptogram(data, state);
             })
             .Map(response =>
             {
@@ -58,7 +58,7 @@ public static class Scp03CommandProcessors
                     l => l.LogDebug("CalculateScp03CardCryptogram succeeded, creating response"),
                     () => { }
                 );
-                return CreateScp03InitializeUpdateResponse(response, state, config);
+                return CreateScp03InitializeUpdateResponse(response, state);
             });
 
         if (result.IsFailure)
@@ -133,7 +133,10 @@ public static class Scp03CommandProcessors
 
     private record Scp03ChallengeData(
         CommandRequests.InitializeUpdateRequest Request,
-        byte[] CardChallenge
+        byte[] CardChallenge,
+        byte[] SequenceCounter,
+        byte EffectiveKeyVersion,
+        Scp03KeySet Keys
     );
 
     private record Scp03CryptogramData(
@@ -214,7 +217,8 @@ public static class Scp03CommandProcessors
         }
 
         // Validate implementation parameter
-        byte[] validImplementations = [0x00, 0x10, 0x20, 0x60, 0x70];
+        // SCP03 Amendment D v1.1.2, Table 5-1.
+        byte[] validImplementations = Gp4Net.Constants.Constants.Scp.Scp03.Implementations.All;
         if (!validImplementations.Any(v => v == (byte)state.ScpImplementation))
         {
             logger.Match(
@@ -241,100 +245,56 @@ public static class Scp03CommandProcessors
         IRngContext rngContext
     )
     {
-        // Generate SCP03 card challenge per GlobalPlatform Card Specification v2.3.1 Section 6.2.2.1
+        if (!TryGetKeySet(request.KeyVersion, state, config, out var keySet) || keySet == null)
+        {
+            return SmartCardError.ReferencedDataNotFound();
+        }
+
+        if (keySet is not Scp03KeySet scp03Keys)
+        {
+            return SmartCardError.InvalidArgument("SCP03 requires SCP03 key set");
+        }
+
+        byte effectiveKeyVersion = scp03Keys.KeyVersion;
 
         // SCP03 Amendment D v1.1.2, Table 5-1: b5 selects pseudo-random challenge generation.
         if (state.ScpImplementation.UsesScp03PseudoRandomChallenge())
         {
-            // Using pseudo-random challenge generation (i=70)
-
-            // Get the key set for pseudo-random generation
-            if (!TryGetKeySet(request.KeyVersion, state, config, out var keySet) || keySet == null)
-            {
-                // Key set not found for requested version
-                return SmartCardError.ReferencedDataNotFound();
-            }
-
-            // Key set found and validated
-
-            if (keySet is not Scp03KeySet scp03Keys)
-            {
-                // Key set type validation failed
-                return SmartCardError.InvalidArgument("SCP03 requires SCP03 key set");
-            }
-
-            // SCP03 key set validated successfully
-
-            // Get sequence counter
-            byte[] sequenceCounter = state.GetSequenceCounter(request.KeyVersion);
-
-            // Derive pseudo-random challenge per GP SCP03 Amendment D using S-ENC KDF
-            byte[] context = sequenceCounter.Concat(config.IsdAid).ToArray();
-            return CryptoService
-                .KeyDerivation.DeriveScp03Data(scp03Keys.EncKey, 0x02, context, 64)
-                .Map(challenge => new Scp03ChallengeData(request, challenge));
+            return IncrementScp03SequenceCounter(state.GetSequenceCounter(effectiveKeyVersion))
+                .Bind(sequenceCounter =>
+                {
+                    byte[] context = sequenceCounter.Concat(config.IsdAid).ToArray();
+                    return CryptoService
+                        .KeyDerivation.DeriveScp03Data(scp03Keys.EncKey, 0x02, context, 64)
+                        .Map(challenge => new Scp03ChallengeData(
+                            request,
+                            challenge,
+                            sequenceCounter,
+                            effectiveKeyVersion,
+                            scp03Keys
+                        ));
+                });
         }
 
-        // Using standard random challenge generation
-        // Standard random challenge generation
         return rngContext
             .GenerateBytes(8)
-            .Map(challenge => new Scp03ChallengeData(request, challenge));
+            .Map(challenge => new Scp03ChallengeData(
+                request,
+                challenge,
+                [],
+                effectiveKeyVersion,
+                scp03Keys
+            ));
     }
 
     private static Result<Scp03CryptogramData, SmartCardError> CalculateScp03CardCryptogram(
         Scp03ChallengeData data,
-        CardState state,
-        CardConfiguration config,
-        IRngContext rngContext
+        CardState state
     )
     {
-        // Calculate SCP03 card cryptogram per GP Card Specification v2.3.1
-
-        // Determine effective key version
-        byte effectiveKeyVersion = data.Request.KeyVersion;
-        if (effectiveKeyVersion == 0x00)
-        {
-            // Key version is 0x00, using state.DefaultKeyVersion
-            effectiveKeyVersion = state.DefaultKeyVersion;
-            if (effectiveKeyVersion == 0xFF)
-            {
-                // DefaultKeyVersion is 0xFF, finding SCP03 key
-                // For SCP03 context, prefer SCP03 key versions
-                var scp03Key = config.StaticKeys.FirstOrDefault(kvp => kvp.Value is Scp03KeySet);
-                effectiveKeyVersion =
-                    scp03Key.Key != 0 ? scp03Key.Key : config.StaticKeys.Keys.FirstOrDefault();
-            }
-        }
-
-        // Effective key version determined
-
-        // Get the appropriate keys
-        if (!TryGetKeySet(effectiveKeyVersion, state, config, out var keys) || keys == null)
-        {
-            // TryGetKeySet failed for key version
-            return SmartCardError.ReferencedDataNotFound();
-        }
-
-        // Found key set for effective key version
-
-        if (keys is not Scp03KeySet)
-        {
-            // Key set type mismatch - not SCP03KeySet
-            return SmartCardError.InvalidArgument("SCP03 requires SCP03 key set");
-        }
-
-        // Get sequence counter
-        byte[] sequenceCounter = state.GetSequenceCounter(effectiveKeyVersion);
-
-        // CRITICAL FIX: Derive session keys BEFORE calculating cryptogram
-        // Per GP Card Spec v2.3.1 Amendment D Section 6.2.2.2:
-        // "The card cryptogram is calculated using the session key S-MAC"
-        var scp03Keys = (Scp03KeySet)keys;
-
         return KeyDerivationContext
             .CreateForScp03(
-                scp03Keys,
+                data.Keys,
                 data.Request.HostChallenge,
                 data.CardChallenge,
                 Maybe<ScpImplementation>.From(state.ScpImplementation)
@@ -349,25 +309,25 @@ public static class Scp03CommandProcessors
                         data.CardChallenge
                     )
                     .Map(cryptogram => new Scp03CryptogramData(
-                        effectiveKeyVersion,
+                        data.EffectiveKeyVersion,
                         state.ScpImplementation,
                         data.Request.HostChallenge,
                         data.CardChallenge,
                         cryptogram,
-                        sequenceCounter,
-                        keys
+                        data.SequenceCounter,
+                        data.Keys
                     ))
             );
     }
 
     private static (ApduResponse, CardState) CreateScp03InitializeUpdateResponse(
         Scp03CryptogramData data,
-        CardState state,
-        CardConfiguration config
+        CardState state
     )
     {
-        // Build SCP03 INITIALIZE UPDATE response
-        byte[] response = new byte[32]; // Fixed size for SCP03
+        bool usesPseudoRandomChallenge = data.Implementation.UsesScp03PseudoRandomChallenge();
+        // SCP03 Amendment D v1.1.2, Table 7-3: the counter is conditional.
+        byte[] response = new byte[29 + (usesPseudoRandomChallenge ? 3 : 0)];
         int offset = 0;
 
         // Key diversification data (10 bytes)
@@ -387,8 +347,10 @@ public static class Scp03CommandProcessors
         Array.Copy(data.CardCryptogram, 0, response, offset, 8);
         offset += 8;
 
-        // Sequence counter (3 bytes)
-        Array.Copy(data.SequenceCounter, 0, response, offset, 3);
+        if (usesPseudoRandomChallenge)
+        {
+            Array.Copy(data.SequenceCounter, 0, response, offset, 3);
+        }
 
         // Update state
         var newState = state
@@ -398,10 +360,9 @@ public static class Scp03CommandProcessors
             )
             .WithKeys(data.Keys);
 
-        // Increment sequence counter if pseudo-random challenges are used (i=70)
-        if (data.Implementation == ScpImplementation.Scp03I70)
+        if (usesPseudoRandomChallenge)
         {
-            newState = newState.WithIncrementedSequenceCounter(data.KeyVersion);
+            newState = newState.WithSequenceCounter(data.KeyVersion, data.SequenceCounter);
         }
 
         // SCP03 INITIALIZE UPDATE response created successfully
@@ -410,6 +371,32 @@ public static class Scp03CommandProcessors
             new ApduResponse(response, Gp4Net.Constants.Constants.StatusWords.Success),
             newState
         );
+    }
+
+    private static Result<byte[], SmartCardError> IncrementScp03SequenceCounter(byte[] counter)
+    {
+        // SCP03 Amendment D v1.1.2, section 6.2.2.1.
+        if (counter.Length != 3)
+        {
+            return SmartCardError.InvalidData("SCP03 sequence counter must be three bytes");
+        }
+
+        if (counter.All(value => value == byte.MaxValue))
+        {
+            return SmartCardError.ConditionsNotSatisfied();
+        }
+
+        byte[] incremented = (byte[])counter.Clone();
+        for (int index = incremented.Length - 1; index >= 0; index--)
+        {
+            incremented[index]++;
+            if (incremented[index] != 0)
+            {
+                break;
+            }
+        }
+
+        return incremented;
     }
 
     private static Result<

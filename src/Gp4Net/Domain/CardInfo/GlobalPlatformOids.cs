@@ -18,7 +18,7 @@ public static class GlobalPlatformOids
 
     /// <summary>
     /// Known GlobalPlatform OIDs and their descriptions.
-    /// Based on GlobalPlatform specifications and common implementations.
+    /// GlobalPlatform-defined OIDs and selected registered industry OIDs.
     /// </summary>
     private static readonly Dictionary<string, string> KnownOids = new Dictionary<string, string>
     {
@@ -32,13 +32,11 @@ public static class GlobalPlatformOids
         { "1.2.840.114283.4.1", "Secure Channel Protocol 01 (SCP01)" },
         { "1.2.840.114283.4.2", "Secure Channel Protocol 02 (SCP02)" },
         { "1.2.840.114283.4.3", "Secure Channel Protocol 03 (SCP03)" },
-        { "1.2.840.114283.4.3.112", "SCP03 with S-ENC and S-MAC" },
+        { "1.2.840.114283.4.3.112", "SCP03 implementation 0x70" },
         { "1.2.840.114283.5", "GlobalPlatform Conformance" },
         { "1.2.840.114283.5.7.2.0.0", "GlobalPlatform Conformance Testing" },
-        // Contactless and additional protocols
-        { "1.2.840.114283.4.3.96", "SCP03 Contactless" },
-        { "1.2.840.114283.4.3.97", "SCP03 Contactless with R-MAC" },
-        { "1.2.840.114283.4.3.98", "SCP03 Contactless with R-ENC and R-MAC" },
+        // GP Card Specification v2.3.1, Appendix H: {globalPlatform 4 scp i}.
+        { "1.2.840.114283.4.3.96", "SCP03 implementation 0x60" },
         // Amendment specifications
         { "1.2.840.114283.2.2.1", "GlobalPlatform Card Specification 2.2.1" },
         { "1.2.840.114283.2.2.2", "GlobalPlatform Card Specification 2.2.2" },

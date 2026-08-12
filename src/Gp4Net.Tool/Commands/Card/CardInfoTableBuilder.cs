@@ -442,7 +442,7 @@ public static class CardInfoTableBuilder
 
                 // Show LFDB hash from CipherSuites first, then from Algorithms as fallback
                 var lfdbHashRows =
-                    cap.CipherSuites.TryGetValue(CipherUsage.LfdbHash, out var lfdbCiphers)
+                    cap.CipherSuites.TryGetValue(CipherUsage.LfdbEncryption, out var lfdbCiphers)
                     && lfdbCiphers.Any()
                         ?
                         [
@@ -462,7 +462,9 @@ public static class CardInfoTableBuilder
 
                 // Show other cipher suites (excluding LFDB hash to avoid duplication)
                 var cipherRows = cap
-                    .CipherSuites.Where(kvp => kvp.Key != CipherUsage.LfdbHash && kvp.Value.Any())
+                    .CipherSuites.Where(kvp =>
+                        kvp.Key != CipherUsage.LfdbEncryption && kvp.Value.Any()
+                    )
                     .Select(kvp => new PropertyRow(
                         $"Supported {GetCipherUsageDisplayName(kvp.Key)} ciphers",
                         string.Join(", ", kvp.Value.Select(c => c.ToFriendlyString()))
@@ -651,11 +653,10 @@ public static class CardInfoTableBuilder
     private static string GetCipherUsageDisplayName(CipherUsage usage) =>
         usage switch
         {
-            CipherUsage.LfdbHash => "LFDB Hash",
+            CipherUsage.LfdbEncryption => "LFDB Encryption",
             CipherUsage.TokenVerification => "Token Verification",
             CipherUsage.ReceiptGeneration => "Receipt Generation",
             CipherUsage.DapVerification => "DAP Verification",
-            CipherUsage.MandatedDapVerification => "Mandated DAP Verification",
             _ => usage.ToString(),
         };
 

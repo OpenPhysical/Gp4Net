@@ -65,6 +65,9 @@ public partial record CardState(
 
     public bool IsSecureChannelAborted { get; init; }
 
+    /// <summary>GP Card Specification v2.3.1, §5.1 and Table 11-6.</summary>
+    public CardLifecycleState CardLifecycleState { get; init; } = CardLifecycleState.OpReady;
+
     /// <summary>
     /// Gets the application registry for the card.
     /// </summary>
@@ -185,6 +188,12 @@ public partial record CardState(
     /// Creates a new state with the card selected.
     /// </summary>
     public CardState WithSelected(bool selected = true) => this with { IsSelected = selected };
+
+    /// <summary>Applies the card transitions in GP Card Specification v2.3.1, Figure 5-1.</summary>
+    public Result<CardState, SmartCardError> WithCardLifecycleState(CardLifecycleState newState) =>
+        GlobalPlatformLifecycle.CanTransitionCard(CardLifecycleState, newState)
+            ? Result.Success<CardState, SmartCardError>(this with { CardLifecycleState = newState })
+            : Result.Failure<CardState, SmartCardError>(SmartCardError.ConditionsNotSatisfied());
 
     /// <summary>
     /// Creates a new state with secure channel established using functional SecureChannelState.
@@ -373,7 +382,7 @@ public partial record CardState(
         // Return appropriate default counter based on SCP version
         return ScpVersion == Protocols.SCP02
             ? [0x00, 0x01] // 2-byte counter for SCP02
-            : [0x00, 0x00, 0x01]; // 3-byte counter for SCP03
+            : [0x00, 0x00, 0x00]; // SCP03 Amendment D v1.1.2, section 6.2.2.1
     }
 
     /// <summary>
@@ -396,9 +405,15 @@ public partial record CardState(
         byte[] resetCounter =
             ScpVersion == Protocols.SCP02
                 ? [0x00, 0x01] // 2-byte counter for SCP02
-                : [0x00, 0x00, 0x01]; // 3-byte counter for SCP03
+                : [0x00, 0x00, 0x00]; // SCP03 Amendment D v1.1.2, section 6.2.2.1
         return this with { SequenceCounters = SequenceCounters.SetItem(keyVersion, resetCounter) };
     }
+
+    public CardState WithSequenceCounter(byte keyVersion, byte[] counter) =>
+        this with
+        {
+            SequenceCounters = SequenceCounters.SetItem(keyVersion, (byte[])counter.Clone()),
+        };
 
     /// <summary>
     /// Increments a counter in big-endian format.
@@ -501,6 +516,7 @@ public partial record CardState(
             SequenceCounters = SequenceCounters, // Preserve sequence counters across resets
             ApplicationContext = ApplicationSelectionContext.WithIsd(), // Reset to ISD as implicitly selected
             ApplicationRegistry = ApplicationRegistry, // Preserve application registry across resets
+            CardLifecycleState = CardLifecycleState,
             IsSelected = true, // ISD is implicitly selected after reset per GP Card Spec v2.3.1
         };
 

@@ -48,6 +48,22 @@ public static partial class CryptoService
         }
 
         /// <summary>
+        /// Computes SHA-384 hash of input data.
+        /// </summary>
+        public static Result<byte[], SmartCardError> Sha384(byte[] data)
+        {
+            return Compute(data, new Sha384Digest(), "SHA-384");
+        }
+
+        /// <summary>
+        /// Computes SHA-512 hash of input data.
+        /// </summary>
+        public static Result<byte[], SmartCardError> Sha512(byte[] data)
+        {
+            return Compute(data, new Sha512Digest(), "SHA-512");
+        }
+
+        /// <summary>
         /// Computes SHA-1 hash of input data.
         /// </summary>
         /// <param name="data">Data to hash.</param>
@@ -103,6 +119,32 @@ public static partial class CryptoService
                         ex =>
                             SmartCardError.CryptographicError(
                                 $"MD5 hash computation failed: {ex.Message}"
+                            )
+                    )
+                );
+        }
+
+        private static Result<byte[], SmartCardError> Compute(
+            byte[] data,
+            Org.BouncyCastle.Crypto.IDigest digest,
+            string algorithm
+        )
+        {
+            return Maybe<byte[]>
+                .From(data)
+                .ToResult(SmartCardError.InvalidArgument("Data cannot be null"))
+                .Bind(input =>
+                    Result.Try(
+                        () =>
+                        {
+                            digest.BlockUpdate(input, 0, input.Length);
+                            var hash = new byte[digest.GetDigestSize()];
+                            digest.DoFinal(hash, 0);
+                            return hash;
+                        },
+                        ex =>
+                            SmartCardError.CryptographicError(
+                                $"{algorithm} hash computation failed: {ex.Message}"
                             )
                     )
                 );

@@ -213,38 +213,14 @@ public class GetDataCommandTests
             );
     }
 
+    /// <summary>GP Card Specification v2.3.1, Table 11-27 and §11.3.2.2.</summary>
     [Test]
-    public void CreateFor3ByteIdentifier_WithValidThreeBytes_CreatesCommand()
+    public void CreateApplicationList_Should_Emit_Mandatory_Tag_List()
     {
-        // Arrange
-        byte[] identifier = [0x00, 0x9F, 0x70];
+        var result = GetDataCommand.CreateApplicationList();
 
-        // Act
-        Result<GetDataCommand, SmartCardError> result = GetDataCommand.CreateFor3ByteIdentifier(
-            identifier
-        );
-
-        // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        _ = result.Value.DataObjectIdentifier.Should().Be(0x009F);
-    }
-
-    [Test]
-    [TestCase(new byte[] { })]
-    [TestCase(new byte[] { 0x00 })]
-    [TestCase(new byte[] { 0x00, 0x9F })]
-    [TestCase(new byte[] { 0x00, 0x9F, 0x70, 0x80 })]
-    public void CreateFor3ByteIdentifier_WithInvalidLength_ReturnsError(byte[] identifier)
-    {
-        // Act
-        Result<GetDataCommand, SmartCardError> result = GetDataCommand.CreateFor3ByteIdentifier(
-            identifier
-        );
-
-        // Assert
-        _ = result.IsFailure.Should().BeTrue();
-        _ = result.Error.Should().BeOfType<SmartCardError>();
-        _ = result.Error.Message.Should().Contain("must be exactly 3 bytes");
+        _ = result.Value.ToBytes().Should().Equal(0x80, 0xCA, 0x2F, 0x00, 0x02, 0x5C, 0x00, 0x00);
     }
 
     [Test]

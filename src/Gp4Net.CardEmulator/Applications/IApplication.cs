@@ -30,7 +30,7 @@ public interface IApplication
     /// <summary>
     /// Current lifecycle state per GP Card Specification Table 11-1.
     /// </summary>
-    LifecycleState LifecycleState { get; }
+    byte LifecycleState { get; }
 
     /// <summary>
     /// Application privileges per GP Card Specification Table 8-1.
@@ -83,7 +83,7 @@ public interface IApplication
     /// </summary>
     /// <param name="newState">Target lifecycle state</param>
     /// <returns>Updated application or error</returns>
-    Result<IApplication, SmartCardError> WithLifecycleState(LifecycleState newState);
+    Result<IApplication, SmartCardError> WithLifecycleState(byte newState);
 
     /// <summary>
     /// Creates a new instance with updated privileges.

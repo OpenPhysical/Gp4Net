@@ -66,7 +66,8 @@ public class LoadFileParsingTests
         // SSD creation package
         var ssdPkg = elfs.FirstOrDefault(e => Convert.ToHexString(e.Aid) == "A0000001515350");
         _ = ssdPkg.Should().NotBeNull();
-        _ = ssdPkg!.LifecycleState.Should().Be(LifecycleState.Loaded);
+        // GP Card Specification v2.3.1, Table 11-3.
+        _ = ssdPkg!.LifecycleState.Should().Be(ExecutableLoadFileLifecycleState.Loaded);
         _ = ssdPkg.VersionString.Should().Be("255.255");
         _ = ssdPkg.AssociatedSecurityDomainAid.HasValue.Should().BeTrue();
         _ = Convert
@@ -107,7 +108,8 @@ public class LoadFileParsingTests
         );
         _ = docLite.Should().NotBeNull();
         _ = docLite!.VersionString.Should().Be("1.0");
-        _ = docLite.LifecycleState.Should().Be(LifecycleState.Loaded);
+        // GP Card Specification v2.3.1, Table 11-3.
+        _ = docLite.LifecycleState.Should().Be(ExecutableLoadFileLifecycleState.Loaded);
         _ = Convert
             .ToHexString(docLite.AssociatedSecurityDomainAid.GetValueOrThrow())
             .Should()

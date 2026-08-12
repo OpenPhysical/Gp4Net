@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
@@ -92,12 +93,46 @@ public class T0ApduTransportTests
         result.Should().BeSuccess();
     }
 
+    [Test]
+    public async Task Should_Preserve_Case4_Data_When_Retrying_6Cxx()
+    {
+        // ISO/IEC 7816-4:2020 §5.6: reissue the same command with SW2 as short Le.
+        var channel = new ScriptedCardChannel(
+            TransportProtocol.T0,
+            [Convert.FromHexString("6C03"), Convert.FromHexString("9000")]
+        );
+        var command = new TestCommand { ExpectedResponseLength = Maybe<int>.From(1) };
+
+        var result = await _transport.TransmitAsync(command, channel);
+
+        result.Should().BeSuccess();
+        Assert.That(channel.Commands, Has.Count.EqualTo(2));
+        byte[] expectedRetry = (byte[])channel.Commands[0].Clone();
+        expectedRetry[^1] = 0x03;
+        Assert.That(channel.Commands[1], Is.EqualTo(expectedRetry));
+    }
+
+    [Test]
+    public async Task Should_Use_Original_Cla_For_Get_Response()
+    {
+        // ISO/IEC 7816-4:2020 §5.3.4: every command in response chaining uses the same CLA.
+        var channel = new ScriptedCardChannel(
+            TransportProtocol.T0,
+            [Convert.FromHexString("AA6102"), Convert.FromHexString("BBCC9000")]
+        );
+        var command = new TestCommand { Cla = 0x01 };
+
+        var result = await _transport.TransmitAsync(command, channel);
+
+        result.Should().BeSuccess();
+        Assert.That(channel.Commands[1], Is.EqualTo(Convert.FromHexString("01C0000002")));
+        Assert.That(result.Value.Data, Is.EqualTo(Convert.FromHexString("AABBCC")));
+        Assert.That(result.Value.StatusWord, Is.EqualTo(0x9000));
+    }
+
     private class TestCommand : IApduCommand
     {
-        public byte Cla
-        {
-            get { return 0x00; }
-        }
+        public byte Cla { get; set; }
         public byte Ins
         {
             get { return 0xA4; }
@@ -145,6 +180,27 @@ public class T0ApduTransportTests
         {
             return ToApdu().BinaryCommand;
         }
+    }
+}
+
+internal sealed class ScriptedCardChannel : ICardChannel
+{
+    private readonly Queue<byte[]> _responses;
+
+    public ScriptedCardChannel(TransportProtocol protocol, IEnumerable<byte[]> responses)
+    {
+        Protocol = protocol;
+        _responses = new Queue<byte[]>(responses);
+    }
+
+    public List<byte[]> Commands { get; } = [];
+    public TransportProtocol Protocol { get; }
+    public bool IsOpen => true;
+
+    public Task<byte[]> TransmitAsync(byte[] command, CancellationToken cancellationToken = default)
+    {
+        Commands.Add((byte[])command.Clone());
+        return Task.FromResult(_responses.Dequeue());
     }
 }
 

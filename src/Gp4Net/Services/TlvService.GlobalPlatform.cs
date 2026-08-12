@@ -173,9 +173,8 @@ public static partial class TlvService
                     var aidTlv = aidTlvs[0];
                     var lifecycleTlv = lifecycleTlvs[0];
 
-                    // Parse lifecycle state
-                    return ParseLifecycleState(lifecycleTlv.TlvData.Bytes.ToArray())
-                        .Bind(lifecycleState =>
+                    return ParseLifecycleByte(lifecycleTlv.TlvData.Bytes.ToArray())
+                        .Bind(rawLifecycleState =>
                         {
                             // Parse privileges - use empty array if not present
                             var privilegesData =
@@ -186,6 +185,20 @@ public static partial class TlvService
 
                             // Determine application type from privileges
                             var appType = DetermineApplicationType(privileges);
+                            bool isValidLifecycle =
+                                appType == ApplicationType.Application
+                                    ? GlobalPlatformLifecycle.IsApplicationState(rawLifecycleState)
+                                    : GlobalPlatformLifecycle.IsSecurityDomainState(
+                                        rawLifecycleState
+                                    );
+                            if (!isValidLifecycle)
+                            {
+                                return Result.Failure<ApplicationInfo, SmartCardError>(
+                                    SmartCardError.InvalidData(
+                                        $"Invalid {appType} lifecycle state: 0x{rawLifecycleState:X2}"
+                                    )
+                                );
+                            }
 
                             // Extract optional associated security domain
                             var associatedSecurityDomainTlvs = nestedTlvs
@@ -206,7 +219,7 @@ public static partial class TlvService
                             return Result.Success<ApplicationInfo, SmartCardError>(
                                 new ApplicationInfo(
                                     Aid: aidTlv.TlvData.Bytes.ToArray(),
-                                    LifecycleState: lifecycleState,
+                                    RawLifecycleState: rawLifecycleState,
                                     Privileges: privileges,
                                     Type: appType,
                                     Version: Maybe<string>.None,
@@ -269,9 +282,14 @@ public static partial class TlvService
                     var aidTlv = aidTlvs[0];
                     var lifecycleTlv = lifecycleTlvs[0];
 
-                    // Parse lifecycle state
-                    return ParseLifecycleState(lifecycleTlv.TlvData.Bytes.ToArray())
-                        .Bind(lifecycleState =>
+                    return ParseLifecycleByte(lifecycleTlv.TlvData.Bytes.ToArray())
+                        .Ensure(
+                            GlobalPlatformLifecycle.IsExecutableLoadFileState,
+                            SmartCardError.InvalidData(
+                                "Executable Load File lifecycle state is not LOADED"
+                            )
+                        )
+                        .Bind(rawLifecycleState =>
                         {
                             // Parse version if available
                             var versionTlvs = nestedTlvs
@@ -320,7 +338,7 @@ public static partial class TlvService
                             return Result.Success<ExecutableLoadFile, SmartCardError>(
                                 new ExecutableLoadFile(
                                     Aid: aidTlv.TlvData.Bytes.ToArray(),
-                                    LifecycleState: lifecycleState,
+                                    LifecycleState: (ExecutableLoadFileLifecycleState)rawLifecycleState,
                                     Version: version,
                                     ExecutableModules: modules,
                                     AssociatedSecurityDomainAid: associatedSecurityDomain
@@ -333,29 +351,16 @@ public static partial class TlvService
         /// <summary>
         /// Parses lifecycle state from TLV value bytes.
         /// </summary>
-        private static Result<LifecycleState, SmartCardError> ParseLifecycleState(byte[] stateBytes)
+        private static Result<byte, SmartCardError> ParseLifecycleByte(byte[] stateBytes)
         {
             if (stateBytes is null || stateBytes.Length == 0)
             {
-                return Result.Failure<LifecycleState, SmartCardError>(
+                return Result.Failure<byte, SmartCardError>(
                     SmartCardError.InvalidData("Lifecycle state value is empty")
                 );
             }
 
-            byte stateValue = stateBytes[0];
-            var lifecycleState = stateValue switch
-            {
-                0x01 => LifecycleState.Loaded,
-                0x03 => LifecycleState.Installed,
-                0x07 => LifecycleState.Selectable,
-                0x0F => LifecycleState.Personalized,
-                0x80 => LifecycleState.Terminated,
-                0x83 => LifecycleState.Locked,
-                0x87 => LifecycleState.Locked,
-                _ => LifecycleState.Unknown,
-            };
-
-            return Result.Success<LifecycleState, SmartCardError>(lifecycleState);
+            return Result.Success<byte, SmartCardError>(stateBytes[0]);
         }
 
         /// <summary>
@@ -602,12 +607,7 @@ public static partial class TlvService
                 tlv.TlvData.Bytes.ToArray()
             );
 
-            return new ApplicationStatusEntry(
-                aid,
-                (ApplicationStatusEntry.LifecycleState)lifecycleState,
-                privileges,
-                executableLoadFile
-            );
+            return new ApplicationStatusEntry(aid, lifecycleState, privileges, executableLoadFile);
         }
     }
 }

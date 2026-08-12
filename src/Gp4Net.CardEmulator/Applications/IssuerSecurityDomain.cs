@@ -5,6 +5,7 @@ using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Functional;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
+using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Shared;
 using JetBrains.Annotations;
@@ -25,9 +26,26 @@ namespace Gp4Net.CardEmulator.Applications;
 [PublicAPI]
 public sealed record IssuerSecurityDomain : IApplication
 {
+    // GP Card Specification v2.3.1, §6.6.2.
+    private const Privilege InitialPrivileges =
+        Privilege.SecurityDomain
+        | Privilege.AuthorizedManagement
+        | Privilege.GlobalRegistry
+        | Privilege.GlobalLock
+        | Privilege.GlobalDelete
+        | Privilege.TokenVerification
+        | Privilege.CardLock
+        | Privilege.CardTerminate
+        | Privilege.TrustedPath
+        | Privilege.CvmManagement
+        | Privilege.CardReset
+        | Privilege.FinalApplication
+        | Privilege.ReceiptGeneration;
+
     public ImmutableArray<byte> Aid { get; init; }
     public string Name { get; init; } = "ISD";
-    public LifecycleState LifecycleState { get; init; }
+    public byte LifecycleState { get; init; }
+    public CardLifecycleState CardLifecycleState => (CardLifecycleState)LifecycleState;
     public Privilege Privileges { get; init; }
     public ImmutableArray<byte> AssociatedSecurityDomainAid { get; init; }
 
@@ -40,7 +58,7 @@ public sealed record IssuerSecurityDomain : IApplication
 
     private IssuerSecurityDomain(
         ImmutableArray<byte> aid,
-        LifecycleState lifecycleState,
+        CardLifecycleState lifecycleState,
         Privilege privileges,
         ImmutableDictionary<byte, IKeySet> installedKeys,
         ImmutableDictionary<ushort, byte[]> dataObjects,
@@ -50,7 +68,7 @@ public sealed record IssuerSecurityDomain : IApplication
     )
     {
         Aid = aid;
-        LifecycleState = lifecycleState;
+        LifecycleState = (byte)lifecycleState;
         Privileges = privileges;
         AssociatedSecurityDomainAid = aid; // ISD is its own security domain
         InstalledKeys = installedKeys;
@@ -86,8 +104,8 @@ public sealed record IssuerSecurityDomain : IApplication
         return Result.Success<IssuerSecurityDomain, SmartCardError>(
             new IssuerSecurityDomain(
                 aid: aid,
-                lifecycleState: LifecycleState.Selectable,
-                privileges: Privilege.SecurityDomain | Privilege.AuthorizedManagement,
+                lifecycleState: CardLifecycleState.OpReady,
+                privileges: InitialPrivileges,
                 installedKeys: defaultKeys,
                 dataObjects: CreateDefaultDataObjects(),
                 defaultKeyVersion: 0xFF,
@@ -123,8 +141,8 @@ public sealed record IssuerSecurityDomain : IApplication
         return Result.Success<IssuerSecurityDomain, SmartCardError>(
             new IssuerSecurityDomain(
                 aid: aid,
-                lifecycleState: LifecycleState.Selectable,
-                privileges: Privilege.SecurityDomain | Privilege.AuthorizedManagement,
+                lifecycleState: CardLifecycleState.OpReady,
+                privileges: InitialPrivileges,
                 installedKeys: defaultKeys,
                 dataObjects: dataObjects,
                 defaultKeyVersion: 0xFF,
@@ -225,10 +243,17 @@ public sealed record IssuerSecurityDomain : IApplication
         };
     }
 
-    public Result<IApplication, SmartCardError> WithLifecycleState(LifecycleState newState)
+    public Result<IApplication, SmartCardError> WithLifecycleState(byte newState)
     {
-        // Validate lifecycle state transitions per GP specification
-        return IsValidLifecycleTransition(LifecycleState, newState)
+        if (!GlobalPlatformLifecycle.IsCardState(newState))
+        {
+            return Result.Failure<IApplication, SmartCardError>(
+                SmartCardError.InvalidData($"Invalid card lifecycle state: 0x{newState:X2}")
+            );
+        }
+
+        var target = (CardLifecycleState)newState;
+        return GlobalPlatformLifecycle.CanTransitionCard(CardLifecycleState, target)
             ? Result.Success<IApplication, SmartCardError>(this with { LifecycleState = newState })
             : Result.Failure<IApplication, SmartCardError>(SmartCardError.ConditionsNotSatisfied());
     }
@@ -507,13 +532,51 @@ public sealed record IssuerSecurityDomain : IApplication
         IRngContext rngContext
     )
     {
-        return ProcessSetStatusCommand(command, cardState, rngContext)
+        // GP Card Specification v2.3.1, Tables 11-85 through 11-87 and Figure 5-1.
+        if (command.Length < 5)
+        {
+            return new ApplicationCommandResult(
+                this,
+                cardState,
+                ApplicationApduResponse.WrongLength()
+            );
+        }
+
+        byte lc = command[4];
+        if (command.Length != 5 + lc)
+        {
+            return new ApplicationCommandResult(
+                this,
+                cardState,
+                ApplicationApduResponse.WrongLength()
+            );
+        }
+
+        if ((command[2] & 0xE0) != 0x80 || !GlobalPlatformLifecycle.IsCardState(command[3]))
+        {
+            return new ApplicationCommandResult(
+                this,
+                cardState,
+                ApplicationApduResponse.Error(
+                    GpConstants.StatusWords.ParameterErrors.IncorrectDataField
+                )
+            );
+        }
+
+        var target = (CardLifecycleState)command[3];
+        return cardState
+            .WithCardLifecycleState(target)
+            .Map(updatedState => new ApplicationCommandResult(
+                this with
+                {
+                    LifecycleState = (byte)target
+                },
+                updatedState,
+                ApplicationApduResponse.Success()
+            ))
             .Match(
-                result =>
-                    Result.Success<ApplicationCommandResult, SmartCardError>(
-                        new ApplicationCommandResult(result.Item1, cardState, result.Item2)
-                    ),
-                error =>
+                Result.Success<ApplicationCommandResult, SmartCardError>,
+                _ =>
                     Result.Success<ApplicationCommandResult, SmartCardError>(
                         new ApplicationCommandResult(
                             this,
@@ -660,32 +723,6 @@ public sealed record IssuerSecurityDomain : IApplication
         );
     }
 
-    private Result<(IApplication, ApplicationApduResponse), SmartCardError> ProcessSetStatusCommand(
-        byte[] command,
-        CardState cardState,
-        IRngContext rngContext
-    )
-    {
-        return Result.Success<(IApplication, ApplicationApduResponse), SmartCardError>(
-            (this, ApplicationApduResponse.ConditionsNotSatisfied())
-        );
-    }
-
-    private static bool IsValidLifecycleTransition(LifecycleState from, LifecycleState to)
-    {
-        // GP Card Specification v2.3.1 Table 11-1
-        return (from, to) switch
-        {
-            (LifecycleState.Loaded, LifecycleState.Installed) => true,
-            (LifecycleState.Installed, LifecycleState.Selectable) => true,
-            (LifecycleState.Selectable, LifecycleState.Personalized) => true,
-            (LifecycleState.Personalized, LifecycleState.Locked) => true,
-            (LifecycleState.Locked, LifecycleState.Personalized) => true,
-            (_, LifecycleState.Terminated) => true,
-            _ => false,
-        };
-    }
-
     private static IKeySet CreateDefaultTestKeySet(byte scpVersion)
     {
         var testKey = new byte[]
@@ -720,61 +757,8 @@ public sealed record IssuerSecurityDomain : IApplication
     {
         return ImmutableDictionary<ushort, byte[]>
             .Empty
-            // Card Production Life Cycle (CPLC)
-            .Add(
-                0x9F7F,
-                [
-                    0x9F,
-                    0x7F,
-                    0x2A,
-                    0x00,
-                    0x00,
-                    0x00,
-                    0x00, // IC Fabricator
-                    0x00,
-                    0x00,
-                    0x00,
-                    0x00, // IC Type
-                    0x00,
-                    0x00,
-                    0x00,
-                    0x00, // Operating System ID
-                    0x00,
-                    0x00, // Operating System Release Date
-                    0x00,
-                    0x00, // Operating System Release Level
-                    0x00,
-                    0x00,
-                    0x00,
-                    0x00, // IC Fabrication Date
-                    0x00,
-                    0x00,
-                    0x00,
-                    0x00, // IC Serial Number
-                    0x00,
-                    0x00, // IC Batch Identifier
-                    0x00,
-                    0x00, // IC Module Fabricator
-                    0x00,
-                    0x00, // IC Module Packaging Date
-                    0x00,
-                    0x00, // ICC Manufacturer
-                    0x00,
-                    0x00, // IC Embedding Date
-                    0x00,
-                    0x00, // IC Pre-Personalizer
-                    0x00,
-                    0x00, // IC Pre-Personalization Date
-                    0x00,
-                    0x00, // IC Pre-Personalization Equipment ID
-                    0x00,
-                    0x00, // IC Personalizer
-                    0x00,
-                    0x00, // IC Personalization Date
-                    0x00,
-                    0x00 // IC Personalization Equipment ID
-                ]
-            )
+            // CPLC is an industry data object, not defined by GP Card Specification v2.3.1.
+            .Add(0x9F7F, [0x9F, 0x7F, 0x2A, .. new byte[42]])
             // Card Data
             .Add(0x0066, [0x00, 0x66, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
     }

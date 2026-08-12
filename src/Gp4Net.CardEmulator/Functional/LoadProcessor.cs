@@ -215,7 +215,7 @@ public static class LoadProcessor
                 ParseCapFileStructure(capFileData)
                     .Bind(capInfo =>
                         VerifyLfdbhHash(capFileData, state)
-                            .Bind(_ => VerifyDapSignature(capFileData, config))
+                            .Bind(_ => VerifyDapSignature(capFileData))
                             .Bind(_ => CreateLoadFileFromCapInfo(capInfo, state))
                     )
                     .Bind(loadFile => InstallLoadFile(loadFile, state))
@@ -268,7 +268,7 @@ public static class LoadProcessor
         return ExtractExpectedLfdbhFromState(state)
             .Bind(expectedLfdbh =>
                 LoadFileDataBlockHash
-                    .ComputeFromCapFile(capFileData)
+                    .ComputeFromCapFile(capFileData, expectedLfdbh.Value.Length)
                     .Bind(actualLfdbh => expectedLfdbh.VerifyMatch(actualLfdbh))
             );
     }
@@ -294,12 +294,9 @@ public static class LoadProcessor
     /// <summary>
     /// Verifies the DAP (Data Authentication Pattern) signature if present.
     /// </summary>
-    private static Result<bool, SmartCardError> VerifyDapSignature(
-        byte[] capFileData,
-        CardConfiguration config
-    )
+    private static Result<bool, SmartCardError> VerifyDapSignature(byte[] capFileData)
     {
-        return DapProcessor.VerifyDapSignature(capFileData, config);
+        return DapProcessor.VerifyDapSignature(capFileData);
     }
 
     /// <summary>

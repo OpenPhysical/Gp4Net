@@ -182,6 +182,22 @@ public class Scp03CryptogramTests
         Assert.That(result2.IsFailure, Is.True, "Should fail with wrong card challenge length");
     }
 
+    /// <summary>
+    /// SCP03 v1.1.2, Table 4-1 marks 0x08 RFU; §6.1 states that no session Key-DEK is generated.
+    /// </summary>
+    [Test]
+    public void Should_Reject_Rfu_SDek_Derivation_Constant()
+    {
+        var result = CryptoService.KeyDerivation.DeriveScp03SessionKey(
+            MasterKey,
+            HostChallenge,
+            CardChallenge,
+            0x08
+        );
+
+        Assert.That(result.IsFailure, Is.True);
+    }
+
     private static byte[] DeriveMacSessionKey(byte[] hostChallenge, byte[] cardChallenge)
     {
         var keySetResult = Scp03KeySet.Create(MasterKey, MasterKey, MasterKey, 0x01);
