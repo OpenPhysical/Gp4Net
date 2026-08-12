@@ -64,7 +64,7 @@ public class CardStateServiceTests
     }
 
     [Test]
-    public void ApplyCommand_ValidCommand_Success_ReturnsNewState()
+    public void ApplyCommand_ValidNoOpCommand_Success_PreservesState()
     {
         var initialStateResult = CreateValidInitialState();
         var selectCommandResult = CreateSelectCommand();
@@ -95,7 +95,7 @@ public class CardStateServiceTests
             if (initialStateResult.IsSuccess)
             {
                 var originalState = initialStateResult.Value;
-                Assert.That(newState, Is.Not.EqualTo(originalState));
+                Assert.That(newState, Is.EqualTo(originalState));
             }
         }
     }

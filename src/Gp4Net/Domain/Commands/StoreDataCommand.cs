@@ -33,10 +33,12 @@ public class StoreDataCommand : IApduCommand
         /// BER-TLV format.
         /// </summary>
         BerTlv = 0x10,
+    }
 
-        /// <summary>
-        /// Encrypted data.
-        /// </summary>
+    /// <summary>P1.b7-b6 data-encryption indication, independent of the structure bits.</summary>
+    public enum EncryptionFormat : byte
+    {
+        None = 0x00,
         Encrypted = 0x60,
     }
 
@@ -65,6 +67,10 @@ public class StoreDataCommand : IApduCommand
     /// Gets the data structure format.
     /// </summary>
     public DataStructureFormat StructureFormat { get; }
+
+    public EncryptionFormat Encryption { get; }
+
+    public bool ResponseDataExpected { get; }
 
     /// <summary>
     /// Gets the block format.
@@ -96,7 +102,7 @@ public class StoreDataCommand : IApduCommand
         {
             GlobalPlatform.Cla.GP_STANDARD,
             GlobalPlatform.Ins.STORE_DATA,
-            (byte)((byte)StructureFormat | (byte)Block),
+            P1,
             BlockNumber,
         };
 
@@ -105,6 +111,7 @@ public class StoreDataCommand : IApduCommand
                 ? headerBytes
                     .Concat([(byte)StoreData.Length]) // Lc
                     .Concat(StoreData)
+                    .Concat(ResponseDataExpected ? new byte[] { 0x00 } : [])
                     .ToArray()
                 : headerBytes;
 
@@ -116,7 +123,15 @@ public class StoreDataCommand : IApduCommand
     /// </summary>
     public byte P1
     {
-        get { return (byte)((byte)StructureFormat | (byte)Block); }
+        get
+        {
+            return (byte)(
+                (byte)StructureFormat
+                | (byte)Encryption
+                | (byte)Block
+                | (ResponseDataExpected ? 0x01 : 0x00)
+            );
+        }
     }
 
     /// <summary>
@@ -136,11 +151,11 @@ public class StoreDataCommand : IApduCommand
     }
 
     /// <summary>
-    /// Gets the expected response length (None for STORE DATA as it's a case 3 command).
+    /// Gets the expected response length for case-4 STORE DATA.
     /// </summary>
     public Maybe<int> ExpectedResponseLength
     {
-        get { return Maybe<int>.None; }
+        get { return ResponseDataExpected ? Maybe<int>.From(256) : Maybe<int>.None; }
     }
 
     /// <summary>
@@ -155,20 +170,26 @@ public class StoreDataCommand : IApduCommand
     /// Initializes a new instance of the StoreDataCommand class.
     /// </summary>
     /// <param name="structureFormat">The data structure format.</param>
+    /// <param name="encryption">The independent data-encryption indication.</param>
     /// <param name="block">The block format.</param>
     /// <param name="blockNumber">The sequential block number encoded in P2.</param>
     /// <param name="data">The data to store.</param>
+    /// <param name="responseDataExpected">Whether P1.b1 requests response data.</param>
     private StoreDataCommand(
         DataStructureFormat structureFormat,
+        EncryptionFormat encryption,
         BlockFormat block,
         byte blockNumber,
-        byte[] data
+        byte[] data,
+        bool responseDataExpected
     )
     {
         StructureFormat = structureFormat;
+        Encryption = encryption;
         Block = block;
         BlockNumber = blockNumber;
         StoreData = data;
+        ResponseDataExpected = responseDataExpected;
     }
 
     /// <summary>
@@ -184,7 +205,14 @@ public class StoreDataCommand : IApduCommand
         }
 
         // GP Card Spec 2.3.1, Table 11-89: a single block sets P1.b8 and uses P2=00.
-        return new StoreDataCommand(DataStructureFormat.Plain, BlockFormat.FirstOrOnly, 0x00, data);
+        return new StoreDataCommand(
+            DataStructureFormat.Plain,
+            EncryptionFormat.None,
+            BlockFormat.FirstOrOnly,
+            0x00,
+            data,
+            false
+        );
     }
 
     /// <summary>
@@ -194,12 +222,16 @@ public class StoreDataCommand : IApduCommand
     /// <param name="block">The block format.</param>
     /// <param name="data">The data to store.</param>
     /// <param name="blockNumber">The sequential block number encoded in P2.</param>
+    /// <param name="encryption">The independent data-encryption indication.</param>
+    /// <param name="responseDataExpected">Whether P1.b1 requests response data.</param>
     /// <returns>A Result containing either a new StoreDataCommand or an error.</returns>
     public static Result<StoreDataCommand, SmartCardError> CreateWithFormat(
         DataStructureFormat structureFormat,
         BlockFormat block,
         byte[] data,
-        byte blockNumber = 0x00
+        byte blockNumber = 0x00,
+        EncryptionFormat encryption = EncryptionFormat.None,
+        bool responseDataExpected = false
     )
     {
         if (data == null)
@@ -209,7 +241,14 @@ public class StoreDataCommand : IApduCommand
 
         // GP Card Spec 2.3.1, 11.11.2: all flags are in P1; P2 is the
         // sequential block number starting at 00.
-        return new StoreDataCommand(structureFormat, block, blockNumber, data);
+        return new StoreDataCommand(
+            structureFormat,
+            encryption,
+            block,
+            blockNumber,
+            data,
+            responseDataExpected
+        );
     }
 
     /// <summary>
@@ -224,7 +263,14 @@ public class StoreDataCommand : IApduCommand
         // Simple TLV format: 7F0D + length + key version
         byte[] data = [0x7F, 0x0D, 0x01, keyVersion];
 
-        return new StoreDataCommand(DataStructureFormat.Dgi, BlockFormat.FirstOrOnly, 0x00, data);
+        return new StoreDataCommand(
+            DataStructureFormat.Dgi,
+            EncryptionFormat.None,
+            BlockFormat.FirstOrOnly,
+            0x00,
+            data,
+            false
+        );
     }
 
     /// <summary>

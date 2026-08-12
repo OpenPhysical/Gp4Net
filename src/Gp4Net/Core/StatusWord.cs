@@ -55,6 +55,12 @@ public readonly struct StatusWord : IEquatable<StatusWord>, IComparable<StatusWo
         get { return (byte)(_value & 0xFF); }
     }
 
+    /// <summary>True when more response data is available through GET RESPONSE.</summary>
+    public bool IsContinuation => Sw1 is 0x61 or 0x9F;
+
+    /// <summary>True for final success or a successful continuation response.</summary>
+    public bool IsSuccessful => _value == 0x9000 || IsContinuation;
+
     /// <summary>
     /// Implicitly converts a ushort to a StatusWord.
     /// </summary>

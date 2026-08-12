@@ -114,7 +114,7 @@ public class ExternalAuthenticateCommandTests
             .Match(
                 apdu =>
                 {
-                    _ = apdu[0].Should().Be(0x00); // CLA - No secure messaging for no MAC
+                    _ = apdu[0].Should().Be(0x80); // GP CLA without secure messaging
                     _ = apdu[1].Should().Be(0x82); // INS - EXTERNAL AUTHENTICATE
                     _ = apdu[2].Should().Be((byte)securityLevel); // P1 - Security Level
                     _ = apdu[3].Should().Be(0x00); // P2 - RFU

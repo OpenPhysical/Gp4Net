@@ -15,7 +15,7 @@ namespace Gp4Net.Domain.CardInfo;
 /// <param name="KeyInfo">Key information template showing available cryptographic keys</param>
 /// <param name="CardData">Card data object with OID-based version and platform identification</param>
 /// <param name="ScpInfo">Structured SCP protocol and implementation option details</param>
-/// <param name="SecurityStatus">Security domain management data and status information</param>
+/// <param name="SecurityStatus">Security domain sequence-counter information</param>
 /// <param name="DiversificationData">Key diversification data for SCP key derivation</param>
 /// <param name="IsdInfo">Issuer Security Domain information from SELECT response</param>
 /// <param name="ChipDetails">Chip identification and hardware platform information</param>

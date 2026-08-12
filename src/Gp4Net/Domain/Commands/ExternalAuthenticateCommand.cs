@@ -195,12 +195,7 @@ public class ExternalAuthenticateCommand : IApduCommand
     /// </summary>
     public byte Cla
     {
-        get
-        {
-            // CLA=0x84 only when MAC is applied (secure messaging)
-            // CLA=0x00 when no MAC (no secure messaging)
-            return Mac.Length > 0 ? CLASS_BYTE : (byte)0x00;
-        }
+        get { return Mac.Length > 0 ? CLASS_BYTE : GlobalPlatform.Cla.GP_STANDARD; }
     }
 
     /// <summary>

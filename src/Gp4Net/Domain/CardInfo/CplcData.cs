@@ -7,7 +7,7 @@ using OperatingSystemIdEnum = Gp4Net.Domain.CardInfo.OperatingSystemId;
 namespace Gp4Net.Domain.CardInfo;
 
 /// <summary>
-/// Card Production Life Cycle (CPLC) data structure according to GlobalPlatform.
+/// Card Production Life Cycle (CPLC) industry data structure.
 /// Contains information about the card's manufacturing and personalization.
 /// </summary>
 public class CplcData

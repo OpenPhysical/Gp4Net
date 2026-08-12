@@ -35,20 +35,6 @@ public static class Apdu
     }
 
     /// <summary>
-    /// Well-known identifiers for card types and standard applications.
-    /// Reference: Various card manufacturer specifications and ISO 7816-4
-    /// </summary>
-    public static class WellKnownIdentifiers
-    {
-        /// <summary>
-        /// Standard GlobalPlatform ISD (Issuer Security Domain) AID.
-        /// Used by most GP-compliant cards as the default security domain.
-        /// Reference: GP Card Specification v2.3.1
-        /// </summary>
-        public static readonly byte[] StandardGpIsdAid = Convert.FromHexString("A000000151000000");
-    }
-
-    /// <summary>
     /// APDU class byte definitions for different command categories.
     /// Reference: ISO 7816-4, Section 5.4.1
     /// </summary>

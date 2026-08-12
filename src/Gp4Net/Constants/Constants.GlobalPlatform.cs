@@ -144,75 +144,6 @@ public static partial class Constants
             public const byte DEFAULT_KEY_VERSION = 0x00;
         }
 
-        // NOTE: Security level flags are defined once in Gp4Net.Domain.SecurityLevel.
-        // This previous duplicate static class was removed to eliminate DRY violations.
-        // Reference: GP SCP02, GP SCP03 specifications
-
-        /// <summary>
-        /// Cryptographic constants for GlobalPlatform operations.
-        /// Reference: GP SCP02, GP SCP03 specifications
-        /// </summary>
-        public static class Crypto
-        {
-            /// <summary>AES block size in bytes (16).</summary>
-            public const int AES_BLOCK_SIZE = 16;
-
-            /// <summary>3DES block size in bytes (8).</summary>
-            public const int TRIPLE_DES_BLOCK_SIZE = 8;
-
-            /// <summary>Single DES block size in bytes (8).</summary>
-            public const int DES_BLOCK_SIZE = 8;
-
-            /// <summary>AES key size for SCP03 in bytes (16).</summary>
-            public const int AES_KEY_SIZE = 16;
-
-            /// <summary>3DES key size for SCP02 (2-key) in bytes (16).</summary>
-            public const int TRIPLE_DES_KEY_SIZE2_KEY = 16;
-
-            /// <summary>3DES key size for SCP02 (3-key) in bytes (24).</summary>
-            public const int TRIPLE_DES_KEY_SIZE3_KEY = 24;
-
-            /// <summary>Single DES key size in bytes (8).</summary>
-            public const int DES_KEY_SIZE = 8;
-
-            /// <summary>MAC size for SCP protocols in bytes (8).</summary>
-            public const int MAC_SIZE = 8;
-
-            /// <summary>Cryptogram size for SCP protocols in bytes (8).</summary>
-            public const int CRYPTOGRAM_SIZE = 8;
-
-            /// <summary>Host challenge size in bytes (8).</summary>
-            public const int HOST_CHALLENGE_SIZE = 8;
-
-            /// <summary>Card challenge size for SCP03 in bytes (8).</summary>
-            public const int CARD_CHALLENGE_SIZE_SCP03 = 8;
-
-            /// <summary>Card challenge size for SCP02 in bytes (6).</summary>
-            public const int CARD_CHALLENGE_SIZE_SCP02 = 6;
-
-            /// <summary>Sequence counter size for SCP03 in bytes (16).</summary>
-            public const int SEQUENCE_COUNTER_SIZE_SCP03 = 16;
-
-            /// <summary>Sequence counter size for SCP02 in bytes (2).</summary>
-            public const int SEQUENCE_COUNTER_SIZE_SCP02 = 2;
-        }
-
-        /// <summary>
-        /// Key derivation constants for Secure Channel Protocol.
-        /// Reference: GP SCP02 specification, Section 4.1.5
-        /// </summary>
-        public static class KeyDerivation
-        {
-            /// <summary>S-ENC key derivation constant for SCP02 (0x0182).</summary>
-            public const ushort SCP02_S_ENC = 0x0182;
-
-            /// <summary>S-MAC key derivation constant for SCP02 (0x0101).</summary>
-            public const ushort SCP02_S_MAC = 0x0101;
-
-            /// <summary>S-DEK key derivation constant for SCP02 (0x0181).</summary>
-            public const ushort SCP02_S_DEK = 0x0181;
-        }
-
         /// <summary>
         /// INSTALL command parameters.
         /// Reference: GP Card Specification v2.3.1, Section 11.5
@@ -312,38 +243,6 @@ public static partial class Constants
         }
 
         /// <summary>
-        /// Security requirements for GlobalPlatform commands.
-        /// Reference: GlobalPlatform Card Specification v2.3.1 Appendix E
-        /// </summary>
-        public static class SecurityRequirements
-        {
-            /// <summary>
-            /// Commands that never require secure channel establishment per GP specification.
-            /// These commands can be executed without an authenticated secure channel.
-            /// </summary>
-            public static readonly ImmutableHashSet<byte> OpenAccessCommands =
-                ImmutableHashSet.Create(
-                    Apdu.Instructions.SELECT, // 0xA4 - Application/ISD selection
-                    Ins.INITIALIZE_UPDATE, // 0x50 - Start secure channel establishment
-                    Apdu.Instructions.EXTERNAL_AUTHENTICATE // 0x82 - Complete secure channel establishment
-                );
-
-            /// <summary>
-            /// Commands that require Command MAC (C-MAC) security level.
-            /// Reference: GP Card Specification v2.3.1 Table E-1
-            /// </summary>
-            public static readonly ImmutableHashSet<byte> CommandMacRequiredCommands =
-                ImmutableHashSet.Create(
-                    Ins.INSTALL, // 0xE6 - Application installation/removal
-                    Ins.LOAD, // 0xE8 - Load CAP file
-                    Ins.DELETE, // 0xE4 - Delete application/package
-                    Ins.PUT_KEY, // 0xD8 - Add/update keys
-                    Ins.STORE_DATA, // 0xE2 - Store card data
-                    Ins.GET_STATUS // 0xF2 - Query application status
-                );
-        }
-
-        /// <summary>
         /// Common byte values used throughout GlobalPlatform operations.
         /// </summary>
         public static class CommonBytes
@@ -368,7 +267,6 @@ public static partial class Constants
         public static class Aids
         {
             /// <summary>Standard Issuer Security Domain (ISD) AID.</summary>
-            public static readonly byte[] IsdDefault = Convert.FromHexString("A000000003000000");
 
             /// <summary>Common test application AID.</summary>
             public static readonly byte[] TestApplication = Convert.FromHexString(

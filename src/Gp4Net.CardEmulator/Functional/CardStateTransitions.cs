@@ -468,40 +468,19 @@ public sealed class CardStateTransitions
         IRngContext rngContext
     )
     {
-        var requestedAid =
-            command.Data.Length == 0
-                ? ImmutableArray<byte>.Empty
-                : ImmutableArray.Create(command.Data);
-
-        var selectResult = ApplicationSelectionProcessor
-            .ProcessSelect(currentState, ImmutableArray.Create(command.RawBytes))
-            .Map(tuple => tuple.NewState)
-            .MapError(error =>
-            {
-                if (requestedAid.Length > 0 && error.Code == "FILE_NOT_FOUND")
-                {
-                    var aidHex = Convert.ToHexString(requestedAid.ToArray());
-                    return Errors.ApplicationNotFound(aidHex);
-                }
-
-                return error;
-            });
-
-        return selectResult.Bind(newState =>
-            newState.ApplicationRegistry.Match(
-                registry =>
-                    registry
-                        .RouteCommand(command.RawBytes, newState, config, rngContext)
-                        .Map(result =>
-                        {
-                            var (updatedRegistry, _, updatedState) = result;
-                            return updatedState.WithApplicationRegistry(updatedRegistry);
-                        }),
-                () =>
-                    Result.Failure<CardState, SmartCardError>(
-                        SmartCardError.UnexpectedError("No application registry available")
-                    )
-            )
+        return currentState.ApplicationRegistry.Match(
+            registry =>
+                registry
+                    .RouteCommand(command.RawBytes, currentState, config, rngContext)
+                    .Map(result =>
+                    {
+                        var (updatedRegistry, _, updatedState) = result;
+                        return updatedState.WithApplicationRegistry(updatedRegistry);
+                    }),
+            () =>
+                Result.Failure<CardState, SmartCardError>(
+                    SmartCardError.UnexpectedError("No application registry available")
+                )
         );
     }
 

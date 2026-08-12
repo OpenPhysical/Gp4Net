@@ -34,7 +34,7 @@ public class CardProfileLoaderTests
           ""scpSupport"": [
             {
               ""protocol"": ""0x02"",
-              ""implementations"": [""0x15"", ""0x55""]
+              ""implementations"": [""0x15"", ""0x35""]
             }
           ]
         },
@@ -93,6 +93,38 @@ public class CardProfileLoaderTests
         // Data objects
         _ = config.DefaultDataObjects.Should().ContainKey(0x9F7F);
         _ = config.DefaultDataObjects.Should().ContainKey(0x00C1);
+    }
+
+    [Test]
+    public void LoadFromJson_WithInstructionCapabilities_AppliesDeclaredSupport()
+    {
+        string profile = SampleP71Profile.Replace(
+            "\"scpSupport\"",
+            "\"instructions\": { \"load\": false }, \"scpSupport\"",
+            StringComparison.Ordinal
+        );
+
+        var result = CardProfileLoader.LoadFromJson(profile);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.SupportedInstructions.Load.Should().BeFalse();
+        result.Value.SupportedInstructions.ManageChannel.Should().BeFalse();
+        result.Value.SupportedInstructions.Select.Should().BeTrue();
+    }
+
+    [Test]
+    public void LoadFromJson_WhenManageChannelIsAdvertised_ReturnsFailure()
+    {
+        string profile = SampleP71Profile.Replace(
+            "\"scpSupport\"",
+            "\"instructions\": { \"manageChannel\": true }, \"scpSupport\"",
+            StringComparison.Ordinal
+        );
+
+        var result = CardProfileLoader.LoadFromJson(profile);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("MANAGE CHANNEL");
     }
 
     [Test]
@@ -325,7 +357,21 @@ public class CardProfileLoaderTests
         {
           ""cardData"": {
             ""atr"": ""3B D5 18 FF 81 91 FE 1F C3 80 73 C8 21 10 0A"",
-            ""isdAid"": ""A0 00 00 01 51 00 00 00""
+            ""isdAid"": ""A0 00 00 01 51 00 00 00"",
+            ""capabilities"": {
+              ""scpSupport"": [{ ""protocol"": ""0x02"", ""implementations"": [""0x15""] }]
+            }
+          },
+          ""staticKeys"": {
+            ""1"": {
+              ""version"": 1,
+              ""type"": ""SCP02"",
+              ""keys"": {
+                ""enc"": ""404142434445464748494A4B4C4D4E4F"",
+                ""mac"": ""404142434445464748494A4B4C4D4E4F"",
+                ""dek"": ""404142434445464748494A4B4C4D4E4F""
+              }
+            }
           }
         }";
 

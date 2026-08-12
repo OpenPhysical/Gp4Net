@@ -379,11 +379,8 @@ public static partial class TlvCodec
         {
             if (privileges.Contains(Privilege.SecurityDomain))
             {
-                // Check if it's an ISD (has global registry privilege)
-                if (privileges.Contains(Privilege.GlobalRegistry))
-                {
-                    return ApplicationType.IssuerSecurityDomain;
-                }
+                // Privileges do not identify the ISD. The configured ISD AID is required
+                // to distinguish it from a Supplementary Security Domain.
                 return ApplicationType.SupplementarySecurityDomain;
             }
 

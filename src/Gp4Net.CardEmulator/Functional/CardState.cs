@@ -9,7 +9,6 @@ using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
 using JetBrains.Annotations;
-using static Gp4Net.CardEmulator.Functional.LoadProcessor;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
 
 namespace Gp4Net.CardEmulator.Functional;
@@ -26,6 +25,20 @@ public sealed record PendingPutKeyOperation(
     byte ReplacedVersion,
     byte NewVersion,
     ImmutableDictionary<byte, StoredKeyComponent> Keys
+);
+
+public sealed record PendingLoadOperation(
+    byte[] LoadFileAid,
+    byte[] SecurityDomainAid,
+    byte[] ExpectedHash,
+    ImmutableList<byte> AccumulatedData,
+    byte LastBlockNumber
+);
+
+public sealed record PendingGetStatusOperation(
+    byte Subset,
+    ImmutableList<byte[]> Entries,
+    int NextIndex
 );
 
 /// <summary>
@@ -49,8 +62,6 @@ public partial record CardState(
     ImmutableDictionary<byte, IKeySet> InstalledKeys,
     byte DefaultKeyVersion,
     ImmutableDictionary<byte, byte[]> SequenceCounters,
-    ApplicationSelectionContext ApplicationContext,
-    ImmutableDictionary<string, LoadContext> LoadContexts,
     Maybe<ApplicationRegistry> ApplicationRegistry
 )
 {
@@ -62,6 +73,12 @@ public partial record CardState(
 
     public Maybe<PendingPutKeyOperation> PendingPutKey { get; init; } =
         Maybe<PendingPutKeyOperation>.None;
+
+    public Maybe<PendingLoadOperation> PendingLoad { get; init; } =
+        Maybe<PendingLoadOperation>.None;
+
+    public Maybe<PendingGetStatusOperation> PendingGetStatus { get; init; } =
+        Maybe<PendingGetStatusOperation>.None;
 
     public bool IsSecureChannelAborted { get; init; }
 
@@ -99,8 +116,6 @@ public partial record CardState(
                 InstalledKeys: ImmutableDictionary<byte, IKeySet>.Empty,
                 DefaultKeyVersion: 0xFF,
                 SequenceCounters: ImmutableDictionary<byte, byte[]>.Empty,
-                ApplicationContext: ApplicationSelectionContext.WithIsd(),
-                LoadContexts: ImmutableDictionary<string, LoadContext>.Empty,
                 ApplicationRegistry: Maybe<ApplicationRegistry>.None
             ));
     }
@@ -127,8 +142,6 @@ public partial record CardState(
             InstalledKeys: ImmutableDictionary<byte, IKeySet>.Empty,
             DefaultKeyVersion: 0xFF,
             SequenceCounters: ImmutableDictionary<byte, byte[]>.Empty,
-            ApplicationContext: ApplicationSelectionContext.WithIsd(),
-            LoadContexts: ImmutableDictionary<string, LoadContext>.Empty,
             ApplicationRegistry: Maybe<ApplicationRegistry>.None
         );
     }
@@ -229,15 +242,6 @@ public partial record CardState(
         {
             SecureChannel = Maybe<SecureChannelState>.From(newSecureChannelState),
             IsSecureChannelAborted = false,
-        };
-
-    /// <summary>
-    /// Creates a new state with updated load contexts.
-    /// </summary>
-    public CardState WithLoadContexts(ImmutableDictionary<string, LoadContext> loadContexts) =>
-        this with
-        {
-            LoadContexts = loadContexts,
         };
 
     /// <summary>
@@ -452,54 +456,6 @@ public partial record CardState(
     }
 
     /// <summary>
-    /// Creates a new state with updated application selection context.
-    /// </summary>
-    public CardState WithApplicationContext(ApplicationSelectionContext newContext) =>
-        this with
-        {
-            ApplicationContext = newContext,
-        };
-
-    /// <summary>
-    /// Selects an application by AID and returns updated card state.
-    /// </summary>
-    public Result<CardState, SmartCardError> SelectApplication(ImmutableArray<byte> aid)
-    {
-        return ApplicationContext
-            .SelectApplication(aid)
-            .Map(newContext => WithApplicationContext(newContext));
-    }
-
-    /// <summary>
-    /// Installs a new application and returns updated card state.
-    /// </summary>
-    public Result<CardState, SmartCardError> InstallApplication(
-        ImmutableArray<byte> aid,
-        string name,
-        ImmutableArray<byte> associatedSecurityDomainAid,
-        Privilege privileges = Privilege.None
-    )
-    {
-        return ApplicationContext
-            .InstallApplication(aid, name, associatedSecurityDomainAid, privileges)
-            .Map(newContext => WithApplicationContext(newContext));
-    }
-
-    /// <summary>
-    /// Gets the currently selected application.
-    /// </summary>
-    public Maybe<VirtualApplication> CurrentlySelectedApplication =>
-        ApplicationContext.SelectedApplication;
-
-    /// <summary>
-    /// Checks if the current application has specific privileges.
-    /// </summary>
-    public bool CurrentApplicationHasPrivileges(Privilege requiredPrivileges)
-    {
-        return ApplicationContext.CurrentApplicationHasPrivileges(requiredPrivileges);
-    }
-
-    /// <summary>
     /// Resets the card state to initial conditions.
     /// Per GP Card Spec v2.3.1 Section 6.4.2.1.1: After card reset, ISD becomes implicitly selected.
     /// Preserves installed applications, keys, and sequence counters but clears secure channel state.
@@ -510,11 +466,14 @@ public partial record CardState(
             ScpVersion = ScpVersion,
             ScpImplementation = ScpImplementation,
             DataObjects = DataObjects,
+            Applications = Applications,
+            LoadFiles = LoadFiles,
             InstalledKeys = InstalledKeys,
             InstalledKeyComponents = InstalledKeyComponents,
             DefaultKeyVersion = DefaultKeyVersion,
             SequenceCounters = SequenceCounters, // Preserve sequence counters across resets
-            ApplicationContext = ApplicationSelectionContext.WithIsd(), // Reset to ISD as implicitly selected
+            PendingLoad = Maybe<PendingLoadOperation>.None,
+            PendingGetStatus = Maybe<PendingGetStatusOperation>.None,
             ApplicationRegistry = ApplicationRegistry, // Preserve application registry across resets
             CardLifecycleState = CardLifecycleState,
             IsSelected = true, // ISD is implicitly selected after reset per GP Card Spec v2.3.1

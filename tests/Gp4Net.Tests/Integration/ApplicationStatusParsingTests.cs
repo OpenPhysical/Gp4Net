@@ -37,7 +37,10 @@ public class ApplicationStatusParsingTests
 
         var r = MakeResponse(resp);
         Result<ImmutableList<ApplicationInfo>, SmartCardError> parsed =
-            Responses.ParseGetStatusResponse(r);
+            Responses.ParseGetStatusResponse(
+                r,
+                Maybe<byte[]>.From(Convert.FromHexString("A000000151000000"))
+            );
 
         _ = parsed.IsSuccess.Should().BeTrue();
         var list = parsed.Value;

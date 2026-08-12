@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
@@ -17,6 +18,7 @@ namespace Gp4Net.CardEmulator.Transport;
 public sealed class VirtualCardChannel : ICardChannel
 {
     private readonly IVirtualCard _virtualCard;
+    private readonly Maybe<Func<IVirtualCard, UnitResult<SmartCardError>>> _persist;
 
     /// <summary>
     /// Gets the active transport protocol for this channel (always T=1 for virtual cards).
@@ -32,22 +34,31 @@ public sealed class VirtualCardChannel : ICardChannel
     /// Initializes a new instance of VirtualCardChannel.
     /// </summary>
     /// <param name="virtualCard">The virtual card to communicate with.</param>
-    private VirtualCardChannel(IVirtualCard virtualCard)
+    /// <param name="persist">Optional callback invoked after each successful command.</param>
+    private VirtualCardChannel(
+        IVirtualCard virtualCard,
+        Maybe<Func<IVirtualCard, UnitResult<SmartCardError>>> persist
+    )
     {
         _virtualCard = virtualCard;
+        _persist = persist;
     }
 
     /// <summary>
     /// Creates a VirtualCardChannel instance.
     /// </summary>
     /// <param name="virtualCard">The virtual card to wrap.</param>
+    /// <param name="persist">Optional callback invoked after each successful command.</param>
     /// <returns>A result containing the channel or an error.</returns>
-    public static Result<VirtualCardChannel, SmartCardError> Create(IVirtualCard virtualCard)
+    public static Result<VirtualCardChannel, SmartCardError> Create(
+        IVirtualCard virtualCard,
+        Maybe<Func<IVirtualCard, UnitResult<SmartCardError>>> persist = default
+    )
     {
         return Maybe
             .From(virtualCard)
             .ToResult(SmartCardError.InvalidArgument("Virtual card cannot be null"))
-            .Map(card => new VirtualCardChannel(card));
+            .Map(card => new VirtualCardChannel(card, persist));
     }
 
     /// <summary>
@@ -64,14 +75,22 @@ public sealed class VirtualCardChannel : ICardChannel
         var result = _virtualCard.ProcessCommand(command);
         return result.Match(
             success =>
-                Task.FromResult(
-                    Result.Success<ChannelExchange, SmartCardError>(
-                        new ChannelExchange(
-                            BuildResponseBytes(success.Response),
-                            new VirtualCardChannel(success.UpdatedCard)
+            {
+                UnitResult<SmartCardError> persisted = _persist.Match(
+                    callback => callback(success.UpdatedCard),
+                    UnitResult.Success<SmartCardError>
+                );
+                return Task.FromResult(
+                    persisted.IsFailure
+                        ? Result.Failure<ChannelExchange, SmartCardError>(persisted.Error)
+                        : Result.Success<ChannelExchange, SmartCardError>(
+                            new ChannelExchange(
+                                BuildResponseBytes(success.Response),
+                                new VirtualCardChannel(success.UpdatedCard, _persist)
+                            )
                         )
-                    )
-                ),
+                );
+            },
             error =>
                 Task.FromResult(
                     Result.Success<ChannelExchange, SmartCardError>(

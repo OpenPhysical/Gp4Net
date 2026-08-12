@@ -1,11 +1,11 @@
 using System;
 using System.IO;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Functional;
+using Gp4Net.CardEmulator.Persistence;
 using Gp4Net.CardEmulator.Profiles;
 using Gp4Net.CardEmulator.Transport;
 using Gp4Net.Core;
@@ -86,12 +86,43 @@ public static class VirtualCardConnections
         CancellationToken cancellationToken
     )
     {
-        // Use the existing CardProfileLoader which handles all the JSON parsing
         return Task.FromResult(
-            CardProfileLoader
-                .LoadFromFile(profilePath)
-                .Map(config => VirtualCardTestBuilder.CreateWithSecureRng(config))
+            CardProfileLoader.LoadFromFile(profilePath).Bind(config => LoadPersistentCard(config))
         );
+    }
+
+    private static Result<VirtualCard, SmartCardError> LoadPersistentCard(
+        CardConfiguration configuration
+    ) =>
+        GetPersistenceSettings()
+            .Bind(settings =>
+                settings.Match(
+                    configured =>
+                        File.Exists(configured.Path)
+                            ? VirtualCardStateStore
+                                .Load(configured.Path, configuration, configured.RootKey)
+                                .Bind(state =>
+                                    VirtualCard.Restore(
+                                        configuration,
+                                        Gp4Net.Cryptography.CryptoOperations.Rng.CreateSecureContext(),
+                                        state
+                                    )
+                                )
+                            : CreateAndPersist(configuration, configured),
+                    () =>
+                        Result.Success<VirtualCard, SmartCardError>(
+                            VirtualCardTestBuilder.CreateWithSecureRng(configuration)
+                        )
+                )
+            );
+
+    private static Result<VirtualCard, SmartCardError> CreateAndPersist(
+        CardConfiguration configuration,
+        PersistenceSettings settings
+    )
+    {
+        VirtualCard card = VirtualCardTestBuilder.CreateWithSecureRng(configuration);
+        return VirtualCardStateStore.Save(card, settings.Path, settings.RootKey).Map(() => card);
     }
 
     /// <summary>
@@ -102,36 +133,60 @@ public static class VirtualCardConnections
         ILogger<CardSessionCommands> logger
     )
     {
-        return VirtualCardChannel
-            .Create(virtualCard)
-            .Bind(channel =>
-                VirtualCardTransport.Create(virtualCard).Map(transport => (channel, transport))
-            )
-            .Map(tuple =>
+        return GetPersistenceSettings()
+            .Bind(settings =>
             {
-                var (channel, transport) = tuple;
+                Maybe<Func<IVirtualCard, UnitResult<SmartCardError>>> persistence = settings.Map(
+                    configured =>
+                        (Func<IVirtualCard, UnitResult<SmartCardError>>)(
+                            card =>
+                                card is VirtualCard concrete
+                                    ? VirtualCardStateStore.Save(
+                                        concrete,
+                                        configured.Path,
+                                        configured.RootKey
+                                    )
+                                    : UnitResult.Failure(
+                                        SmartCardError.InvalidArgument(
+                                            "Unsupported virtual-card implementation"
+                                        )
+                                    )
+                        )
+                );
 
-                var environment = new CommandEnvironment(
-                    Channel: channel,
-                    Transport: transport,
-                    SecureChannel: Maybe<SecureChannelState>.None,
-                    Logger: logger,
-                    Options: new CommandOptions(
-                        UseSecureChannel: false,
-                        CaptureMetrics: true,
-                        EnableLogging: true, // Enable logging infrastructure
-                        VerboseLogging: false, // CLI will override if --verbose
-                        DebugLogging: false // CLI will override if --debug
+                return VirtualCardChannel
+                    .Create(virtualCard, persistence)
+                    .Bind(channel =>
+                        VirtualCardTransport
+                            .Create(virtualCard)
+                            .Map(transport => (channel, transport))
                     )
-                );
+                    .Map(tuple =>
+                    {
+                        var (channel, transport) = tuple;
 
-                var processor = Gp4Net.Pipeline.CommandProcessors.CreatePipeline(
-                    enableLogging: true,
-                    enableSecureChannel: true
-                );
+                        var environment = new CommandEnvironment(
+                            Channel: channel,
+                            Transport: transport,
+                            SecureChannel: Maybe<SecureChannelState>.None,
+                            Logger: logger,
+                            Options: new CommandOptions(
+                                UseSecureChannel: false,
+                                CaptureMetrics: true,
+                                EnableLogging: true, // Enable logging infrastructure
+                                VerboseLogging: false, // CLI will override if --verbose
+                                DebugLogging: false // CLI will override if --debug
+                            )
+                        );
 
-                return (ICardSessionCommands)
-                    new CardSessionCommands(environment, processor, logger);
+                        var processor = Gp4Net.Pipeline.CommandProcessors.CreatePipeline(
+                            enableLogging: true,
+                            enableSecureChannel: true
+                        );
+
+                        return (ICardSessionCommands)
+                            new CardSessionCommands(environment, processor, logger);
+                    });
             });
     }
 
@@ -141,43 +196,56 @@ public static class VirtualCardConnections
     /// </summary>
     /// <param name="virtualCard">The virtual card to save</param>
     /// <param name="statePath">Path to save the state</param>
+    /// <param name="rootKey">32-byte state-encryption root key.</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Success or error result</returns>
     public static Task<UnitResult<SmartCardError>> SaveCardStateAsync(
         VirtualCard virtualCard,
         string statePath,
+        byte[] rootKey,
         CancellationToken cancellationToken = default
     )
     {
-        return SerializeCardState(virtualCard)
-            .Bind(json => WriteStateToFile(json, statePath, cancellationToken));
+        return Task.FromResult(VirtualCardStateStore.Save(virtualCard, statePath, rootKey));
     }
 
-    /// <summary>
-    /// Serializes virtual card state to JSON.
-    /// </summary>
-    private static Result<string, SmartCardError> SerializeCardState(VirtualCard virtualCard)
+    private static Result<Maybe<PersistenceSettings>, SmartCardError> GetPersistenceSettings()
     {
-        var cardState = new { CardType = "VirtualCard", Timestamp = DateTime.UtcNow };
+        Maybe<string> path = Maybe<string>
+            .From(Environment.GetEnvironmentVariable("GP4NET_VIRTUAL_STATE"))
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+        if (path.HasNoValue)
+            return Result.Success<Maybe<PersistenceSettings>, SmartCardError>(
+                Maybe<PersistenceSettings>.None
+            );
 
-        string json = JsonSerializer.Serialize(
-            cardState,
-            new JsonSerializerOptions { WriteIndented = true }
-        );
-
-        return Result.Success<string, SmartCardError>(json);
+        return Maybe<string>
+            .From(Environment.GetEnvironmentVariable("GP4NET_VIRTUAL_STATE_KEY"))
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToResult(
+                SmartCardError.InvalidArgument(
+                    "GP4NET_VIRTUAL_STATE_KEY is required when GP4NET_VIRTUAL_STATE is set"
+                )
+            )
+            .Ensure(
+                value => value.Length == 64,
+                SmartCardError.InvalidArgument(
+                    "GP4NET_VIRTUAL_STATE_KEY must be exactly 32 hexadecimal bytes"
+                )
+            )
+            .Bind(value =>
+                Result.Try(
+                    () => Convert.FromHexString(value),
+                    _ =>
+                        SmartCardError.InvalidArgument(
+                            "GP4NET_VIRTUAL_STATE_KEY must contain hexadecimal characters"
+                        )
+                )
+            )
+            .Map(rootKey =>
+                Maybe<PersistenceSettings>.From(new PersistenceSettings(path.Value, rootKey))
+            );
     }
 
-    /// <summary>
-    /// Writes state JSON to file.
-    /// </summary>
-    private static async Task<UnitResult<SmartCardError>> WriteStateToFile(
-        string json,
-        string statePath,
-        CancellationToken cancellationToken
-    )
-    {
-        await File.WriteAllTextAsync(statePath, json, cancellationToken);
-        return UnitResult.Success<SmartCardError>();
-    }
+    private sealed record PersistenceSettings(string Path, byte[] RootKey);
 }

@@ -111,10 +111,8 @@ public class P71VirtualCard
         CardLogging loggingService
     )
     {
-        // Use dual protocol config but default to SCP03
         return CardConfiguration
-            .DualProtocol()
-            .Map(config => config.WithScpDefaults(0x03, ScpImplementation.Scp03I70))
+            .P71Scp03()
             .Bind(config => CardState.Create().Bind(_ => VirtualCard.Create(config, rngContext)))
             .Map(baseCard => new P71VirtualCard("P71_SCP03_Default", baseCard));
     }

@@ -82,6 +82,53 @@ public class SecureChannelOperationsScp03Tests
     }
 
     [Test]
+    public async Task Should_Apply_Card_Lifecycle_Transitions_And_Unlock_A_Locked_Card()
+    {
+        string readerSpec = $"virtual:{Scp03ProfilePath.Value}";
+        var serviceResult = await VirtualCardConnections.CreateServiceAsync(
+            readerSpec,
+            NullLogger<CardSessionCommands>.Instance,
+            CancellationToken.None
+        );
+        Assert.That(serviceResult.IsSuccess, Is.True, () => serviceResult.Error.ToString());
+        using var service = serviceResult.Value;
+
+        var rawKeyset = RawKeyset
+            .Create(
+                (byte[])GpTestKeys.GpTestKey.Clone(),
+                (byte[])GpTestKeys.GpTestKey.Clone(),
+                (byte[])GpTestKeys.GpTestKey.Clone(),
+                keyVersion: 0x01
+            )
+            .Value;
+        var established = await ScpOperations.Establishment.EstablishAsync(
+            service.SendCommandAsync,
+            rawKeyset,
+            SecurityLevel.CMac,
+            CancellationToken.None
+        );
+        Assert.That(established.IsSuccess, Is.True, () => established.Error.ToString());
+
+        var channelState = established.Value.State;
+        foreach (byte lifecycle in new byte[] { 0x07, 0x0F, 0x7F, 0x0F })
+        {
+            var secured = ScpOperations.Security.ApplyCommandSecurity(
+                new WSCT.ISO7816.CommandAPDU([0x80, 0xF0, 0x80, lifecycle, 0x00]),
+                channelState
+            );
+            Assert.That(secured.IsSuccess, Is.True, () => secured.Error.ToString());
+
+            var response = await service.SendCommandAsync(
+                secured.Value.securedCommand.BinaryCommand,
+                CancellationToken.None
+            );
+            Assert.That(response.IsSuccess, Is.True, () => response.Error.ToString());
+            Assert.That(response.Value.StatusWord.Value, Is.EqualTo(0x9000));
+            channelState = secured.Value.newState;
+        }
+    }
+
+    [Test]
     public async Task Should_Fail_When_Scp03_Keys_Are_Incorrect()
     {
         string readerSpec = $"virtual:{Scp03ProfilePath.Value}";

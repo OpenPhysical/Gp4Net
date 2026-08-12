@@ -83,7 +83,7 @@ public class InstallCommandConformanceTests
 
         _ = first.P1.Should().Be(0x0E);
         _ = first.P2.Should().Be(0x01);
-        _ = last.P1.Should().Be(0x0C);
+        _ = last.P1.Should().Be(0x0E);
         _ = last.P2.Should().Be(0x03);
     }
 

@@ -645,7 +645,7 @@ public abstract record InstallCommand : IApduCommand
             );
 
             return result.Map(command => new InstallForInstallCommand(
-                command.Type,
+                InstallType.ForLoadInstallAndMakeSelectable,
                 command.PackageAid,
                 command.AppletAid,
                 command.ModuleAid,

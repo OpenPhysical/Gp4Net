@@ -4,109 +4,77 @@ using Gp4Net.Core;
 
 namespace Gp4Net.Domain.CardInfo;
 
-/// <summary>
-/// Utility class for parsing CPLC date format.
-/// CPLC dates are encoded as 2 bytes representing days since January 1, 2000.
-/// </summary>
+/// <summary>A valid industry CPLC YDDD production-date value.</summary>
+public readonly record struct CplcProductionDate(byte YearDigit, ushort DayOfYear)
+{
+    /// <summary>Resolves the one-digit year using an explicitly chosen decade.</summary>
+    public Result<DateTime, SmartCardError> Resolve(int decade)
+    {
+        if (decade < 1 || decade % 10 != 0)
+            return SmartCardError.InvalidArgument(
+                "The CPLC decade must be a positive multiple of ten"
+            );
+
+        int year = decade + YearDigit;
+        int maximumDay = DateTime.IsLeapYear(year) ? 366 : 365;
+        return DayOfYear is >= 1 && DayOfYear <= maximumDay
+            ? Result.Success<DateTime, SmartCardError>(
+                new DateTime(year, 1, 1).AddDays(DayOfYear - 1)
+            )
+            : Result.Failure<DateTime, SmartCardError>(
+                SmartCardError.InvalidData($"Day {DayOfYear} is invalid for {year}")
+            );
+    }
+}
+
+/// <summary>Parses the industry YDDD form used by CPLC production-date fields.</summary>
 public static class CplcDateParser
 {
-    private static readonly DateTime BaseDate = new DateTime(2000, 1, 1);
-
-    /// <summary>
-    /// Invalid date value (all bits set).
-    /// </summary>
     public const ushort INVALID_DATE_MAX = 0xFFFF;
-
-    /// <summary>
-    /// Invalid date value (all bits clear).
-    /// </summary>
     public const ushort INVALID_DATE_MIN = 0x0000;
 
-    /// <summary>
-    /// Parses a CPLC date value to a DateTime.
-    /// </summary>
-    /// <param name="cplcDate">The 2-byte CPLC date value.</param>
-    /// <returns>The parsed date, or None if the date is invalid.</returns>
-    public static Maybe<DateTime> ParseDate(ushort cplcDate)
+    public static Maybe<CplcProductionDate> Parse(ushort value)
     {
-        if (!IsValidDate(cplcDate))
-        {
-            return Maybe<DateTime>.None;
-        }
+        if (value is INVALID_DATE_MIN or INVALID_DATE_MAX)
+            return Maybe<CplcProductionDate>.None;
 
-        // Check bounds to avoid DateTime overflow
-        // Since ushort max is 65535, and BaseDate is 2000-01-01, max date would be ~2179
-        // This is well within DateTime range, but we validate for safety
-        // No additional check needed - ushort range is inherently safe
+        int year = value >> 12;
+        int hundreds = value >> 8 & 0x0F;
+        int tens = value >> 4 & 0x0F;
+        int ones = value & 0x0F;
+        if (year > 9 || hundreds > 9 || tens > 9 || ones > 9)
+            return Maybe<CplcProductionDate>.None;
 
-        return Maybe<DateTime>.From(BaseDate.AddDays(cplcDate));
+        int day = hundreds * 100 + tens * 10 + ones;
+        return day is >= 1 and <= 366
+            ? Maybe<CplcProductionDate>.From(new CplcProductionDate((byte)year, (ushort)day))
+            : Maybe<CplcProductionDate>.None;
     }
 
-    /// <summary>
-    /// Formats a CPLC date value as a string.
-    /// </summary>
-    /// <param name="cplcDate">The 2-byte CPLC date value.</param>
-    /// <returns>Formatted date string or indication of invalid date.</returns>
-    public static string FormatDate(ushort cplcDate)
-    {
-        var date = ParseDate(cplcDate);
-        if (date.HasValue)
-        {
-            return date.Value.ToString("yyyy-MM-dd");
-        }
+    public static Maybe<DateTime> ParseDate(ushort value, int decade) =>
+        Parse(value)
+            .Bind(parsed =>
+                parsed
+                    .Resolve(decade)
+                    .Match(date => Maybe<DateTime>.From(date), _ => Maybe<DateTime>.None)
+            );
 
-        if (cplcDate is INVALID_DATE_MAX or INVALID_DATE_MIN)
-        {
-            return "(invalid date format)";
-        }
+    public static string FormatDate(ushort value) =>
+        Parse(value)
+            .Match(
+                parsed => $"YDDD(year digit {parsed.YearDigit}, day {parsed.DayOfYear:000})",
+                () => $"(invalid date: {value:X4})"
+            );
 
-        return $"(invalid date: {cplcDate:X4})";
-    }
+    public static bool IsValidDate(ushort value) => Parse(value).HasValue;
 
-    /// <summary>
-    /// Checks if a CPLC date value is valid.
-    /// </summary>
-    /// <param name="cplcDate">The date value to check.</param>
-    /// <returns>True if the date is valid, false otherwise.</returns>
-    public static bool IsValidDate(ushort cplcDate)
-    {
-        return cplcDate != INVALID_DATE_MIN && cplcDate != INVALID_DATE_MAX;
-    }
-
-    /// <summary>
-    /// Converts a DateTime to CPLC date format.
-    /// </summary>
-    /// <param name="date">The date to convert.</param>
-    /// <returns>A Result containing the CPLC date value.</returns>
     public static Result<ushort, SmartCardError> ToCplcDate(DateTime date)
     {
-        if (date < BaseDate)
-        {
-            return Result.Failure<ushort, SmartCardError>(
-                SmartCardError.InvalidArgument("Date cannot be before January 1, 2000")
-            );
-        }
-
-        int days = (date - BaseDate).Days;
-        if (days > 0xFFFE) // Reserve 0xFFFF for invalid
-        {
-            return Result.Failure<ushort, SmartCardError>(
-                SmartCardError.InvalidArgument("Date is too far in the future for CPLC format")
-            );
-        }
-
-        return Result.Success<ushort, SmartCardError>((ushort)days);
+        int day = date.DayOfYear;
+        int encoded = (date.Year % 10) << 12 | day / 100 << 8 | day / 10 % 10 << 4 | day % 10;
+        return Result.Success<ushort, SmartCardError>((ushort)encoded);
     }
 
-    /// <summary>
-    /// Formats CPLC data with date interpretation for display.
-    /// </summary>
-    /// <param name="fieldName">Name of the field.</param>
-    /// <param name="dateValue">The CPLC date value.</param>
-    /// <returns>Formatted string for display.</returns>
-    public static string FormatDateField(string fieldName, ushort dateValue)
-    {
-        string dateStr = FormatDate(dateValue);
-        return $"{fieldName}: {dateValue:X4} {dateStr}";
-    }
+    public static string FormatDateField(string fieldName, ushort dateValue) =>
+        $"{fieldName}: {dateValue:X4} {FormatDate(dateValue)}";
 }

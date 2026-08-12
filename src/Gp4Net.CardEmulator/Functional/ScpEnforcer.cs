@@ -175,25 +175,7 @@ public static partial class ScpEnforcer
         SmartCardError
     > ValidateSecurityDomainCapabilities(CommandSecurityContext context)
     {
-        // ISD is always implicitly selected and can always handle INITIALIZE UPDATE
-        var selectedApp = context.CardState.CurrentlySelectedApplication;
-
-        // Use functional pattern matching approach
-        return selectedApp.Match(
-            Some: app =>
-                app.Privileges.HasFlag(Privilege.SecurityDomain)
-                    ? Result.Success<CommandSecurityContext, SmartCardError>(context)
-                    : Result.Failure<CommandSecurityContext, SmartCardError>(
-                        SmartCardError
-                            .ConditionsNotSatisfied()
-                            .WithContext("Instruction", "INITIALIZE UPDATE")
-                            .WithContext(
-                                "Requirement",
-                                "Selected application must have SecurityDomain privileges per GP Card Spec v2.3.1"
-                            )
-                    ),
-            None: () => Result.Success<CommandSecurityContext, SmartCardError>(context)
-        ); // No app selected = ISD implicitly selected
+        return Result.Success<CommandSecurityContext, SmartCardError>(context);
     }
 
     /// <summary>

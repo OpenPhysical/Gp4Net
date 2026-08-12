@@ -66,9 +66,11 @@ public static class Responses
     /// Reference: GlobalPlatform Card Specification v2.3.1 Section 11.5
     /// </summary>
     /// <param name="response">The command response to parse.</param>
+    /// <param name="issuerSecurityDomainAid">Configured ISD AID used for unambiguous classification.</param>
     /// <returns>The list of applications or an error.</returns>
     public static Result<ImmutableList<ApplicationInfo>, SmartCardError> ParseGetStatusResponse(
-        CommandResponse response
+        CommandResponse response,
+        Maybe<byte[]> issuerSecurityDomainAid = default
     )
     {
         if (!response.IsSuccess)
@@ -82,7 +84,7 @@ public static class Responses
 
         return GetStatusResponse
             .Parse(response.Data)
-            .Map(parsed => ConvertToApplicationInfos(parsed));
+            .Map(parsed => ConvertToApplicationInfos(parsed, issuerSecurityDomainAid));
     }
 
     /// <summary>
@@ -180,7 +182,8 @@ public static class Responses
     /// Converts GetStatusResponse entries to domain ApplicationInfo objects.
     /// </summary>
     private static ImmutableList<ApplicationInfo> ConvertToApplicationInfos(
-        GetStatusResponse response
+        GetStatusResponse response,
+        Maybe<byte[]> issuerSecurityDomainAid
     )
     {
         return
@@ -194,11 +197,17 @@ public static class Responses
                         : ImmutableList<Constants.Constants.GlobalPlatform.Privilege>.Empty;
 
                 // Determine application type based on privileges
-                var appType = privilegesList.Contains(
+                bool isSecurityDomain = privilegesList.Contains(
                     Constants.Constants.GlobalPlatform.Privilege.SecurityDomain
-                )
+                );
+                bool isIssuerSecurityDomain = issuerSecurityDomainAid
+                    .Map(aid => aid.SequenceEqual(entry.Aid))
+                    .GetValueOrDefault(false);
+                var appType = isIssuerSecurityDomain
                     ? ApplicationType.IssuerSecurityDomain
-                    : ApplicationType.Application;
+                    : isSecurityDomain
+                        ? ApplicationType.SupplementarySecurityDomain
+                        : ApplicationType.Application;
 
                 return new ApplicationInfo(
                     entry.Aid,

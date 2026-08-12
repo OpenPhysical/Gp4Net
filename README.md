@@ -21,7 +21,9 @@ Card Specification 2.3.1 and SCP02/SCP03 secure channels.
 - CAP validation, loading, installation, instantiation, listing, and deletion
 - Java Card SDK package scanning and EXP analysis
 - APDU trace conversion and validation support
-- Deterministic virtual-card profiles for development and integration testing
+- Stateful virtual-card profiles for development and integration testing
+- Encrypted virtual-card persistence with profile binding and atomic updates
+- A narrow applet runtime boundary ready for a future Java Card VM
 - Result-oriented error handling with `CSharpFunctionalExtensions`
 - Cryptographic operations implemented through Bouncy Castle
 
@@ -52,7 +54,7 @@ dotnet test
 ```
 
 GitHub Actions also collects Cobertura coverage and enforces total line and branch baselines for
-every solution test project: 25% for the core suite, 10% for the emulator suite, and 4% for the CLI
+every solution test project: 30% for the core suite, 12% for the emulator suite, and 5% for the CLI
 suite. It uploads all reports and publishes the Ubuntu reports to Codecov when a `CODECOV_TOKEN`
 secret is configured.
 
@@ -101,6 +103,12 @@ Reader selection follows this order:
 
 A virtual reader uses the form `virtual:path/to/profile.json`.
 
+Set `GP4NET_VIRTUAL_STATE` to persist a virtual card between CLI runs. Persistence requires a
+32-byte root key encoded as 64 hexadecimal characters in `GP4NET_VIRTUAL_STATE_KEY`. The encrypted
+state is bound to both the card UUID and the selected profile. Installed applications, load files,
+keys, counters, data objects, and lifecycle state survive; secure-channel sessions, selection, and
+incomplete LOAD or PUT KEY operations do not.
+
 ### Command groups
 
 ```text
@@ -146,6 +154,7 @@ against the exact card profile before deployment.
 ## Documentation
 
 - [Architecture](docs/architecture/README.md)
+- [Virtual-card architecture](docs/architecture/CARD_EMULATOR.md)
 - [SCP02 notes](docs/SCP02_specification.md)
 - [Contributing guide](CONTRIBUTING.md)
 - [Contributor copyright assignment](CONTRIBUTOR_ASSIGNMENT.md)

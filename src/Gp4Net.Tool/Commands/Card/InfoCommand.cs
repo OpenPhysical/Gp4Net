@@ -106,22 +106,7 @@ public class InfoCommand : AsyncCommand<InfoCommand.Settings>
                     )
             )
             .Match(
-                async info =>
-                {
-                    // Save virtual card state if requested
-                    await settings
-                        .GetSaveFile()
-                        .Match(
-                            async saveFile =>
-                            {
-                                _displayService.Info($"Card state would be saved to: {saveFile}");
-                                await Task.CompletedTask;
-                            },
-                            () => Task.CompletedTask
-                        );
-
-                    return 0;
-                },
+                _ => Task.FromResult(0),
                 error =>
                 {
                     _displayService.Error(ReaderResolutionHelper.FormatResolutionError(error));

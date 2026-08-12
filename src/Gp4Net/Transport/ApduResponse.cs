@@ -30,7 +30,7 @@ public sealed class ApduResponse
     }
 
     /// <summary>
-    /// Gets a value indicating whether the command was successful (SW=9000).
+    /// Gets a value indicating whether the command succeeded or has continuation data.
     /// </summary>
-    public bool IsSuccessful => StatusWord == 0x9000;
+    public bool IsSuccessful => new Core.StatusWord(StatusWord).IsSuccessful;
 }

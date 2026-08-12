@@ -26,26 +26,7 @@ public class ApduResponse
     /// Includes both normal success (0x9000) and continuation responses (0x61XX, 0x9FXX).
     /// Per GP specification section 8.2, success responses include chained data responses.
     /// </summary>
-    public bool IsSuccessful
-    {
-        get
-        {
-            return StatusWord == Constants.Constants.StatusWords.Success
-                || IsSuccessWithContinuation;
-        }
-    }
-
-    /// <summary>
-    /// Gets a value indicating whether this is a success response with continuation data.
-    /// </summary>
-    private bool IsSuccessWithContinuation
-    {
-        get
-        {
-            ushort sw = StatusWord;
-            return (sw & 0xFF00) == 0x6100 || (sw & 0xFF00) == 0x9F00; // 0x61XX or 0x9FXX
-        }
-    }
+    public bool IsSuccessful => StatusWord.IsSuccessful;
 
     /// <summary>
     /// Initializes a new instance of the ApduResponse class.

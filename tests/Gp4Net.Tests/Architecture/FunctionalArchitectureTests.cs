@@ -45,6 +45,7 @@ public sealed class FunctionalArchitectureTests
         string[] approved =
         [
             "IApplication",
+            "IAppletRuntime",
             "IApduCommand",
             "IApduTransport",
             "ICardChannel",

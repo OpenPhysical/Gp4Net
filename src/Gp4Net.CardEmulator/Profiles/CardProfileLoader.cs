@@ -117,30 +117,29 @@ public static class CardProfileLoader
                             .Bind(staticKeys =>
                                 // Build default data objects
                                 BuildDataObjects(profile)
-                                    .Map(dataObjects =>
-                                    {
-                                        // Determine SCP version and implementation
-                                        (byte scpVersion, var scpImplementation) =
-                                            DetermineScpDefaults(profile);
-
-                                        var config = new CardConfiguration(
-                                            Atr: atrBytes,
-                                            IsdAid: isdAidBytes,
-                                            StaticKeys: staticKeys,
-                                            DefaultDataObjects: dataObjects,
-                                            SupportedInstructions: BuildSupportedInstructions(),
-                                            CardType: string.IsNullOrEmpty(
-                                                profile.ProfileInfo.Description
+                                    .Bind(dataObjects =>
+                                        DetermineScpDefaults(profile)
+                                            .Bind(defaults =>
+                                                BuildSupportedInstructions(
+                                                        profile.CardData.Capabilities.Instructions
+                                                    )
+                                                    .Map(instructions => new CardConfiguration(
+                                                        Atr: atrBytes,
+                                                        IsdAid: isdAidBytes,
+                                                        StaticKeys: staticKeys,
+                                                        DefaultDataObjects: dataObjects,
+                                                        SupportedInstructions: instructions,
+                                                        CardType: string.IsNullOrEmpty(
+                                                            profile.ProfileInfo.Description
+                                                        )
+                                                            ? "Custom Card"
+                                                            : profile.ProfileInfo.Description,
+                                                        DefaultScpVersion: defaults.scpVersion,
+                                                        DefaultScpImplementation: defaults.scpImplementation,
+                                                        SupportedAlgorithms: CardConfigurationAlgorithms.CreateStandardAlgorithms()
+                                                    ))
                                             )
-                                                ? "Custom Card"
-                                                : profile.ProfileInfo.Description,
-                                            DefaultScpVersion: scpVersion,
-                                            DefaultScpImplementation: scpImplementation,
-                                            SupportedAlgorithms: CardConfigurationAlgorithms.CreateStandardAlgorithms()
-                                        );
-
-                                        return config;
-                                    })
+                                    )
                             )
                     )
             );
@@ -266,59 +265,104 @@ public static class CardProfileLoader
             .MapError(_ => SmartCardError.InvalidData($"Invalid data object tag: {key}"));
     }
 
-    private static (byte scpVersion, ScpImplementation scpImplementation) DetermineScpDefaults(
-        CardProfile profile
-    )
+    private static Result<
+        (byte scpVersion, ScpImplementation scpImplementation),
+        SmartCardError
+    > DetermineScpDefaults(CardProfile profile)
     {
-        // Check if card has SCP03 support
-        bool hasScp03 = profile.CardData.Capabilities.ScpSupport.Any(s => s.Protocol == "0x03");
-        bool hasScp02 = profile.CardData.Capabilities.ScpSupport.Any(s => s.Protocol == "0x02");
+        var declared = profile.CardData.Capabilities.ScpSupport;
+        if (declared.Count == 0)
+            return SmartCardError.InvalidData(
+                "A card profile must explicitly declare a secure-channel protocol"
+            );
 
-        // Determine based on key type
-        bool hasAesKeys = profile.CardData.KeyInfo.Any(k => k.Type == "AES");
-
-        if (hasScp03 || hasAesKeys)
+        foreach (ScpSupportProfile support in declared)
         {
-            // Default to SCP03 i=70 for cards with SCP03 support
-            return (0x03, ScpImplementation.Scp03I70);
-        }
-        if (hasScp02)
-        {
-            // Check if card explicitly supports SCP02 i=15 (prefer it over i=55)
-            var scp02Implementations = profile
-                .CardData.Capabilities.ScpSupport.Where(s => s.Protocol == "0x02")
-                .SelectMany(s => s.Implementations)
-                .ToList();
+            if (support.Protocol is not ("0x02" or "0x03"))
+                return SmartCardError.InvalidData($"Unsupported protocol: {support.Protocol}");
 
-            if (scp02Implementations.Contains("0x15"))
+            foreach (string value in support.Implementations)
             {
-                return (0x02, ScpImplementation.Scp02I15);
+                if (
+                    !value.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+                    || !byte.TryParse(
+                        value.AsSpan(2),
+                        System.Globalization.NumberStyles.HexNumber,
+                        null,
+                        out byte implementation
+                    )
+                )
+                    return SmartCardError.InvalidData($"Invalid SCP implementation: {value}");
+
+                bool supported =
+                    support.Protocol == "0x02"
+                        ? implementation is 0x05 or 0x15 or 0x25 or 0x35
+                        : implementation is 0x00 or 0x10 or 0x20 or 0x30 or 0x60 or 0x70;
+                if (!supported)
+                    return SmartCardError.InvalidData(
+                        $"Unsupported {support.Protocol} implementation: {value}"
+                    );
             }
-            // Default to SCP02 i=55 for SCP02-only cards
-            return (0x02, ScpImplementation.Scp02I55);
         }
 
-        // Fallback to SCP02 i=15
-        return (0x02, ScpImplementation.Scp02I15);
+        ScpSupportProfile selected = declared[0];
+        if (selected.Implementations.Count == 0)
+            return SmartCardError.InvalidData("The default SCP protocol has no implementation");
+
+        string preferred =
+            selected.Protocol == "0x02" && selected.Implementations.Contains("0x15")
+                ? "0x15"
+                : selected.Protocol == "0x03" && selected.Implementations.Contains("0x70")
+                    ? "0x70"
+                    : selected.Implementations[0];
+        byte selectedValue = byte.Parse(
+            preferred.AsSpan(2),
+            System.Globalization.NumberStyles.HexNumber
+        );
+        byte protocol = selected.Protocol == "0x03" ? (byte)0x03 : (byte)0x02;
+        bool matchingKeys = profile.StaticKeys.Values.Any(key =>
+            string.Equals(
+                key.Type,
+                protocol == 0x03 ? "SCP03" : "SCP02",
+                StringComparison.OrdinalIgnoreCase
+            )
+        );
+        return matchingKeys
+            ? Result.Success<(byte, ScpImplementation), SmartCardError>(
+                (protocol, (ScpImplementation)selectedValue)
+            )
+            : Result.Failure<(byte, ScpImplementation), SmartCardError>(
+                SmartCardError.InvalidData(
+                    $"The default {selected.Protocol} protocol has no matching static keyset"
+                )
+            );
     }
 
-    private static SupportedInstructions BuildSupportedInstructions()
-    {
-        // Standard GP instructions with type safety
-        return new SupportedInstructions(
-            Select: true,
-            InitializeUpdate: true,
-            ExternalAuthenticate: true,
-            GetData: true,
-            GetStatus: true,
-            Install: true,
-            Load: true,
-            Delete: true,
-            PutKey: true,
-            StoreData: true,
-            ManageChannel: true
-        );
-    }
+    private static Result<SupportedInstructions, SmartCardError> BuildSupportedInstructions(
+        InstructionSupportProfile instructions
+    ) =>
+        instructions.ManageChannel
+            ? Result.Failure<SupportedInstructions, SmartCardError>(
+                SmartCardError.InvalidData(
+                    "MANAGE CHANNEL cannot be advertised until logical channels are implemented"
+                )
+            )
+            : Result.Success<SupportedInstructions, SmartCardError>(
+                new SupportedInstructions(
+                    Select: instructions.Select,
+                    InitializeUpdate: instructions.InitializeUpdate,
+                    ExternalAuthenticate: instructions.ExternalAuthenticate,
+                    GetData: instructions.GetData,
+                    GetStatus: instructions.GetStatus,
+                    Install: instructions.Install,
+                    Load: instructions.Load,
+                    Delete: instructions.Delete,
+                    PutKey: instructions.PutKey,
+                    StoreData: instructions.StoreData,
+                    SetStatus: instructions.SetStatus,
+                    ManageChannel: false
+                )
+            );
 
     private static Result<byte[], SmartCardError> ParseHexString(string hex, string fieldName) =>
         Maybe<string>
@@ -510,6 +554,26 @@ internal class CapabilitiesProfile
     /// </summary>
     /// <value>Maps the <c>scpSupport</c> array.</value>
     public List<ScpSupportProfile> ScpSupport { get; set; } = [];
+
+    /// <summary>Gets or sets the APDU instructions exposed by this profile.</summary>
+    public InstructionSupportProfile Instructions { get; set; } = new();
+}
+
+/// <summary>Executable APDU capabilities declared by a card profile.</summary>
+internal sealed class InstructionSupportProfile
+{
+    public bool Select { get; set; } = true;
+    public bool InitializeUpdate { get; set; } = true;
+    public bool ExternalAuthenticate { get; set; } = true;
+    public bool GetData { get; set; } = true;
+    public bool GetStatus { get; set; } = true;
+    public bool Install { get; set; } = true;
+    public bool Load { get; set; } = true;
+    public bool Delete { get; set; } = true;
+    public bool PutKey { get; set; } = true;
+    public bool StoreData { get; set; } = true;
+    public bool SetStatus { get; set; } = true;
+    public bool ManageChannel { get; set; }
 }
 
 /// <summary>

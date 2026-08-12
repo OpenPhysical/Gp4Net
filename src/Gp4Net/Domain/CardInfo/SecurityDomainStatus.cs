@@ -1,233 +1,52 @@
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Domain.DataObjects;
 
 namespace Gp4Net.Domain.CardInfo;
 
 /// <summary>
-/// Security Domain Management Data (tag C1) parser.
-/// Contains information about the current state of the security domain.
+/// Security Domain Management Data (tag C1).
+/// GP Card Specification v2.3.1, §11.3.2.1 defines its value as the default key
+/// version's two- or three-byte sequence counter.
 /// </summary>
-public class SecurityDomainStatus
+public sealed class SecurityDomainStatus
 {
-    /// <summary>
-    /// Gets the raw status data.
-    /// </summary>
+    private SecurityDomainStatus(byte[] rawData, byte[] sequenceCounter)
+    {
+        RawData = (byte[])rawData.Clone();
+        SequenceCounter = (byte[])sequenceCounter.Clone();
+    }
+
     public byte[] RawData { get; }
 
-    /// <summary>
-    /// Gets the security domain state byte.
-    /// </summary>
-    public byte StateByte { get; }
+    public byte[] SequenceCounter { get; }
 
-    /// <summary>
-    /// Gets additional status bytes if present.
-    /// </summary>
-    public Maybe<byte[]> AdditionalData { get; }
-
-    private SecurityDomainStatus(byte[] rawData, byte stateByte, Maybe<byte[]> additionalData)
-    {
-        RawData = rawData;
-        StateByte = stateByte;
-        AdditionalData = additionalData;
-    }
-
-    /// <summary>
-    /// Parses Security Domain Management Data from tag C1.
-    /// </summary>
-    /// <param name="data">The tag C1 data bytes.</param>
-    /// <returns>Result containing parsed status or error.</returns>
-    public static Result<SecurityDomainStatus, SmartCardError> Parse(Maybe<byte[]> data)
-    {
-        return data.Match(
-            Some: bytes => ParseFromBytes(bytes),
-            None: () =>
+    public static Result<SecurityDomainStatus, SmartCardError> Parse(Maybe<byte[]> data) =>
+        data.Match(
+            bytes =>
+                SecurityDomainInfoCodec
+                    .Decode(bytes)
+                    .Map(info => new SecurityDomainStatus(bytes, info.SequenceCounter)),
+            () =>
                 Result.Failure<SecurityDomainStatus, SmartCardError>(
-                    SmartCardError.InvalidData("Security domain status data cannot be null")
+                    SmartCardError.InvalidData("Security domain management data cannot be absent")
                 )
         );
-    }
 
-    private static Result<SecurityDomainStatus, SmartCardError> ParseFromBytes(byte[] data)
+    public static Result<SecurityDomainStatus, SmartCardError> Parse(byte[] data) =>
+        Parse(Maybe<byte[]>.From(data));
+
+    public Maybe<uint> GetSequenceCounter()
     {
-        if (data.Length < 3) // Minimum: tag (1) + length (1) + state (1)
-        {
-            return Result.Failure<SecurityDomainStatus, SmartCardError>(
-                SmartCardError.InvalidData(
-                    $"Security domain status data too short: {data.Length} bytes"
-                )
-            );
-        }
-
-        // Verify tag
-        if (data[0] != 0xC1)
-        {
-            return Result.Failure<SecurityDomainStatus, SmartCardError>(
-                SmartCardError.InvalidData($"Invalid tag: expected 0xC1, got 0x{data[0]:X2}")
-            );
-        }
-
-        // Get length
-        byte length = data[1];
-        if (data.Length < 2 + length)
-        {
-            return Result.Failure<SecurityDomainStatus, SmartCardError>(
-                SmartCardError.InvalidData(
-                    $"Data length mismatch: expected {2 + length}, got {data.Length}"
-                )
-            );
-        }
-
-        // Extract state byte
-        byte stateByte = data[2];
-
-        // Extract additional data if present
-        var additionalData =
-            length > 1 ? Maybe<byte[]>.From(data[3..(2 + length)]) : Maybe<byte[]>.None;
-
-        return Result.Success<SecurityDomainStatus, SmartCardError>(
-            new SecurityDomainStatus(data, stateByte, additionalData)
-        );
+        uint value = 0;
+        foreach (byte current in SequenceCounter)
+            value = value << 8 | current;
+        return Maybe<uint>.From(value);
     }
 
-    /// <summary>
-    /// Gets the ISD state from the state byte.
-    /// </summary>
-    public IsdState GetIsdState()
-    {
-        // Check for special states first (full byte values)
-        return StateByte switch
-        {
-            0x7F => IsdState.CardLocked,
-            0xFF => IsdState.Terminated,
-            _ => (IsdState)(StateByte & 0x0F), // For normal states, mask the flags
-        };
-    }
+    public override string ToString() =>
+        $"Security Domain Sequence Counter: 0x{Convert.ToHexString(SequenceCounter)}";
 
-    /// <summary>
-    /// Gets whether the ISD is personalized.
-    /// </summary>
-    public bool IsPersonalized()
-    {
-        return (StateByte & 0x10) != 0;
-    }
-
-    /// <summary>
-    /// Gets whether the ISD is locked.
-    /// </summary>
-    public bool IsLocked()
-    {
-        return (StateByte & 0x80) != 0;
-    }
-
-    /// <summary>
-    /// Gets the sequence counter value if present.
-    /// For C1020004, this would be 0x0004.
-    /// For C103000046, this would be 0x0046.
-    /// </summary>
-    public Maybe<ushort> GetSequenceCounter()
-    {
-        return AdditionalData.Bind(data =>
-        {
-            switch (data.Length)
-            {
-                case 1:
-                    // Single byte counter
-                    return Maybe<ushort>.From(data[0]);
-                case >= 2:
-                {
-                    // Two byte counter (big-endian)
-                    ushort counter = (ushort)(data[^2] << 8 | data[^1]);
-                    return Maybe<ushort>.From(counter);
-                }
-                default:
-                    return Maybe<ushort>.None;
-            }
-        });
-    }
-
-    /// <summary>
-    /// Formats the security domain status as a human-readable string.
-    /// </summary>
-    public override string ToString()
-    {
-        var sb = new StringBuilder();
-        _ = sb.Append("Security Domain Status: ");
-        _ = sb.Append($"State={GetIsdState()}");
-
-        if (IsPersonalized())
-        {
-            _ = sb.Append(" [Personalized]");
-        }
-
-        if (IsLocked())
-        {
-            _ = sb.Append(" [Locked]");
-        }
-
-        GetSequenceCounter()
-            .Match(Some: counter => sb.Append($", Sequence=0x{counter:X4}"), None: () => { });
-
-        return sb.ToString();
-    }
-
-    /// <summary>
-    /// Gets a short description of the status.
-    /// </summary>
-    public string GetShortDescription()
-    {
-        var parts = new List<string> { GetIsdState().ToString() };
-
-        if (IsPersonalized())
-        {
-            parts.Add("Personalized");
-        }
-
-        if (IsLocked())
-        {
-            parts.Add("Locked");
-        }
-
-        GetSequenceCounter().Execute(counter => parts.Add($"Seq:0x{counter:X4}"));
-
-        return string.Join(", ", parts);
-    }
-}
-
-/// <summary>
-/// ISD (Issuer Security Domain) states.
-/// </summary>
-public enum IsdState : byte
-{
-    /// <summary>
-    /// OP_READY state - normal operational state.
-    /// </summary>
-    OpReady = 0x01,
-
-    /// <summary>
-    /// INITIALIZED state.
-    /// </summary>
-    Initialized = 0x07,
-
-    /// <summary>
-    /// SECURED state.
-    /// </summary>
-    Secured = 0x0F,
-
-    /// <summary>
-    /// CARD_LOCKED state.
-    /// </summary>
-    CardLocked = 0x7F,
-
-    /// <summary>
-    /// TERMINATED state.
-    /// </summary>
-    Terminated = 0xFF,
-
-    /// <summary>
-    /// Unknown or invalid state.
-    /// </summary>
-    Unknown = 0x00,
+    public string GetShortDescription() => $"Seq:0x{Convert.ToHexString(SequenceCounter)}";
 }

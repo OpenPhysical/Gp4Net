@@ -124,6 +124,32 @@ public partial class VirtualCard : IVirtualCard
             });
     }
 
+    /// <summary>Restores nonvolatile state and performs the reset required on card power-up.</summary>
+    public static Result<VirtualCard, SmartCardError> Restore(
+        CardConfiguration config,
+        IRngContext rngContext,
+        CardState persistedState
+    )
+    {
+        CardState resetState = persistedState.Reset().WithoutApplicationRegistry();
+        return CardStateTransitions
+            .InitializeApplicationRegistryWithDataObjects(
+                resetState,
+                config.IsdAid.ToImmutableArray(),
+                resetState.DataObjects
+            )
+            .Bind(state => SynchronizeApplicationRegistry(state, config))
+            .Map(state => new VirtualCard(
+                config,
+                rngContext,
+                state,
+                new CardLogging(Maybe<ILogger>.None),
+                new EmulatorCapFiles(),
+                new CardStateTransitions(Maybe<ILogger>.None),
+                Maybe<CardState>.From(state)
+            ));
+    }
+
     /// <inheritdoc />
     public byte[] GetAtr() => _config.Atr;
 
@@ -410,18 +436,11 @@ public partial class VirtualCard : IVirtualCard
         bool installForLoad = (p1 & 0x02) != 0;
         bool installForInstall = (p1 & 0x04) != 0;
 
-        if (installForLoad)
+        if (installForLoad && !installForInstall)
         {
             // INSTALL [for load] - GlobalPlatform Card Specification v2.3.1 Section 11.5.2.1
             return ParseInstallForLoadData(commandData)
-                .Bind(parsedData =>
-                    ValidateInstallToken(
-                            parsedData.loadToken,
-                            parsedData.loadFileDataBlockHash,
-                            config
-                        )
-                        .Map(_ => parsedData)
-                )
+                .Bind(parsedData => ValidateInstallToken(parsedData.loadToken).Map(_ => parsedData))
                 .Bind(parsedData => CreateInstallForLoadResponse(parsedData, state, config));
         }
         if (installForInstall)
@@ -443,7 +462,10 @@ public partial class VirtualCard : IVirtualCard
                     byte[] resolvedModuleAid = moduleAid.Match(mAid => mAid, () => appAid);
 
                     // Create application with proper lifecycle management
-                    const byte validInitialState = (byte)ApplicationLifecycleState.Installed;
+                    byte validInitialState =
+                        (p1 & 0x08) != 0
+                            ? (byte)ApplicationLifecycleState.Selectable
+                            : (byte)ApplicationLifecycleState.Installed;
 
                     return Result
                         .Success<InstalledApplication, SmartCardError>(
@@ -472,9 +494,8 @@ public partial class VirtualCard : IVirtualCard
                 });
         }
 
-        // Default response for unhandled install types
-        return Result.Success<(ApduResponse, CardState), SmartCardError>(
-            (new ApduResponse([0x00], Constants.Constants.StatusWords.Success), state)
+        return Result.Failure<(ApduResponse, CardState), SmartCardError>(
+            SmartCardError.IncorrectP1P2()
         );
     }
 
@@ -794,18 +815,27 @@ public partial class VirtualCard : IVirtualCard
         CardConfiguration config
     )
     {
-        // Get or create the load context from card state data objects
+        // INSTALL [for load] creates the only valid load context.
         return GetOrCreateLoadContext(state, blockNumber)
             .Bind(loadContext =>
             {
+                byte expectedBlock =
+                    loadContext.LastBlockNumber == 0xFF
+                        ? (byte)0x00
+                        : (byte)(loadContext.LastBlockNumber + 1);
+                if (blockNumber != expectedBlock)
+                    return Result.Failure<(CardState, bool), SmartCardError>(
+                        SmartCardError.IncorrectP1P2()
+                    );
+
                 // Append data block to accumulated data
-                return AccumulateLoadData(loadContext.AccumulatedData, dataBlock, blockNumber)
+                return AccumulateLoadData(loadContext.AccumulatedData, dataBlock)
                     .Bind(updatedData =>
                     {
                         if (isLastBlock)
                         {
                             // Process complete CAP file and update load files
-                            return ProcessCompleteCapFile(updatedData, state, config)
+                            return ProcessCompleteCapFile(updatedData, state, loadContext)
                                 .Map(newState =>
                                 {
                                     // Remove load context from state and mark load as complete
@@ -829,33 +859,18 @@ public partial class VirtualCard : IVirtualCard
     }
 
     /// <summary>
-    /// Gets existing or creates new load context for tracking data block accumulation.
+    /// Gets the load context created by INSTALL [for load].
     /// </summary>
-    private static Result<LoadContext, SmartCardError> GetOrCreateLoadContext(
+    private static Result<PendingLoadOperation, SmartCardError> GetOrCreateLoadContext(
         CardState state,
         byte blockNumber
     )
     {
-        const ushort loadContextTag = 0xFFFF; // Internal tag for load context storage
-
-        if (
-            state.DataObjects.TryGetValue(loadContextTag, out byte[]? contextData)
-            && contextData is not null
-        )
-        {
-            // Deserialize existing context
-            return DeserializeLoadContext(contextData);
-        }
-
-        // Create new context for block 0
-        if (blockNumber != 0x00)
-            return Result.Failure<LoadContext, SmartCardError>(
-                SmartCardError.InvalidArgument("LOAD must start with block 0")
+        return state.PendingLoad.HasValue
+            ? Result.Success<PendingLoadOperation, SmartCardError>(state.PendingLoad.Value)
+            : Result.Failure<PendingLoadOperation, SmartCardError>(
+                SmartCardError.ConditionsNotSatisfied()
             );
-
-        return Result.Success<LoadContext, SmartCardError>(
-            new LoadContext(ImmutableList<byte>.Empty, 0xFF)
-        ); // 0xFF indicates no previous block
     }
 
     /// <summary>
@@ -863,14 +878,9 @@ public partial class VirtualCard : IVirtualCard
     /// </summary>
     private static Result<ImmutableList<byte>, SmartCardError> AccumulateLoadData(
         ImmutableList<byte> currentData,
-        byte[] dataBlock,
-        byte blockNumber
+        byte[] dataBlock
     )
     {
-        // Validate block sequence
-        byte expectedBlockNumber = (byte)(currentData.Count / 255 % 256); // Estimate based on data size
-
-        // Accumulate data functionally
         return Result.Success<ImmutableList<byte>, SmartCardError>(currentData.AddRange(dataBlock));
     }
 
@@ -882,30 +892,34 @@ public partial class VirtualCard : IVirtualCard
     private static Result<CardState, SmartCardError> ProcessCompleteCapFile(
         ImmutableList<byte> capFileData,
         CardState state,
-        CardConfiguration config
+        PendingLoadOperation loadContext
     )
     {
         byte[] capBytes = capFileData.ToArray();
         var capFileService = new EmulatorCapFiles();
-        var expectedHashMaybe = ExtractExpectedLfdbhFromState(state)
-            .Match(
-                success => Maybe<LoadFileDataBlockHash>.From(success),
-                error => Maybe<LoadFileDataBlockHash>.None
-            );
+        Result<Maybe<LoadFileDataBlockHash>, SmartCardError> expectedHash =
+            loadContext.ExpectedHash.Length == 0
+                ? Result.Success<Maybe<LoadFileDataBlockHash>, SmartCardError>(
+                    Maybe<LoadFileDataBlockHash>.None
+                )
+                : LoadFileDataBlockHash
+                    .Create(loadContext.ExpectedHash)
+                    .Map(Maybe<LoadFileDataBlockHash>.From);
 
-        return capFileService
-            .ProcessCapFileForLoading(capBytes, expectedHashMaybe)
-            .Bind(module => CreateLoadFileFromModule(module, capBytes, config))
-            .Map(loadFile => state.WithLoadFile(loadFile));
+        return expectedHash.Bind(hash =>
+            capFileService
+                .ProcessCapFileForLoading(capBytes, hash)
+                .Bind(module => CreateLoadFileFromModule(module, loadContext))
+                .Map(loadFile => state.WithLoadFile(loadFile))
+        );
     }
 
     /// <summary>
-    /// Creates a LoadFile from an extracted ExecutableModule and CAP file data.
+    /// Creates a LoadFile from the validated module and INSTALL [for load] context.
     /// </summary>
     private static Result<LoadFile, SmartCardError> CreateLoadFileFromModule(
         ExecutableModule module,
-        byte[] capFileData,
-        CardConfiguration config
+        PendingLoadOperation loadContext
     )
     {
         const byte validInitialState = (byte)ExecutableLoadFileLifecycleState.Loaded;
@@ -913,10 +927,15 @@ public partial class VirtualCard : IVirtualCard
         var moduleBuilder = ImmutableList.CreateBuilder<ExecutableModule>();
         moduleBuilder.Add(module);
 
+        if (!module.Aid.SequenceEqual(loadContext.LoadFileAid))
+            return SmartCardError.InvalidData(
+                "The loaded CAP package AID does not match INSTALL [for load]"
+            );
+
         return Result.Success<LoadFile, SmartCardError>(
             new LoadFile(
-                Aid: module.Aid,
-                AssociatedSecurityDomainAid: config.IsdAid,
+                Aid: loadContext.LoadFileAid,
+                AssociatedSecurityDomainAid: loadContext.SecurityDomainAid,
                 LifecycleState: validInitialState,
                 ExecutableModules: moduleBuilder.ToImmutable()
             )
@@ -927,123 +946,15 @@ public partial class VirtualCard : IVirtualCard
     /// Validates install token according to GlobalPlatform Card Specification v2.3.1 Section 11.5.2.1.
     /// Token validation ensures authorization for load file installation operations.
     /// </summary>
-    private static Result<bool, SmartCardError> ValidateInstallToken(
-        byte[] loadToken,
-        byte[] loadFileDataBlockHash,
-        CardConfiguration config
-    )
+    private static Result<bool, SmartCardError> ValidateInstallToken(byte[] loadToken)
     {
-        // GlobalPlatform Card Specification v2.3.1 Section 11.5.2.1:
-        // Token validation shall verify authorization and integrity
-        return ParseTokenStructure(loadToken)
-            .Bind(token => ValidateTokenSignature(token, loadFileDataBlockHash, config))
-            .Bind(token => ValidateTokenAuthorization(token, config))
-            .Map(_ => true);
-    }
-
-    /// <summary>
-    /// Parses install token TLV structure per GP specification.
-    /// </summary>
-    private static Result<InstallToken, SmartCardError> ParseTokenStructure(byte[] tokenData)
-    {
-        return tokenData.Length >= 16
-            ? Result.Success<InstallToken, SmartCardError>(
-                new InstallToken(
-                    Signature: tokenData.Take(8).ToArray(),
-                    Algorithm: "HMAC_SHA256",
-                    KeyIdentifier: tokenData.Skip(8).Take(2).ToArray(),
-                    AuthorizationLevel: tokenData.Skip(10).Take(1).ToArray()
-                )
-            )
-            : Result.Failure<InstallToken, SmartCardError>(
-                SmartCardError.InvalidData("Install token too short")
-            );
-    }
-
-    /// <summary>
-    /// Validates token signature against load file hash.
-    /// </summary>
-    private static Result<InstallToken, SmartCardError> ValidateTokenSignature(
-        InstallToken token,
-        byte[] loadFileHash,
-        CardConfiguration config
-    )
-    {
-        // Verify HMAC signature per GlobalPlatform specification
-        // Token signature covers: AID + parameters + load file hash
-
-        // Get token key from configuration (or use test key for virtual card)
-        return GetTokenVerificationKey(config, token.KeyIdentifier)
-            .Bind(key =>
-            {
-                // Construct data to verify: loadFileHash + keyIdentifier + authLevel
-                byte[] dataToVerify = loadFileHash
-                    .Concat(token.KeyIdentifier)
-                    .Concat(token.AuthorizationLevel)
-                    .ToArray();
-
-                // Compute HMAC-SHA256 using BouncyCastle directly
-                return Result.Try(
-                    () =>
-                    {
-                        var hmac = new Org.BouncyCastle.Crypto.Macs.HMac(
-                            new Org.BouncyCastle.Crypto.Digests.Sha256Digest()
-                        );
-                        hmac.Init(new Org.BouncyCastle.Crypto.Parameters.KeyParameter(key));
-                        hmac.BlockUpdate(dataToVerify, 0, dataToVerify.Length);
-                        byte[] result = new byte[hmac.GetMacSize()];
-                        hmac.DoFinal(result, 0);
-                        return result.Take(8).ToArray(); // Take first 8 bytes as token MAC
-                    },
-                    ex =>
-                        SmartCardError.CryptographicError($"HMAC calculation failed: {ex.Message}")
-                );
-            })
-            .Bind(expectedMac =>
-            {
-                // Verify signature matches (use first 8 bytes of HMAC for token)
-                byte[] truncatedMac = expectedMac.Take(8).ToArray();
-                bool isValid = truncatedMac.SequenceEqual(token.Signature);
-
-                return isValid
-                    ? Result.Success<InstallToken, SmartCardError>(token)
-                    : Result.Failure<InstallToken, SmartCardError>(
-                        SmartCardError.SecurityStatusNotSatisfied(
-                            "Install token HMAC verification failed - signature mismatch"
-                        )
-                    );
-            });
-    }
-
-    private static Result<byte[], SmartCardError> GetTokenVerificationKey(
-        CardConfiguration config,
-        byte[] keyIdentifier
-    )
-    {
-        // In virtual card, use deterministic test key based on key identifier
-        // Production would look up actual key from secure storage
-        byte[] testKey = Enumerable
-            .Range(0, 32) // 256-bit HMAC key
-            .Select(i => (byte)((keyIdentifier[0] + i * 13 + 97) % 256))
-            .ToArray();
-
-        return Result.Success<byte[], SmartCardError>(testKey);
-    }
-
-    /// <summary>
-    /// Validates token authorization level against security domain privileges.
-    /// </summary>
-    private static Result<InstallToken, SmartCardError> ValidateTokenAuthorization(
-        InstallToken token,
-        CardConfiguration config
-    )
-    {
-        // Check if security domain has sufficient privileges for installation
-        return token.AuthorizationLevel.Length > 0 && token.AuthorizationLevel[0] >= 0x01
-            ? Result.Success<InstallToken, SmartCardError>(token)
-            : Result.Failure<InstallToken, SmartCardError>(
+        // Token verification is conditional. This profile has no Token Verification key or
+        // policy, so an omitted token is valid and a supplied token must not be simulated.
+        return loadToken.Length == 0
+            ? Result.Success<bool, SmartCardError>(true)
+            : Result.Failure<bool, SmartCardError>(
                 SmartCardError.SecurityStatusNotSatisfied(
-                    "Insufficient privileges for installation"
+                    "The active card profile does not configure install-token verification"
                 )
             );
     }
@@ -1068,151 +979,36 @@ public partial class VirtualCard : IVirtualCard
             () => config.IsdAid
         );
 
-        const byte validInitialState = (byte)ExecutableLoadFileLifecycleState.Loaded;
-
-        return Result
-            .Success<LoadFile, SmartCardError>(
-                new LoadFile(
-                    Aid: parsedData.loadFileAid,
-                    AssociatedSecurityDomainAid: resolvedSecurityDomain,
-                    LifecycleState: validInitialState,
-                    ExecutableModules: ImmutableList<ExecutableModule>.Empty
-                )
-            )
-            .Map(loadFile =>
-            {
-                var newState = state.WithLoadFile(loadFile);
-                return (
-                    new ApduResponse([0x00], Constants.Constants.StatusWords.Success),
-                    newState
-                );
-            });
-    }
-
-    /// <summary>
-    /// Represents install token structure per GlobalPlatform specification.
-    /// </summary>
-    private record InstallToken(
-        byte[] Signature,
-        string Algorithm,
-        byte[] KeyIdentifier,
-        byte[] AuthorizationLevel
-    );
-
-    /// <summary>
-    /// Verifies Load File Data Block Hash per GlobalPlatform Card Specification v2.3.1.
-    /// LFDBH verification ensures load file integrity against INSTALL [for load] hash.
-    /// </summary>
-    private static Result<bool, SmartCardError> VerifyLfdbhHash(
-        byte[] completeCapFileData,
-        CardState state
-    )
-    {
-        // GlobalPlatform Card Specification v2.3.1 Section 11.5.2.1:
-        // Hash verification shall compare actual load file data against expected hash
-        return ExtractExpectedLfdbhFromState(state)
-            .Bind(expectedHash =>
-                LoadFileDataBlockHash
-                    .ComputeFromCapFile(completeCapFileData, expectedHash.Value.Length)
-                    .Bind(actualHash => expectedHash.VerifyMatch(actualHash))
-            );
-    }
-
-    /// <summary>
-    /// Extracts expected LFDBH from card state (from previous INSTALL [for load]).
-    /// </summary>
-    private static Result<LoadFileDataBlockHash, SmartCardError> ExtractExpectedLfdbhFromState(
-        CardState state
-    )
-    {
-        // In a complete implementation, this would extract the hash from the load context
-        // saved during INSTALL [for load] command processing
-        return state.DataObjects.TryGetValue(0xC001, out var hashValue)
-            ? LoadFileDataBlockHash.Create(hashValue)
-            : Result.Failure<LoadFileDataBlockHash, SmartCardError>(
-                SmartCardError.SecurityStatusNotSatisfied(
-                    "Expected LFDBH not found in card state - INSTALL [for load] required first"
-                )
-            );
+        var pending = new PendingLoadOperation(
+            (byte[])parsedData.loadFileAid.Clone(),
+            (byte[])resolvedSecurityDomain.Clone(),
+            (byte[])parsedData.loadFileDataBlockHash.Clone(),
+            ImmutableList<byte>.Empty,
+            0xFF
+        );
+        var newState = state with { PendingLoad = Maybe<PendingLoadOperation>.From(pending) };
+        return Result.Success<(ApduResponse, CardState), SmartCardError>(
+            (new ApduResponse([0x00], Constants.Constants.StatusWords.Success), newState)
+        );
     }
 
     /// <summary>
     /// Updates the load context in card state data objects.
     /// </summary>
-    private static CardState UpdateLoadContext(CardState state, LoadContext context)
-    {
-        byte[] contextData = SerializeLoadContext(context);
-        return state.WithDataObject(0xFFFF, contextData);
-    }
+    private static CardState UpdateLoadContext(CardState state, PendingLoadOperation context) =>
+        state with
+        {
+            PendingLoad = Maybe<PendingLoadOperation>.From(context)
+        };
 
     /// <summary>
     /// Removes the load context from card state after load completion.
     /// </summary>
-    private static CardState RemoveLoadContext(CardState state)
-    {
-        const ushort loadContextTag = 0xFFFF;
-        return state with { DataObjects = state.DataObjects.Remove(loadContextTag) };
-    }
-
-    /// <summary>
-    /// Serializes load context for storage in card state.
-    /// </summary>
-    private static byte[] SerializeLoadContext(LoadContext context)
-    {
-        // Simple serialization: length (4 bytes) + data + last block number (1 byte)
-        byte[] result = new byte[5 + context.AccumulatedData.Count];
-        int dataCount = context.AccumulatedData.Count;
-
-        // Write data length in big-endian format
-        result[0] = (byte)(dataCount >> 24);
-        result[1] = (byte)(dataCount >> 16);
-        result[2] = (byte)(dataCount >> 8);
-        result[3] = (byte)dataCount;
-
-        // Write accumulated data
-        if (dataCount > 0)
+    private static CardState RemoveLoadContext(CardState state) =>
+        state with
         {
-            byte[] dataArray = context.AccumulatedData.ToArray();
-            Array.Copy(dataArray, 0, result, 4, dataCount);
-        }
-
-        // Write last block number
-        result[4 + dataCount] = context.LastBlockNumber;
-
-        return result;
-    }
-
-    /// <summary>
-    /// Deserializes load context from card state storage.
-    /// </summary>
-    private static Result<LoadContext, SmartCardError> DeserializeLoadContext(byte[] data)
-    {
-        if (data.Length < 5)
-            return Result.Failure<LoadContext, SmartCardError>(
-                SmartCardError.InvalidData("Load context data too small")
-            );
-
-        // Read data length in big-endian format
-        int dataLength = data[0] << 24 | data[1] << 16 | data[2] << 8 | data[3];
-
-        if (data.Length != 5 + dataLength)
-            return Result.Failure<LoadContext, SmartCardError>(
-                SmartCardError.InvalidData("Load context data length mismatch")
-            );
-
-        // Read accumulated data
-        var accumulatedData =
-            dataLength > 0
-                ? ImmutableList.CreateRange(data.Skip(4).Take(dataLength))
-                : ImmutableList<byte>.Empty;
-
-        // Read last block number
-        byte lastBlockNumber = data[4 + dataLength];
-
-        return Result.Success<LoadContext, SmartCardError>(
-            new LoadContext(accumulatedData, lastBlockNumber)
-        );
-    }
+            PendingLoad = Maybe<PendingLoadOperation>.None
+        };
 
     /// <summary>
     /// Processes the DELETE command based on the provided APDU structure,
@@ -1754,8 +1550,6 @@ public partial class VirtualCard : IVirtualCard
 
         byte p1 = command[2];
 
-        // GlobalPlatform Card Specification v2.3.1 Section 11.5.6: P2 parameter handling
-        // P2 bits: b8=More blocks, b7-b1=RFU, b1=Encrypt flag
         byte p2 = command[3];
         byte lc = command[4];
 
@@ -1767,39 +1561,76 @@ public partial class VirtualCard : IVirtualCard
         byte[] data = new byte[lc];
         Array.Copy(command, 5, data, 0, lc);
 
-        // Check for DGI format (P1 = 0x80) containing SET CONFIG
-        if (p1 == 0x80 && data.Length >= 3)
+        bool isLastBlock = (p1 & 0x80) != 0;
+        byte encryption = (byte)(p1 & 0x60);
+        byte structure = (byte)(p1 & 0x18);
+        if (!isLastBlock || p2 != 0x00)
+            return Result.Failure<(ApduResponse, CardState), SmartCardError>(
+                SmartCardError.ConditionsNotSatisfied()
+            );
+        if (encryption != 0x00)
+            return Result.Failure<(ApduResponse, CardState), SmartCardError>(
+                SmartCardError.ConditionsNotSatisfied()
+            );
+
+        return structure switch
         {
-            // Parse SET CONFIG TLV: DF2B + length + data
-            if (data[0] == 0xDF && data[1] == 0x2B)
-            {
-                byte totalLength = data[2];
-                if (data.Length >= 3 + totalLength)
-                {
-                    byte[] configData = new byte[totalLength];
-                    Array.Copy(data, 3, configData, 0, totalLength);
-                }
-            }
+            0x08 => StoreSingleDataObject(data, state, isDgi: true),
+            0x10 => StoreSingleDataObject(data, state, isDgi: false),
+            _
+                => Result.Failure<(ApduResponse, CardState), SmartCardError>(
+                    SmartCardError.IncorrectP1P2()
+                ),
+        };
+    }
+
+    private static Result<(ApduResponse, CardState), SmartCardError> StoreSingleDataObject(
+        byte[] data,
+        CardState state,
+        bool isDgi
+    )
+    {
+        if (data.Length < 3)
+            return Result.Failure<(ApduResponse, CardState), SmartCardError>(
+                SmartCardError.InvalidData("STORE DATA object is incomplete")
+            );
+
+        int tagLength = isDgi || (data[0] & 0x1F) == 0x1F ? 2 : 1;
+        if (data.Length <= tagLength)
+            return Result.Failure<(ApduResponse, CardState), SmartCardError>(
+                SmartCardError.InvalidData("STORE DATA object has no length")
+            );
+
+        ushort tag = tagLength == 2 ? (ushort)(data[0] << 8 | data[1]) : data[0];
+        int lengthOffset = tagLength;
+        int valueOffset = lengthOffset + 1;
+        int valueLength = data[lengthOffset];
+        if (valueLength == 0xFF && isDgi)
+        {
+            if (data.Length < valueOffset + 2)
+                return Result.Failure<(ApduResponse, CardState), SmartCardError>(
+                    SmartCardError.InvalidData("STORE DATA extended DGI length is incomplete")
+                );
+            valueLength = data[valueOffset] << 8 | data[valueOffset + 1];
+            valueOffset += 2;
+        }
+        else if ((valueLength & 0x80) != 0)
+        {
+            return Result.Failure<(ApduResponse, CardState), SmartCardError>(
+                SmartCardError.InvalidData("Unsupported STORE DATA length encoding")
+            );
         }
 
-        // Check for default key version setting (tag 0x7F0D)
-        if (p1 != 0x80 || data.Length < 4 || data[0] != 0x7F || data[1] != 0x0D)
-        {
-            return CreateSuccessResponse(state);
-        }
+        if (valueOffset + valueLength != data.Length)
+            return Result.Failure<(ApduResponse, CardState), SmartCardError>(
+                SmartCardError.InvalidData("STORE DATA object length does not match its value")
+            );
 
-        byte length = data[2];
-        if (length != 1 || data.Length < 4)
-        {
-            return CreateSuccessResponse(state);
-        }
-
-        byte newDefaultKeyVersion = data[3];
-        var newState = state.WithDefaultKeyVersion(newDefaultKeyVersion);
-
-        // Per GlobalPlatform Card Specification v2.3.1: Only return success if data was actually stored
-        // Return success with updated state after processing default key version
-        return CreateSuccessResponse(newState);
+        byte[] value = data.AsSpan(valueOffset, valueLength).ToArray();
+        CardState updated = state.WithDataObject(tag, value);
+        if (tag == 0x7F0D && value.Length == 1)
+            updated = updated.WithDefaultKeyVersion(value[0]);
+        return CreateSuccessResponse(updated);
     }
 
     /// <summary>
@@ -1882,37 +1713,6 @@ public partial class VirtualCard : IVirtualCard
                     SmartCardError.ConditionsNotSatisfied()
                 ),
         };
-    }
-
-    /// <summary>
-    /// Parses PUT KEY command data to extract ENC, MAC, and DEK keys.
-    /// Per GlobalPlatform Card Specification v2.3.1 Section 11.5.5.
-    /// </summary>
-    private static Result<
-        (byte[] encKey, byte[] macKey, byte[] dekKey),
-        SmartCardError
-    > ParsePutKeyData(byte[] command, int dataOffset, int remainingLength)
-    {
-        // Parse simplified format: 3 consecutive 16-byte AES keys
-        // Full implementation parses TLV structure per GP specification
-        if (remainingLength < 48) // 3 * 16 bytes for AES-128 keys
-        {
-            return Result.Failure<(byte[] encKey, byte[] macKey, byte[] dekKey), SmartCardError>(
-                SmartCardError.WrongLength("Insufficient data for 3 AES keys")
-            );
-        }
-
-        byte[] encKey = new byte[16];
-        byte[] macKey = new byte[16];
-        byte[] dekKey = new byte[16];
-
-        Array.Copy(command, dataOffset, encKey, 0, 16);
-        Array.Copy(command, dataOffset + 16, macKey, 0, 16);
-        Array.Copy(command, dataOffset + 32, dekKey, 0, 16);
-
-        return Result.Success<(byte[] encKey, byte[] macKey, byte[] dekKey), SmartCardError>(
-            (encKey, macKey, dekKey)
-        );
     }
 
     /// <summary>
@@ -2079,6 +1879,61 @@ public partial class VirtualCard : IVirtualCard
         CardLogging logging
     )
     {
+        bool isIssuerSecurityDomainSelected = state.ApplicationRegistry.Match(
+            registry =>
+                registry.SelectedApplicationAid.Match(
+                    aid => aid.AsSpan().SequenceEqual(config.IsdAid),
+                    () => false
+                ),
+            () => false
+        );
+        Result<(ApduResponse, CardState), SmartCardError> managementResult =
+            isIssuerSecurityDomainSelected
+                ? command[1] switch
+                {
+                    Ins.INITIALIZE_UPDATE
+                        => ProcessInitializeUpdateWithCorrectScp(
+                            command,
+                            state,
+                            config,
+                            rngContext,
+                            logging
+                        ),
+                    Gp4Net.Constants.Apdu.Instructions.EXTERNAL_AUTHENTICATE
+                        => ProcessExternalAuthenticateWithCorrectScp(
+                            command,
+                            state,
+                            config,
+                            rngContext,
+                            logging
+                        ),
+                    Ins.INSTALL => ProcessInstallCommand(command, state, config),
+                    Ins.LOAD => ProcessLoadCommand(command, state, config),
+                    Ins.DELETE => ProcessDeleteCommand(command, state, config, logging),
+                    Ins.PUT_KEY => ProcessPutKeyCommand(command, state, config),
+                    Ins.STORE_DATA => ProcessStoreDataCommand(command, state, config),
+                    Ins.GET_STATUS => ProcessGetStatusCommand(command, state, config),
+                    Ins.SET_STATUS => ProcessSetStatusCommand(command, state),
+                    _
+                        => Result.Failure<(ApduResponse, CardState), SmartCardError>(
+                            SmartCardError.InstructionNotSupported()
+                        ),
+                }
+                : Result.Failure<(ApduResponse, CardState), SmartCardError>(
+                    SmartCardError.InstructionNotSupported()
+                );
+
+        if (managementResult.IsSuccess)
+            return managementResult.Bind(result =>
+                SynchronizeApplicationRegistry(result.Item2, config)
+                    .Map(synchronized => (result.Item1, synchronized))
+            );
+
+        if (
+            managementResult.Error.StatusWord != SmartCardError.InstructionNotSupported().StatusWord
+        )
+            return managementResult;
+
         return state.ApplicationRegistry.Match(
             registry =>
             {
@@ -2118,6 +1973,283 @@ public partial class VirtualCard : IVirtualCard
                 );
             }
         );
+    }
+
+    private static Result<(ApduResponse, CardState), SmartCardError> ProcessGetStatusCommand(
+        byte[] command,
+        CardState state,
+        CardConfiguration config
+    )
+    {
+        if (command.Length < 5)
+            return Result.Success<(ApduResponse, CardState), SmartCardError>(
+                (ApduResponse.Error(0x6700), state)
+            );
+
+        byte p1 = command[2];
+        byte p2 = command[3];
+        if (p1 is not (0x80 or 0x40 or 0x20 or 0x10) || (p2 & 0xFC) != 0)
+            return Result.Success<(ApduResponse, CardState), SmartCardError>(
+                (ApduResponse.Error(0x6A86), state)
+            );
+
+        byte lc = command[4];
+        if (command.Length < 5 + lc)
+            return Result.Success<(ApduResponse, CardState), SmartCardError>(
+                (ApduResponse.Error(0x6700), state)
+            );
+
+        bool getNext = (p2 & 0x01) != 0;
+        if (getNext)
+        {
+            if (!state.PendingGetStatus.HasValue || state.PendingGetStatus.Value.Subset != p1)
+                return Result.Success<(ApduResponse, CardState), SmartCardError>(
+                    (ApduResponse.Error(0x6A83), state)
+                );
+            return CreateGetStatusPage(state.PendingGetStatus.Value, state);
+        }
+
+        byte[] aidFilter = ParseGetStatusAidFilter(command.AsSpan(5, lc));
+        IEnumerable<byte[]> entries = p1 switch
+        {
+            0x80
+                =>
+                [
+                    EncodeRegistryEntry(
+                        config.IsdAid,
+                        (byte)state.CardLifecycleState,
+                        [(byte)Privilege.SecurityDomain, 0xFE, 0x80],
+                        [],
+                        []
+                    )
+                ],
+            0x40
+                => state.Applications.Values.Select(app =>
+                    EncodeRegistryEntry(
+                        app.Aid,
+                        app.LifecycleState,
+                        [(byte)app.Privileges],
+                        config.IsdAid,
+                        [app.ExecutableModuleAid]
+                    )
+                ),
+            0x20
+                => state.LoadFiles.Select(loadFile =>
+                    EncodeRegistryEntry(
+                        loadFile.Aid,
+                        loadFile.LifecycleState,
+                        [],
+                        loadFile.AssociatedSecurityDomainAid,
+                        []
+                    )
+                ),
+            0x10
+                => state.LoadFiles.Select(loadFile =>
+                    EncodeRegistryEntry(
+                        loadFile.Aid,
+                        loadFile.LifecycleState,
+                        [],
+                        loadFile.AssociatedSecurityDomainAid,
+                        loadFile.ExecutableModules.Select(module => module.Aid)
+                    )
+                ),
+            _ => [],
+        };
+
+        ImmutableList<byte[]> matchingEntries = entries
+            .Where(entry => aidFilter.Length == 0 || RegistryEntryMatchesAid(entry, aidFilter))
+            .ToImmutableList();
+        return CreateGetStatusPage(new PendingGetStatusOperation(p1, matchingEntries, 0), state);
+    }
+
+    private static Result<(ApduResponse, CardState), SmartCardError> CreateGetStatusPage(
+        PendingGetStatusOperation operation,
+        CardState state
+    )
+    {
+        const int maximumPageLength = 240;
+        List<byte> data = [];
+        int nextIndex = operation.NextIndex;
+        while (nextIndex < operation.Entries.Count)
+        {
+            byte[] entry = operation.Entries[nextIndex];
+            if (data.Count > 0 && data.Count + entry.Length > maximumPageLength)
+                break;
+            data.AddRange(entry);
+            nextIndex++;
+        }
+
+        bool hasMore = nextIndex < operation.Entries.Count;
+        CardState updated = state with
+        {
+            PendingGetStatus = hasMore
+                ? Maybe<PendingGetStatusOperation>.From(operation with { NextIndex = nextIndex })
+                : Maybe<PendingGetStatusOperation>.None,
+        };
+        ushort status = hasMore ? (ushort)0x6310 : Constants.Constants.StatusWords.Success;
+        return Result.Success<(ApduResponse, CardState), SmartCardError>(
+            (new ApduResponse(data.ToArray(), status), updated)
+        );
+    }
+
+    private static byte[] ParseGetStatusAidFilter(ReadOnlySpan<byte> data) =>
+        data.Length >= 2 && data[0] == 0x4F && data[1] <= data.Length - 2
+            ? data.Slice(2, data[1]).ToArray()
+            : [];
+
+    private static bool RegistryEntryMatchesAid(byte[] entry, byte[] aid) =>
+        entry.AsSpan().IndexOf(aid) >= 0;
+
+    private static byte[] EncodeRegistryEntry(
+        byte[] aid,
+        byte lifecycle,
+        byte[] privileges,
+        byte[] associatedSecurityDomain,
+        IEnumerable<byte[]> modules
+    )
+    {
+        List<byte> content = [];
+        AppendSimpleTlv(content, 0x4F, aid);
+        content.AddRange([0x9F, 0x70, 0x01, lifecycle]);
+        if (privileges.Length > 0)
+            AppendSimpleTlv(content, 0xC5, privileges);
+        if (associatedSecurityDomain.Length > 0)
+            AppendSimpleTlv(content, 0xCC, associatedSecurityDomain);
+        foreach (byte[] module in modules)
+            AppendSimpleTlv(content, 0x84, module);
+
+        List<byte> result = [0xE3];
+        AppendBerLength(result, content.Count);
+        result.AddRange(content);
+        return [.. result];
+    }
+
+    private static void AppendSimpleTlv(List<byte> target, byte tag, byte[] value)
+    {
+        target.Add(tag);
+        AppendBerLength(target, value.Length);
+        target.AddRange(value);
+    }
+
+    private static void AppendBerLength(List<byte> target, int length)
+    {
+        if (length < 0x80)
+            target.Add((byte)length);
+        else if (length <= 0xFF)
+            target.AddRange([0x81, (byte)length]);
+        else
+            target.AddRange([0x82, (byte)(length >> 8), (byte)length]);
+    }
+
+    private static Result<(ApduResponse, CardState), SmartCardError> ProcessSetStatusCommand(
+        byte[] command,
+        CardState state
+    )
+    {
+        if (command.Length < 4)
+            return Result.Success<(ApduResponse, CardState), SmartCardError>(
+                (ApduResponse.Error(0x6700), state)
+            );
+
+        byte p1 = command[2];
+        byte newLifecycle = command[3];
+        byte[] aid =
+            command.Length >= 5 && command[4] > 0 && command.Length >= 5 + command[4]
+                ? command.AsSpan(5, command[4]).ToArray()
+                : [];
+
+        if (p1 == 0x80)
+        {
+            if (!GlobalPlatformLifecycle.IsCardState(newLifecycle))
+                return Result.Success<(ApduResponse, CardState), SmartCardError>(
+                    (ApduResponse.Error(0x6A86), state)
+                );
+
+            var transition = state.WithCardLifecycleState((CardLifecycleState)newLifecycle);
+            return transition.Match(
+                updated =>
+                    Result.Success<(ApduResponse, CardState), SmartCardError>(
+                        (ApduResponse.Success([]), updated)
+                    ),
+                _ =>
+                    Result.Success<(ApduResponse, CardState), SmartCardError>(
+                        (ApduResponse.Error(0x6985), state)
+                    )
+            );
+        }
+
+        if (p1 is not (0x40 or 0x60) || aid.Length == 0)
+            return Result.Success<(ApduResponse, CardState), SmartCardError>(
+                (ApduResponse.Error(0x6A86), state)
+            );
+
+        string key = Convert.ToHexString(aid);
+        if (!state.Applications.TryGetValue(key, out InstalledApplication? application))
+            return Result.Success<(ApduResponse, CardState), SmartCardError>(
+                (ApduResponse.Error(0x6A88), state)
+            );
+        if (!GlobalPlatformLifecycle.IsApplicationState(newLifecycle))
+            return Result.Success<(ApduResponse, CardState), SmartCardError>(
+                (ApduResponse.Error(0x6A86), state)
+            );
+
+        var updatedApplication = application with { LifecycleState = newLifecycle };
+        var updatedState = state with
+        {
+            Applications = state.Applications.SetItem(key, updatedApplication),
+        };
+        return Result.Success<(ApduResponse, CardState), SmartCardError>(
+            (ApduResponse.Success([]), updatedState)
+        );
+    }
+
+    private static Result<CardState, SmartCardError> SynchronizeApplicationRegistry(
+        CardState state,
+        CardConfiguration config
+    )
+    {
+        if (state.ApplicationRegistry.HasNoValue)
+            return Result.Failure<CardState, SmartCardError>(
+                SmartCardError.UnexpectedError("Application registry is unavailable")
+            );
+
+        ApplicationRegistry registry = state.ApplicationRegistry.Value;
+        var installedAids = state
+            .Applications.Values.Select(app => app.Aid.ToImmutableArray())
+            .ToImmutableList();
+
+        foreach (var existing in registry.Applications.Values.OfType<ManagedApplication>())
+        {
+            if (installedAids.Any(aid => aid.SequenceEqual(existing.Aid)))
+                continue;
+
+            var removal = registry.RemoveApplication(existing.Aid);
+            if (removal.IsFailure)
+                return Result.Failure<CardState, SmartCardError>(removal.Error);
+            registry = removal.Value;
+        }
+
+        foreach (InstalledApplication installed in state.Applications.Values)
+        {
+            var aid = installed.Aid.ToImmutableArray();
+            var managed = new ManagedApplication(
+                aid,
+                installed.ExecutableModuleAid.ToImmutableArray(),
+                installed.LifecycleState,
+                installed.Privileges,
+                config.IsdAid.ToImmutableArray(),
+                Maybe<IAppletRuntime>.None
+            );
+
+            var update = registry.Applications.ContainsKey(aid)
+                ? registry.UpdateApplication(managed)
+                : registry.AddApplication(managed);
+            if (update.IsFailure)
+                return Result.Failure<CardState, SmartCardError>(update.Error);
+            registry = update.Value;
+        }
+
+        return Result.Success<CardState, SmartCardError>(state.WithApplicationRegistry(registry));
     }
 
     /// <summary>

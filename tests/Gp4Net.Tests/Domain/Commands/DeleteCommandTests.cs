@@ -327,7 +327,7 @@ public class DeleteCommandTests
     }
 
     [Test]
-    public void ToApdu_ForMultipleAids_ConcatenatesAllAids()
+    public void ToApdu_ForMultipleAids_EncodesOneDataObjectPerAid()
     {
         // Arrange
         byte[][] aids =
@@ -344,20 +344,17 @@ public class DeleteCommandTests
             .Match(
                 apdu =>
                 {
-                    int totalAidLength = aids.Sum(aid => aid.Length); // 9 + 7 + 5 = 21
-                    int expectedLc = 2 + totalAidLength; // 4F<len><all AIDs>
+                    int expectedLc = aids.Sum(aid => aid.Length + 2);
 
                     _ = apdu[4].Should().Be((byte)expectedLc); // Lc
-                    _ = apdu[5].Should().Be(0x4F); // AID tag
-                    _ = apdu[6].Should().Be((byte)totalAidLength); // Total length of all AIDs
-
-                    // Verify all AIDs are concatenated using functional approach
                     aids.Aggregate(
-                        7,
+                        5,
                         (offset, aid) =>
                         {
-                            _ = apdu.Skip(offset).Take(aid.Length).Should().BeEquivalentTo(aid);
-                            return offset + aid.Length;
+                            _ = apdu[offset].Should().Be(0x4F);
+                            _ = apdu[offset + 1].Should().Be((byte)aid.Length);
+                            _ = apdu.Skip(offset + 2).Take(aid.Length).Should().Equal(aid);
+                            return offset + aid.Length + 2;
                         }
                     );
                 },

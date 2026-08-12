@@ -26,6 +26,7 @@ public record SupportedInstructions(
     bool Delete,
     bool PutKey,
     bool StoreData,
+    bool SetStatus,
     bool ManageChannel
 )
 {
@@ -44,6 +45,7 @@ public record SupportedInstructions(
             Delete: true,
             PutKey: true,
             StoreData: true,
+            SetStatus: true,
             ManageChannel: false
         );
 
@@ -63,6 +65,7 @@ public record SupportedInstructions(
             Ins.DELETE => Delete,
             Ins.PUT_KEY => PutKey,
             Ins.STORE_DATA => StoreData,
+            Ins.SET_STATUS => SetStatus,
             Apdu.Instructions.MANAGE_CHANNEL => ManageChannel,
             _ => false,
         };
@@ -88,40 +91,19 @@ public record CardConfiguration(
     /// <summary>
     /// Creates a configuration for emulated NXP P71 cards using the JSON profile.
     /// </summary>
-    public static Result<CardConfiguration, SmartCardError> P71()
+    public static Result<CardConfiguration, SmartCardError> P71() =>
+        LoadBundledProfile("p71_card_1.json");
+
+    /// <summary>Creates a P71 configuration whose declared default protocol is SCP03.</summary>
+    public static Result<CardConfiguration, SmartCardError> P71Scp03() =>
+        LoadBundledProfile("p71_card_2.json");
+
+    private static Result<CardConfiguration, SmartCardError> LoadBundledProfile(string fileName)
     {
         var profilePath = Path.Combine(
             Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? ".",
             "Profiles",
-            "p71_card_1.json"
-        );
-
-        return CardProfileLoader.LoadFromFile(profilePath);
-    }
-
-    /// <summary>
-    /// Creates a dual-protocol card configuration from JSON profile.
-    /// </summary>
-    public static Result<CardConfiguration, SmartCardError> DualProtocol()
-    {
-        var profilePath = Path.Combine(
-            Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? ".",
-            "Profiles",
-            "dual_protocol_card.json"
-        );
-
-        return CardProfileLoader.LoadFromFile(profilePath);
-    }
-
-    /// <summary>
-    /// Creates an SCP03-first card configuration from JSON profile.
-    /// </summary>
-    public static Result<CardConfiguration, SmartCardError> Scp03First()
-    {
-        var profilePath = Path.Combine(
-            Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? ".",
-            "Profiles",
-            "scp03_card.json"
+            fileName
         );
 
         return CardProfileLoader.LoadFromFile(profilePath);
@@ -164,28 +146,4 @@ public record CardConfiguration(
     /// Creates a new configuration with updated ISD AID.
     /// </summary>
     public CardConfiguration WithIsdAid(byte[] isdAid) => this with { IsdAid = isdAid };
-
-    /// <summary>
-    /// Creates SCP02 key sets using GlobalPlatform Test Keys.
-    /// </summary>
-    /// <summary>
-    /// Creates standard SCP02 test keys for basic testing.
-    /// </summary>
-    private static ImmutableDictionary<byte, IKeySet> CreateScp02TestKeys() =>
-        GpTestKeys
-            .CreateScp02TestKeySet(0x01)
-            .Map(static keySet => ImmutableDictionary.Create<byte, IKeySet>().Add(0x01, keySet))
-            .Match(
-                static success => success,
-                static error => ImmutableDictionary<byte, IKeySet>.Empty
-            );
-
-    /// <summary>
-    /// Creates standard SCP03 test keys for basic testing.
-    /// </summary>
-    private static ImmutableDictionary<byte, IKeySet> CreateScp03TestKeys() =>
-        GpTestKeys
-            .CreateScp03TestKeySet(0x01)
-            .Map(keySet => ImmutableDictionary.Create<byte, IKeySet>().Add(0x01, keySet))
-            .Match(success => success, error => ImmutableDictionary<byte, IKeySet>.Empty);
 }

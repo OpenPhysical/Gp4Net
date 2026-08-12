@@ -53,13 +53,6 @@ public class CardCommandSettings : CommandSettings
     public string ReaderName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the file path to save virtual card state.
-    /// </summary>
-    [CommandOption("--save-file")]
-    [Description("Save virtual card state to file")]
-    public string SaveFile { get; set; } = string.Empty;
-
-    /// <summary>
     /// Gets or sets a value indicating whether to use verbose output.
     /// </summary>
     [CommandOption("-v|--verbose")]
@@ -78,12 +71,6 @@ public class CardCommandSettings : CommandSettings
     /// </summary>
     public Maybe<string> GetReaderName() =>
         string.IsNullOrWhiteSpace(ReaderName) ? Maybe<string>.None : Maybe<string>.From(ReaderName);
-
-    /// <summary>
-    /// Gets the save file path as Maybe type.
-    /// </summary>
-    public Maybe<string> GetSaveFile() =>
-        string.IsNullOrWhiteSpace(SaveFile) ? Maybe<string>.None : Maybe<string>.From(SaveFile);
 
     /// <summary>
     /// Creates CommandOptions from the settings.
@@ -127,13 +114,6 @@ public class SecureCommandSettings : CommandSettings
     public string KeyVersion { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the file path to save virtual card state.
-    /// </summary>
-    [CommandOption("--save-file")]
-    [Description("Save virtual card state to file")]
-    public string SaveFile { get; set; } = string.Empty;
-
-    /// <summary>
     /// Gets or sets a value indicating whether to use verbose output.
     /// </summary>
     [CommandOption("-v|--verbose")]
@@ -158,12 +138,6 @@ public class SecureCommandSettings : CommandSettings
     /// </summary>
     public Maybe<string> GetKeyset() =>
         string.IsNullOrWhiteSpace(Keyset) ? Maybe<string>.None : Maybe<string>.From(Keyset);
-
-    /// <summary>
-    /// Gets the save file path as Maybe type.
-    /// </summary>
-    public Maybe<string> GetSaveFile() =>
-        string.IsNullOrWhiteSpace(SaveFile) ? Maybe<string>.None : Maybe<string>.From(SaveFile);
 
     /// <summary>
     /// Creates CommandOptions from the settings.

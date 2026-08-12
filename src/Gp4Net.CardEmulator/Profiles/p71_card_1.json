@@ -90,10 +90,24 @@
       "66": "1.3.6.1.4.1.42.2.110.1.3"
     },
     "capabilities": {
+      "instructions": {
+        "select": true,
+        "initializeUpdate": true,
+        "externalAuthenticate": true,
+        "getData": true,
+        "getStatus": true,
+        "install": true,
+        "load": true,
+        "delete": true,
+        "putKey": true,
+        "storeData": true,
+        "setStatus": true,
+        "manageChannel": false
+      },
       "scpSupport": [
         {
           "protocol": "0x02",
-          "implementations": ["0x15", "0x35", "0x55", "0x75"]
+          "implementations": ["0x15", "0x35"]
         }
       ],
       "domainPrivileges": [

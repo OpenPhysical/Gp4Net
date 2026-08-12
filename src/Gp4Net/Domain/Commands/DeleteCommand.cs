@@ -182,14 +182,17 @@ public class DeleteCommand : IApduCommand
 
         if (Target is DeleteTarget.ByAid or DeleteTarget.WithRelated)
         {
-            // For AID deletion, encode as TLV: 4F <len> <AIDs concatenated>
-            int totalAidLength = Aids.Sum(aid => aid.Length);
-            data.Add(0x4F); // Tag for AID
-            data.Add((byte)totalAidLength);
+            // Table 11-23 carries one AID data object for each object to delete.
             foreach (byte[] aid in Aids)
             {
+                data.Add(0x4F);
+                data.Add((byte)aid.Length);
                 data.AddRange(aid);
             }
+
+            // The CRT participates in both token calculation and the transmitted command.
+            BuildControlReferenceTemplate().Execute(data.AddRange);
+
             // If DeletionTokenKey or DeletionToken is present, emit TLV (calculated as needed)
             var tokenToUse = DeletionToken;
 

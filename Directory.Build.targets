@@ -11,9 +11,9 @@
   <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.csproj' and '$(IsTestProject)' == 'true' and '$(CollectCoverage)' == 'true'">
     <CoverletOutputFormat>cobertura</CoverletOutputFormat>
     <CoverletOutput>$(MSBuildProjectDirectory)/../coverage/$(MSBuildProjectName).xml</CoverletOutput>
-    <Threshold Condition="'$(MSBuildProjectName)' == 'Gp4Net.Tests'">25</Threshold>
-    <Threshold Condition="'$(MSBuildProjectName)' == 'Gp4Net.CardEmulator.Tests'">10</Threshold>
-    <Threshold Condition="'$(MSBuildProjectName)' == 'Gp4Net.Tool.Tests'">4</Threshold>
+    <Threshold Condition="'$(MSBuildProjectName)' == 'Gp4Net.Tests'">30</Threshold>
+    <Threshold Condition="'$(MSBuildProjectName)' == 'Gp4Net.CardEmulator.Tests'">12</Threshold>
+    <Threshold Condition="'$(MSBuildProjectName)' == 'Gp4Net.Tool.Tests'">5</Threshold>
     <ThresholdType>line,branch</ThresholdType>
     <ThresholdStat>total</ThresholdStat>
   </PropertyGroup>

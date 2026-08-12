@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using AwesomeAssertions;
 using Gp4Net.CardEmulator.Applications;
+using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Functional;
 using Gp4Net.Core;
 using Gp4Net.Domain;
@@ -64,48 +65,22 @@ public class IssuerSecurityDomainTests
     /// GP Card Specification v2.3.1, Tables 11-85 through 11-87 and Figure 5-1.
     /// </summary>
     [Test]
-    public void Should_Apply_Isd_Set_Status_To_The_Card_Lifecycle()
+    public void Should_Require_A_Secure_Channel_For_Set_Status()
     {
-        var isd = IssuerSecurityDomain
-            .Create(ImmutableArray.Create<byte>(0xA0, 0x00, 0x00, 0x00, 0x03))
-            .Value;
-        var state = CardState.Create().Value;
         var config = CardConfiguration.P71().Value;
+        var state = VirtualCard.Create(config, Rng.CreateSecureContext()).Value.CurrentState;
         byte[] setInitialized = [0x80, 0xF0, 0x80, 0x07, 0x00];
 
-        var result = isd.ProcessCommand(setInitialized, state, config, Rng.CreateSecureContext());
-
-        _ = result.IsSuccess.Should().BeTrue();
-        _ = result.Value.Response.StatusWord.Should().Be((StatusWord)0x9000);
-        _ = result
-            .Value.UpdatedState.CardLifecycleState.Should()
-            .Be(CardLifecycleState.Initialized);
-        _ = ((IssuerSecurityDomain)result.Value.UpdatedApplication)
-            .CardLifecycleState.Should()
-            .Be(CardLifecycleState.Initialized);
-    }
-
-    /// <summary>
-    /// GP Card Specification v2.3.1, §11.10.2.2 rejects a transition to the current state.
-    /// </summary>
-    [Test]
-    public void Should_Reject_Set_Status_To_The_Current_Card_State()
-    {
-        var isd = IssuerSecurityDomain
-            .Create(ImmutableArray.Create<byte>(0xA0, 0x00, 0x00, 0x00, 0x03))
-            .Value;
-        var state = CardState.Create().Value;
-        byte[] setOpReady = [0x80, 0xF0, 0x80, 0x01, 0x00];
-
-        var result = isd.ProcessCommand(
-            setOpReady,
+        var result = VirtualCard.ProcessCommandFunctionally(
+            setInitialized,
             state,
-            CardConfiguration.P71().Value,
-            Rng.CreateSecureContext()
+            config,
+            Rng.CreateSecureContext(),
+            CardLogging.None
         );
 
-        _ = result.IsSuccess.Should().BeTrue();
-        _ = result.Value.Response.StatusWord.Should().Be((StatusWord)0x6985);
-        _ = result.Value.UpdatedState.CardLifecycleState.Should().Be(CardLifecycleState.OpReady);
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.StatusWord.HasValue.Should().BeTrue();
+        _ = result.Error.StatusWord.Value.Should().Be(0x6982);
     }
 }

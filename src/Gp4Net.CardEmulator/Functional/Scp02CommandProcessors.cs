@@ -147,12 +147,14 @@ public static class Scp02CommandProcessors
             .TapError(error =>
                 logging.LogDebug("SCP02 VerifyScp02HostCryptogram: FAILED - {Error}", error.Message)
             )
-            .Bind(request => DeriveScp02SessionKeys(request, state, rngContext))
-            .Tap(sessionKeys => logging.LogDebug("SCP02 DeriveScp02SessionKeys: SUCCESS"))
+            .Bind(request =>
+                DeriveScp02SessionKeys(request, state, rngContext).Map(keys => (request, keys))
+            )
+            .Tap(_ => logging.LogDebug("SCP02 DeriveScp02SessionKeys: SUCCESS"))
             .TapError(error =>
                 logging.LogDebug("SCP02 DeriveScp02SessionKeys: FAILED - {Error}", error.Message)
             )
-            .Map(sessionKeys => CreateScp02ExternalAuthResponse(sessionKeys, state));
+            .Map(result => CreateScp02ExternalAuthResponse(result.keys, result.request, state));
     }
 
     // Helper methods and data structures
@@ -520,7 +522,7 @@ public static class Scp02CommandProcessors
             return SmartCardError.WrongLength();
 
         if (
-            command[0] != GlobalPlatform.Cla.SECURED && command[0] != GlobalPlatform.Cla.STANDARD
+            command[0] != GlobalPlatform.Cla.SECURED
             || command[1] != Gp4Net.Constants.Apdu.Instructions.EXTERNAL_AUTHENTICATE
         )
             return SmartCardError.InstructionNotSupported();
@@ -529,33 +531,14 @@ public static class Scp02CommandProcessors
         byte p2 = command[3];
         byte lc = command[4];
 
-        // For SCP02, EXTERNAL AUTHENTICATE command format depends on secure messaging:
-        // - CLA=0x00 (no secure messaging): 5 bytes header + 8 bytes host cryptogram = 13 bytes total
-        // - CLA=0x84 (secure messaging): 5 bytes header + 8 bytes host cryptogram + 8 bytes MAC = 21 bytes total
-        if (command[0] == GlobalPlatform.Cla.SECURED) // Secure messaging with MAC
-        {
-            if (lc != 16 || command.Length != 21) // LC includes both host cryptogram (8) and MAC (8)
-                return SmartCardError.WrongLength();
+        if (p2 != 0x00 || lc != 16 || command.Length != 21)
+            return SmartCardError.WrongLength();
 
-            byte[] hostCryptogram = command.Skip(5).Take(8).ToArray();
-            byte[] hostMac = command.Skip(13).Take(8).ToArray(); // MAC follows the host cryptogram
-
-            return Result.Success<ExternalAuthenticateRequest, SmartCardError>(
-                new ExternalAuthenticateRequest(securityLevel, hostCryptogram, hostMac)
-            );
-        }
-        else // No secure messaging (CLA=0x00)
-        {
-            if (lc != 8 || command.Length != 13) // Only host cryptogram
-                return SmartCardError.WrongLength();
-
-            byte[] hostCryptogram = command.Skip(5).Take(8).ToArray();
-            byte[] hostMac = []; // No MAC for non-secure messaging
-
-            return Result.Success<ExternalAuthenticateRequest, SmartCardError>(
-                new ExternalAuthenticateRequest(securityLevel, hostCryptogram, hostMac)
-            );
-        }
+        byte[] hostCryptogram = command.Skip(5).Take(8).ToArray();
+        byte[] hostMac = command.Skip(13).Take(8).ToArray();
+        return Result.Success<ExternalAuthenticateRequest, SmartCardError>(
+            new ExternalAuthenticateRequest(securityLevel, hostCryptogram, hostMac)
+        );
     }
 
     private static Result<
@@ -573,7 +556,7 @@ public static class Scp02CommandProcessors
             return SmartCardError.ConditionsNotSatisfied();
 
         // Validate security level for SCP02
-        int[] validLevels = [0x00, 0x01, 0x03]; // None, C-MAC, C-DECRYPTION
+        int[] validLevels = [0x00, 0x01, 0x03, 0x10, 0x11, 0x13];
         if (!validLevels.Contains(request.SecurityLevel))
             return SmartCardError.InvalidArgument(
                 $"Invalid security level for SCP02: {request.SecurityLevel:X2}"
@@ -712,7 +695,7 @@ public static class Scp02CommandProcessors
                         validatedData.hostChallenge,
                         validatedData.cardRandom,
                         validatedData.sequenceCounter,
-                        ScpImplementation.Scp02I15
+                        state.ScpImplementation
                     )
                     .Bind(context => CryptoOperations.KeyDerivation.DeriveSessionKeys(context))
             )
@@ -768,7 +751,7 @@ public static class Scp02CommandProcessors
                         validatedData.hostChallenge,
                         validatedData.cardRandom,
                         validatedData.sequenceCounter,
-                        ScpImplementation.Scp02I15
+                        state.ScpImplementation
                     )
                     .Bind(context => CryptoOperations.KeyDerivation.DeriveSessionKeys(context));
             });
@@ -833,16 +816,16 @@ public static class Scp02CommandProcessors
 
     private static (ApduResponse, CardState) CreateScp02ExternalAuthResponse(
         SessionKeys sessionKeys,
+        ExternalAuthenticateRequest request,
         CardState state
     )
     {
-        // Create functional secure channel state for SCP02
-        var securityLevel = (SecurityLevel)0x01; // Basic C-MAC
         var secureChannelStateResult = SecureChannelState.Create(
             sessionKeys: sessionKeys,
-            securityLevel: securityLevel,
+            securityLevel: (SecurityLevel)request.SecurityLevel,
             protocolVersion: (CryptoOperations.ScpVersion)GlobalPlatform.Protocols.SCP02,
-            initialMacChainingValue: new byte[8], // Initialize with zeros for SCP02
+            // The verified EXTERNAL AUTHENTICATE C-MAC is the ICV for the next command.
+            initialMacChainingValue: request.HostMac,
             implementationParameter: (byte)state.ScpImplementation
         );
 

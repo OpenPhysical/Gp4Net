@@ -21,6 +21,8 @@ public sealed record ApduResponse
     /// </summary>
     public StatusWord StatusWord { get; }
 
+    public bool IsSuccessful => StatusWord.IsSuccessful;
+
     private ApduResponse(ImmutableArray<byte> data, StatusWord statusWord)
     {
         Data = data;
