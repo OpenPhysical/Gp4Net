@@ -155,7 +155,6 @@ against the exact card profile before deployment.
 
 - [Architecture](docs/architecture/README.md)
 - [Virtual-card architecture](docs/architecture/CARD_EMULATOR.md)
-- [SCP02 notes](docs/SCP02_specification.md)
 - [Contributing guide](CONTRIBUTING.md)
 - [Contributor copyright assignment](CONTRIBUTOR_ASSIGNMENT.md)
 - [Commercial licensing](COMMERCIAL-LICENSING.md)
