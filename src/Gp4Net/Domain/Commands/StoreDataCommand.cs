@@ -27,38 +27,38 @@ public class StoreDataCommand : IApduCommand
         /// <summary>
         /// DGI (Data Grouping Identifier) format.
         /// </summary>
-        Dgi = 0x80,
+        Dgi = 0x08,
 
         /// <summary>
         /// BER-TLV format.
         /// </summary>
-        BerTlv = 0x60,
+        BerTlv = 0x10,
 
         /// <summary>
         /// Encrypted data.
         /// </summary>
-        Encrypted = 0x20,
+        Encrypted = 0x60,
     }
 
     /// <summary>
-    /// Block format values for P2.
+    /// Last/more-block values for P1.b8.
     /// </summary>
     public enum BlockFormat : byte
     {
         /// <summary>
         /// First or only block.
         /// </summary>
-        FirstOrOnly = 0x00,
+        FirstOrOnly = 0x80,
 
         /// <summary>
         /// More blocks to follow.
         /// </summary>
-        MoreBlocks = 0x01,
+        MoreBlocks = 0x00,
 
         /// <summary>
         /// Last block of sequence.
         /// </summary>
-        LastBlock = 0x02,
+        LastBlock = 0x80,
     }
 
     /// <summary>
@@ -70,6 +70,9 @@ public class StoreDataCommand : IApduCommand
     /// Gets the block format.
     /// </summary>
     public BlockFormat Block { get; }
+
+    /// <summary>Zero-based block number encoded in P2.</summary>
+    public byte BlockNumber { get; }
 
     /// <summary>
     /// Gets the data to store.
@@ -93,8 +96,8 @@ public class StoreDataCommand : IApduCommand
         {
             GlobalPlatform.Cla.GP_STANDARD,
             GlobalPlatform.Ins.STORE_DATA,
-            (byte)StructureFormat,
-            (byte)Block,
+            (byte)((byte)StructureFormat | (byte)Block),
+            BlockNumber,
         };
 
         var apduBytes =
@@ -113,7 +116,7 @@ public class StoreDataCommand : IApduCommand
     /// </summary>
     public byte P1
     {
-        get { return (byte)StructureFormat; }
+        get { return (byte)((byte)StructureFormat | (byte)Block); }
     }
 
     /// <summary>
@@ -121,7 +124,7 @@ public class StoreDataCommand : IApduCommand
     /// </summary>
     public byte P2
     {
-        get { return (byte)Block; }
+        get { return BlockNumber; }
     }
 
     /// <summary>
@@ -153,11 +156,18 @@ public class StoreDataCommand : IApduCommand
     /// </summary>
     /// <param name="structureFormat">The data structure format.</param>
     /// <param name="block">The block format.</param>
+    /// <param name="blockNumber">The sequential block number encoded in P2.</param>
     /// <param name="data">The data to store.</param>
-    private StoreDataCommand(DataStructureFormat structureFormat, BlockFormat block, byte[] data)
+    private StoreDataCommand(
+        DataStructureFormat structureFormat,
+        BlockFormat block,
+        byte blockNumber,
+        byte[] data
+    )
     {
         StructureFormat = structureFormat;
         Block = block;
+        BlockNumber = blockNumber;
         StoreData = data;
     }
 
@@ -173,7 +183,8 @@ public class StoreDataCommand : IApduCommand
             return SmartCardError.InvalidArgument("Data cannot be null.");
         }
 
-        return new StoreDataCommand(DataStructureFormat.Plain, BlockFormat.FirstOrOnly, data);
+        // GP Card Spec 2.3.1, Table 11-89: a single block sets P1.b8 and uses P2=00.
+        return new StoreDataCommand(DataStructureFormat.Plain, BlockFormat.FirstOrOnly, 0x00, data);
     }
 
     /// <summary>
@@ -182,11 +193,13 @@ public class StoreDataCommand : IApduCommand
     /// <param name="structureFormat">The data structure format.</param>
     /// <param name="block">The block format.</param>
     /// <param name="data">The data to store.</param>
+    /// <param name="blockNumber">The sequential block number encoded in P2.</param>
     /// <returns>A Result containing either a new StoreDataCommand or an error.</returns>
     public static Result<StoreDataCommand, SmartCardError> CreateWithFormat(
         DataStructureFormat structureFormat,
         BlockFormat block,
-        byte[] data
+        byte[] data,
+        byte blockNumber = 0x00
     )
     {
         if (data == null)
@@ -194,7 +207,9 @@ public class StoreDataCommand : IApduCommand
             return SmartCardError.InvalidArgument("Data cannot be null.");
         }
 
-        return new StoreDataCommand(structureFormat, block, data);
+        // GP Card Spec 2.3.1, 11.11.2: all flags are in P1; P2 is the
+        // sequential block number starting at 00.
+        return new StoreDataCommand(structureFormat, block, blockNumber, data);
     }
 
     /// <summary>
@@ -209,7 +224,7 @@ public class StoreDataCommand : IApduCommand
         // Simple TLV format: 7F0D + length + key version
         byte[] data = [0x7F, 0x0D, 0x01, keyVersion];
 
-        return new StoreDataCommand(DataStructureFormat.Dgi, BlockFormat.FirstOrOnly, data);
+        return new StoreDataCommand(DataStructureFormat.Dgi, BlockFormat.FirstOrOnly, 0x00, data);
     }
 
     /// <summary>

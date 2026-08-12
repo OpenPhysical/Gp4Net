@@ -111,6 +111,28 @@ public class InitializeUpdateResponseParsingTests
     }
 
     [Test]
+    public void Parse_WithScp03RandomChallengeResponse_ShouldAccept29Bytes()
+    {
+        byte[] response = new byte[29];
+        response[10] = 0xFF;
+        response[11] = 0x03;
+        response[12] = 0x60;
+        for (int i = 0; i < 8; i++)
+        {
+            response[13 + i] = (byte)(0x10 + i);
+            response[21 + i] = (byte)(0x20 + i);
+        }
+
+        var result = InitializeUpdateResponse.Parse(response);
+
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.KeyVersion.Should().Be(0xFF);
+        _ = result.Value.SequenceCounter.Should().BeEmpty();
+        _ = result.Value.CardChallenge.Should().HaveCount(8);
+        _ = result.Value.CardCryptogram.Should().HaveCount(8);
+    }
+
+    [Test]
     public void Parse_WithValidScp03Response_ShouldSucceed()
     {
         // Arrange - Valid SCP03 response (32 bytes)

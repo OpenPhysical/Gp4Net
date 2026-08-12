@@ -48,6 +48,15 @@ public class CommandMacDataTests
     }
 
     [Test]
+    public void Should_Keep_Scp02_SMac_And_SRMac_Distinct()
+    {
+        // GP Card Spec 2.3.1, E.4.1: S-MAC uses 01 01 and S-RMAC uses 01 02.
+        var state = CreateScp02State(SecurityLevel.RMac);
+
+        Assert.That(state.SessionKeys.SrMac, Is.Not.EqualTo(state.SessionKeys.SMac));
+    }
+
+    [Test]
     public void Should_Build_Scp02_Cmac_Input_For_Plain_Command()
     {
         var commandBytes = Convert.FromHexString("84F240020A4F0029AA9C8EF87BE9D200");

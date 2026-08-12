@@ -72,7 +72,7 @@ public static class DataGeneration
 
     /// <summary>
     /// Generates key information template data object (tag 0x00E0) for virtual cards.
-    /// Reference: GlobalPlatform Card Specification v2.3.1 Section 11.7
+    /// Reference: GlobalPlatform Card Specification v2.3.1 Section 11.3.3.1.1.
     /// </summary>
     /// <param name="keyVersionNumber">The key version number.</param>
     /// <param name="keyIdentifier">The key identifier.</param>
@@ -193,7 +193,7 @@ public static class DataGeneration
                         new TlvValue(
                             [
                                 .. relevantKeyTypes.SelectMany(kt =>
-                                    new byte[] { kt.Type, kt.Length }
+                                    new byte[] { (byte)kt.Type, (byte)kt.Length }
                                 )
                             ]
                         )

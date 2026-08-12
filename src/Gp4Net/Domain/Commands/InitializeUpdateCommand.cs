@@ -613,13 +613,13 @@ public class InitializeUpdateResponse
 
             case 0x03: // SCP03
             {
-                // SCP03 requires exactly 32 bytes minimum per GP spec:
-                // Key diversification data (10) + Key info (3) + Card challenge (8) + Card cryptogram (8) + Sequence counter (3) = 32
-                if (response.Length < 32)
+                // SCP03 S8 with a random card challenge is 29 bytes. A 3-byte sequence
+                // counter is appended only for pseudo-random challenge generation.
+                if (response.Length < 29)
                 {
                     return Result.Failure<InitializeUpdateResponse, SmartCardError>(
                         SmartCardError.InvalidData(
-                            $"SCP03 INITIALIZE UPDATE response too short: {response.Length} bytes, expected at least 32"
+                            $"SCP03 INITIALIZE UPDATE response too short: {response.Length} bytes, expected at least 29"
                         )
                     );
                 }

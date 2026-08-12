@@ -328,6 +328,9 @@ public class ApplicationStatusEntry
     /// </summary>
     public LifecycleState State { get; }
 
+    /// <summary>Lifecycle byte returned by GET STATUS.</summary>
+    public byte RawLifecycleState { get; }
+
     /// <summary>
     /// Gets the application privileges.
     /// </summary>
@@ -357,6 +360,7 @@ public class ApplicationStatusEntry
 
         Aid = aid.Length == 0 ? Array.Empty<byte>() : (byte[])aid.Clone();
         State = state;
+        RawLifecycleState = (byte)state;
         Privileges = privileges.Length == 0 ? Array.Empty<byte>() : (byte[])privileges.Clone();
         ExecutableLoadFileAid = executableLoadFileAid.Map(value =>
             value.Length == 0 ? Array.Empty<byte>() : (byte[])value.Clone()

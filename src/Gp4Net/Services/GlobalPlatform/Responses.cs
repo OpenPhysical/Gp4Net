@@ -240,50 +240,8 @@ public static class Responses
         byte[] privBytes
     )
     {
-        byte b1 = privBytes.Length > 0 ? privBytes[0] : (byte)0x00;
-        byte b2 = privBytes.Length > 1 ? privBytes[1] : (byte)0x00;
-        byte b3 = privBytes.Length > 2 ? privBytes[2] : (byte)0x00;
-
-        var list = ImmutableList.CreateBuilder<Constants.Constants.GlobalPlatform.Privilege>();
-
-        if ((b1 & 0x80) != 0)
-            list.Add(Constants.Constants.GlobalPlatform.Privilege.SecurityDomain);
-        if ((b1 & 0x40) != 0)
-            list.Add(Constants.Constants.GlobalPlatform.Privilege.DapVerification);
-        if ((b1 & 0x20) != 0)
-            list.Add(Constants.Constants.GlobalPlatform.Privilege.DelegatedManagement);
-        if ((b1 & 0x10) != 0)
-            list.Add(Constants.Constants.GlobalPlatform.Privilege.CardLock);
-        if ((b1 & 0x08) != 0)
-            list.Add(Constants.Constants.GlobalPlatform.Privilege.CardTerminate);
-        if ((b1 & 0x04) != 0)
-            list.Add(Constants.Constants.GlobalPlatform.Privilege.CardReset);
-        if ((b1 & 0x02) != 0)
-            list.Add(Constants.Constants.GlobalPlatform.Privilege.CvmManagement);
-        if ((b1 & 0x01) != 0)
-            list.Add(Constants.Constants.GlobalPlatform.Privilege.TrustedPath);
-
-        if ((b2 & 0x80) != 0)
-            list.Add(Constants.Constants.GlobalPlatform.Privilege.AuthorizedManagement);
-        if ((b2 & 0x40) != 0)
-            list.Add(Constants.Constants.GlobalPlatform.Privilege.TokenVerification);
-        if ((b2 & 0x20) != 0)
-            list.Add(Constants.Constants.GlobalPlatform.Privilege.GlobalDelete);
-        if ((b2 & 0x10) != 0)
-            list.Add(Constants.Constants.GlobalPlatform.Privilege.GlobalLock);
-        if ((b2 & 0x08) != 0)
-            list.Add(Constants.Constants.GlobalPlatform.Privilege.GlobalRegistry);
-        if ((b2 & 0x04) != 0)
-            list.Add(Constants.Constants.GlobalPlatform.Privilege.FinalApplication);
-        if ((b2 & 0x02) != 0)
-            list.Add(Constants.Constants.GlobalPlatform.Privilege.GlobalService);
-        if ((b2 & 0x01) != 0)
-            list.Add(Constants.Constants.GlobalPlatform.Privilege.ReceiptGeneration);
-
-        if ((b3 & 0x01) != 0)
-            list.Add(Constants.Constants.GlobalPlatform.Privilege.MandatedDapVerification);
-
-        return list.ToImmutable();
+        // GP Card Spec 2.3.1, Tables 11-7 through 11-9.
+        return Helpers.PrivilegeHelpers.ToList(privBytes);
     }
 
     /// <summary>

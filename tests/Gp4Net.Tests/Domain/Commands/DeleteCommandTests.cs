@@ -227,7 +227,7 @@ public class DeleteCommandTests
         _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
         _ = command.Type.Should().Be(DeleteCommand.DeleteType.DeleteObjectOnly);
-        _ = command.Target.Should().Be(DeleteCommand.DeleteTarget.ByAid);
+        _ = command.Target.Should().Be(DeleteCommand.DeleteTarget.ByKey);
         _ = command.Aids.Should().HaveCount(1);
         _ = command.Aids[0].Should().BeEquivalentTo([keyIdentifier, keyVersion]);
     }
@@ -247,13 +247,15 @@ public class DeleteCommandTests
                 {
                     _ = apdu[0].Should().Be(0x80); // CLA
                     _ = apdu[1].Should().Be(0xE4); // INS
-                    _ = apdu[2].Should().Be(0x80); // P1 (delete object only)
+                    // GP Card Spec 2.3.1, Tables 11-21/22: P1=00 is the last
+                    // or only DELETE and P2=00 deletes only the named object.
+                    _ = apdu[2].Should().Be(0x00);
                     _ = apdu[3].Should().Be(0x00); // P2 (by AID)
                     _ = apdu[4].Should().Be(0x0A); // Lc = 2 + 8 (tag + length + AID)
                     _ = apdu[5].Should().Be(0x4F); // AID tag
                     _ = apdu[6].Should().Be(0x08); // AID length (8 bytes)
                     _ = apdu.Skip(7).Take(8).Should().BeEquivalentTo(aid);
-                    _ = apdu.Length.Should().Be(15); // 5 header + 10 data
+                    _ = apdu.Length.Should().Be(16); // header + data + mandatory Le=00
                 },
                 error =>
                     Result
@@ -283,7 +285,8 @@ public class DeleteCommandTests
                 _ = apdu[2].Should().Be(0x00); // P1 (delete object and related)
                 _ = apdu[3].Should().Be(0x80); // P2 (with related)
 
-                int expectedLc = 2 + aid.Length + deletionToken.Length; // 4F<len><AID><token>
+                // GP Card Spec 2.3.1, Table 11-23: Delete Token is tag 9E.
+                int expectedLc = 2 + aid.Length + 2 + deletionToken.Length;
                 _ = apdu[4].Should().Be((byte)expectedLc);
 
                 // Verify AID TLV
@@ -291,9 +294,10 @@ public class DeleteCommandTests
                 _ = apdu[6].Should().Be((byte)aid.Length);
                 _ = apdu.Skip(7).Take(aid.Length).Should().BeEquivalentTo(aid);
 
-                // Verify deletion token is appended directly (no TLV wrapper)
                 int tokenOffset = 7 + aid.Length;
-                _ = apdu.Skip(tokenOffset)
+                _ = apdu[tokenOffset].Should().Be(0x9E);
+                _ = apdu[tokenOffset + 1].Should().Be((byte)deletionToken.Length);
+                _ = apdu.Skip(tokenOffset + 2)
                     .Take(deletionToken.Length)
                     .Should()
                     .BeEquivalentTo(deletionToken);
@@ -350,7 +354,7 @@ public class DeleteCommandTests
     }
 
     [Test]
-    public void ToApdu_DoesNotIncludeLeByte()
+    public void ToApdu_IncludesMandatoryLeByte()
     {
         // Arrange
         byte[] aid = Convert.FromHexString("A000000003000000");
@@ -362,10 +366,10 @@ public class DeleteCommandTests
             .Match(
                 apdu =>
                 {
-                    // Total length should be: 5 (header) + Lc value
-                    int expectedLength = 5 + apdu[4];
+                    // GP Card Spec 2.3.1, Table 11-20 requires Le=00.
+                    int expectedLength = 5 + apdu[4] + 1;
                     _ = apdu.Length.Should().Be(expectedLength);
-                    // No LE byte at the end
+                    _ = apdu[^1].Should().Be(0x00);
                 },
                 error =>
                     Result

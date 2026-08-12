@@ -4,9 +4,14 @@ using System.Linq;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
+using Gp4Net.Domain.Keys;
+using Gp4Net.Extensions;
+using Gp4Net.Services.GlobalPlatform;
 using Gp4Net.Transport;
 using NUnit.Framework;
+using static Gp4Net.Cryptography.CryptoService;
 
 namespace Gp4Net.Tests.Domain.Commands;
 
@@ -18,6 +23,24 @@ namespace Gp4Net.Tests.Domain.Commands;
 [Category("Unit")]
 public class PutKeyCommandTests
 {
+    [TestCase(0x01, 0x01, 0x02)]
+    [TestCase(0x7F, 0x7F, 0x01)]
+    [TestCase(0xFF, 0x00, 0x01)]
+    public void DefaultVersions_Should_Advance_And_Handle_Factory_Keys(
+        byte active,
+        byte replaced,
+        byte next
+    )
+    {
+        // GP Card Spec 2.3.1, 11.8.2.1/11.8.2.3: P1=00 adds keys;
+        // a new Key Version Number is encoded from 01 through 7F.
+        var result = KeyChange.GetDefaultVersions(active);
+
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.ReplacedVersion.Should().Be(replaced);
+        _ = result.Value.NewVersion.Should().Be(next);
+    }
+
     private static readonly byte[] ValidDesKey = Convert.FromHexString("0102030405060708");
     private static readonly byte[] ValidTripleDes2Key = Convert.FromHexString(
         "0102030405060708090A0B0C0D0E0F10"
@@ -47,7 +70,7 @@ public class PutKeyCommandTests
         _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
         _ = command.UsageQualifier.Should().Be(PutKeyCommand.KeyUsageQualifier.SingleKey);
-        _ = command.KekIdentifier.Should().Be(PutKeyCommand.KeyEncryptionKeyIdentifier.None);
+        _ = command.KekIdentifier.Should().Be(PutKeyCommand.KeyEncryptionKeyIdentifier.CurrentKek);
         _ = command.KeyDataBlocks.Should().HaveCount(1);
         _ = command.KeyDataBlocks[0].Should().Be(keyDataBlock);
     }
@@ -64,7 +87,7 @@ public class PutKeyCommandTests
         _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
         _ = command.UsageQualifier.Should().Be(PutKeyCommand.KeyUsageQualifier.MultipleKeys);
-        _ = command.KekIdentifier.Should().Be(PutKeyCommand.KeyEncryptionKeyIdentifier.None);
+        _ = command.KekIdentifier.Should().Be(PutKeyCommand.KeyEncryptionKeyIdentifier.CurrentKek);
         _ = command.KeyDataBlocks.Should().HaveCount(2);
         _ = command.KeyDataBlocks[0].Should().Be(keyDataBlock1);
         _ = command.KeyDataBlocks[1].Should().Be(keyDataBlock2);
@@ -100,7 +123,7 @@ public class PutKeyCommandTests
         var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
         _ = command.UsageQualifier.Should().Be(PutKeyCommand.KeyUsageQualifier.SingleKey);
-        _ = command.P1.Should().Be(0x81);
+        _ = command.P1.Should().Be(0x00);
     }
 
     [Test]
@@ -124,14 +147,65 @@ public class PutKeyCommandTests
     }
 
     [Test]
-    public void KekIdentifier_DefaultsToNone()
+    public void P2_DefaultsToFirstKeyIdentifier()
     {
         var keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock];
         var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
-        _ = command.KekIdentifier.Should().Be(PutKeyCommand.KeyEncryptionKeyIdentifier.None);
-        _ = command.P2.Should().Be(0x00);
+        _ = command.KekIdentifier.Should().Be(PutKeyCommand.KeyEncryptionKeyIdentifier.CurrentKek);
+        _ = command.P2.Should().Be(0x01);
+    }
+
+    [Test]
+    public void P2_UsesMultipleKeyFlagAndEncKeyIdentifier_ForKeysetReplacement()
+    {
+        // GP Card Spec 2.3.1, 11.8.2.2, Table 11-66: b8 marks multiple keys
+        // and b7-b1 identify the first key, ENC key ID 01 gives P2=81.
+        var keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        List<KeyDataBlock> keyDataBlocks = [keyDataBlock, keyDataBlock, keyDataBlock];
+        var command = PutKeyCommand.CreateReplacement(0x00, 0x01, 0x01, keyDataBlocks).Value;
+
+        _ = command.P1.Should().Be(0x00);
+        _ = command.P2.Should().Be(0x81);
+    }
+
+    [Test]
+    public void Scp03KeyComponents_Should_Use_Table_11_70_ExplicitLengthFormat()
+    {
+        // GP Card Spec 2.3.1, 11.8.2.3.2, Table 11-70 permits a clear-key
+        // length prefix before the encrypted key component.
+        // SCP03 1.1.2, 6.2.8 requires static Key-DEK, AES-CBC, and a zero ICV.
+        var sessionKeys = SessionKeys
+            .Create(new byte[16], new byte[16], new byte[16], new byte[16])
+            .Value;
+        var channel = SecureChannelState
+            .Create(sessionKeys, SecurityLevel.CMac, ScpVersion.Scp03, new byte[16], 0x70)
+            .Value;
+        var keyset = Scp03KeySet.Create(ValidAes128Key, ValidAes128Key, ValidAes128Key, 0x01).Value;
+
+        var command = KeyChange.CreateCommand(keyset, channel, 0x00).Value;
+
+        _ = command.P2.Should().Be(0x81);
+        _ = command.Data[0].Should().Be(0x01);
+        _ = command.Data[1].Should().Be(0x88);
+        _ = command.Data[2].Should().Be(0x11);
+        _ = command.Data[3].Should().Be(0x10);
+        _ = command.Data.Should().HaveCount(70);
+        _ = command.ToApdu().BinaryCommand.Should().HaveCount(5 + command.Data.Length);
+    }
+
+    [Test]
+    public void Scp03Mac_Should_Preserve_PutKey_As_Case3Apdu()
+    {
+        // SCP03 1.1.2, 6.2.4 appends C-MAC to command data without adding Le.
+        var block = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        var command = PutKeyCommand.Create(0x01, [block]).Value.ToApdu();
+
+        var secured = command.WithMac(Enumerable.Repeat((byte)0xA5, 8).ToArray()).Value;
+
+        _ = secured.BinaryCommand.Should().HaveCount(command.BinaryCommand.Length + 8);
+        _ = secured.BinaryCommand[^1].Should().Be(0xA5);
     }
 
     [Test]
@@ -558,12 +632,13 @@ public class PutKeyCommandTests
     [Test]
     public void KeyType_EnumValues_AreCorrect()
     {
+        // GP Card Specification v2.3.1, Table 11-16: all DES key lengths use type 80.
         _ = ((byte)KeyDataBlock.KeyType.Des).Should().Be(0x80);
-        _ = ((byte)KeyDataBlock.KeyType.TripleDes2Key).Should().Be(0x81);
-        _ = ((byte)KeyDataBlock.KeyType.TripleDes3Key).Should().Be(0x82);
+        _ = ((byte)KeyDataBlock.KeyType.TripleDes2Key).Should().Be(0x80);
+        _ = ((byte)KeyDataBlock.KeyType.TripleDes3Key).Should().Be(0x80);
         _ = ((byte)KeyDataBlock.KeyType.Aes128).Should().Be(0x88);
-        _ = ((byte)KeyDataBlock.KeyType.Aes192).Should().Be(0x89);
-        _ = ((byte)KeyDataBlock.KeyType.Aes256).Should().Be(0x8A);
+        _ = ((byte)KeyDataBlock.KeyType.Aes192).Should().Be(0x88);
+        _ = ((byte)KeyDataBlock.KeyType.Aes256).Should().Be(0x88);
         _ = ((byte)KeyDataBlock.KeyType.RsaPublic).Should().Be(0xA0);
         _ = ((byte)KeyDataBlock.KeyType.RsaPrivate).Should().Be(0xA1);
         _ = ((byte)KeyDataBlock.KeyType.EccPublic).Should().Be(0xB0);
@@ -577,7 +652,7 @@ public class PutKeyCommandTests
 
         byte[]? bytes = keyDataBlock.ToBytes();
 
-        _ = bytes.Should().HaveCount(10); // 1 byte type + 1 byte length + 8 bytes key
+        _ = bytes.Should().HaveCount(11); // type + length + key + zero KCV length
         _ = bytes[0].Should().Be(0x80); // DES key type
         _ = bytes[1].Should().Be(0x08); // Key length
         _ = bytes.Skip(2).Take(8).Should().BeEquivalentTo(ValidDesKey);
@@ -590,23 +665,29 @@ public class PutKeyCommandTests
 
         byte[]? bytes = keyDataBlock.ToBytes();
 
-        _ = bytes.Should().HaveCount(13); // 1 byte type + 1 byte length + 8 bytes key + 3 bytes KCV
+        _ = bytes.Should().HaveCount(14); // type + length + key + KCV length + KCV
         _ = bytes[0].Should().Be(0x80); // DES key type
         _ = bytes[1].Should().Be(0x08); // Key length
         _ = bytes.Skip(2).Take(8).Should().BeEquivalentTo(ValidDesKey);
-        _ = bytes.Skip(10).Take(3).Should().BeEquivalentTo(ValidKeyCheckValue);
+        _ = bytes[10].Should().Be(3);
+        _ = bytes.Skip(11).Take(3).Should().BeEquivalentTo(ValidKeyCheckValue);
     }
 
     [Test]
     public void ToBytes_WithDifferentKeyTypes_ReturnsCorrectTypeBytes()
     {
+        // GP Card Specification v2.3.1, Table 11-16.
         var desKey = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        var tripleDes2Key = KeyDataBlock.CreateTripleDes2Key(ValidTripleDes2Key).Value;
+        var tripleDes3Key = KeyDataBlock.CreateTripleDes3Key(ValidTripleDes3Key).Value;
         var aes128Key = KeyDataBlock.CreateAes128Key(ValidAes128Key).Value;
         var aes256Key = KeyDataBlock.CreateAes256Key(ValidAes256Key).Value;
 
         _ = desKey.ToBytes()[0].Should().Be(0x80);
+        _ = tripleDes2Key.ToBytes()[0].Should().Be(0x80);
+        _ = tripleDes3Key.ToBytes()[0].Should().Be(0x80);
         _ = aes128Key.ToBytes()[0].Should().Be(0x88);
-        _ = aes256Key.ToBytes()[0].Should().Be(0x8A);
+        _ = aes256Key.ToBytes()[0].Should().Be(0x88);
     }
 
     [Test]
@@ -724,37 +805,35 @@ public class PutKeyCommandTests
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock];
         var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
-        // Currently uses SingleKey, not SingleDesKey
         _ = command.UsageQualifier.Should().Be(PutKeyCommand.KeyUsageQualifier.SingleKey);
         _ = command.UsageQualifier.Should().NotBe(PutKeyCommand.KeyUsageQualifier.SingleDesKey);
 
-        // But SingleDesKey enum value should exist for future use
         _ = ((byte)PutKeyCommand.KeyUsageQualifier.SingleDesKey).Should().Be(0x01);
     }
 
     [Test]
     public void KeyDataBlock_ValidateAllKeyTypesHaveCorrectEnumValues()
     {
-        // Comprehensive validation of all key type enum values
-        var expectedKeyTypes = new Dictionary<KeyDataBlock.KeyType, byte>
+        // GP Card Specification v2.3.1, Table 11-16.
+        (KeyDataBlock.KeyType Type, byte Value)[] expectedKeyTypes =
         {
-            { KeyDataBlock.KeyType.Des, 0x80 },
-            { KeyDataBlock.KeyType.TripleDes2Key, 0x81 },
-            { KeyDataBlock.KeyType.TripleDes3Key, 0x82 },
-            { KeyDataBlock.KeyType.Aes128, 0x88 },
-            { KeyDataBlock.KeyType.Aes192, 0x89 },
-            { KeyDataBlock.KeyType.Aes256, 0x8A },
-            { KeyDataBlock.KeyType.RsaPublic, 0xA0 },
-            { KeyDataBlock.KeyType.RsaPrivate, 0xA1 },
-            { KeyDataBlock.KeyType.EccPublic, 0xB0 },
-            { KeyDataBlock.KeyType.EccPrivate, 0xB1 },
+            (KeyDataBlock.KeyType.Des, 0x80),
+            (KeyDataBlock.KeyType.TripleDes2Key, 0x80),
+            (KeyDataBlock.KeyType.TripleDes3Key, 0x80),
+            (KeyDataBlock.KeyType.Aes128, 0x88),
+            (KeyDataBlock.KeyType.Aes192, 0x88),
+            (KeyDataBlock.KeyType.Aes256, 0x88),
+            (KeyDataBlock.KeyType.RsaPublic, 0xA0),
+            (KeyDataBlock.KeyType.RsaPrivate, 0xA1),
+            (KeyDataBlock.KeyType.EccPublic, 0xB0),
+            (KeyDataBlock.KeyType.EccPrivate, 0xB1),
         };
 
         foreach (var kvp in expectedKeyTypes)
         {
-            _ = ((byte)kvp.Key)
+            _ = ((byte)kvp.Type)
                 .Should()
-                .Be(kvp.Value, $"KeyType.{kvp.Key} should have value 0x{kvp.Value:X2}");
+                .Be(kvp.Value, $"KeyType.{kvp.Type} should have value 0x{kvp.Value:X2}");
         }
     }
 
@@ -769,13 +848,14 @@ public class PutKeyCommandTests
 
         _ = apdu[0].Should().Be(0x80); // CLA
         _ = apdu[1].Should().Be(0xD8); // INS
-        _ = apdu[2].Should().Be(0x81); // P1 (Single key)
-        _ = apdu[3].Should().Be(0x00); // P2 (No KEK)
-        _ = apdu[4].Should().Be(0x0A); // LC (10 bytes data)
-        _ = apdu[5].Should().Be(0x80); // Key type (DES)
-        _ = apdu[6].Should().Be(0x08); // Key length
-        _ = apdu.Skip(7).Take(8).Should().BeEquivalentTo(ValidDesKey); // Key data
-        _ = apdu[15].Should().Be(0x03); // LE (3 bytes expected response for 1 key)
+        _ = apdu[2].Should().Be(0x00); // P1 (add new version)
+        _ = apdu[3].Should().Be(0x01); // P2 (single key, identifier 1)
+        _ = apdu[4].Should().Be(0x0C);
+        _ = apdu[5].Should().Be(0x01); // New key version
+        _ = apdu[6].Should().Be(0x80);
+        _ = apdu[7].Should().Be(0x08);
+        _ = apdu.Skip(8).Take(8).Should().BeEquivalentTo(ValidDesKey);
+        _ = apdu[^1].Should().Be(0x00);
     }
 
     [Test]
@@ -791,20 +871,21 @@ public class PutKeyCommandTests
         _ = apdu[0].Should().Be(0x80); // CLA
         _ = apdu[1].Should().Be(0xD8); // INS
         _ = apdu[2].Should().Be(0x00); // P1 (Multiple keys)
-        _ = apdu[3].Should().Be(0x00); // P2 (No KEK)
-        _ = apdu[4].Should().Be(0x1C); // LC (28 bytes data: 10 + 18)
+        _ = apdu[3].Should().Be(0x81); // Multiple keys from identifier 1
+        _ = apdu[4].Should().Be(0x1F);
 
         // First key block
-        _ = apdu[5].Should().Be(0x80); // Key type (DES)
-        _ = apdu[6].Should().Be(0x08); // Key length
-        _ = apdu.Skip(7).Take(8).Should().BeEquivalentTo(ValidDesKey); // Key data
+        _ = apdu[5].Should().Be(0x01);
+        _ = apdu[6].Should().Be(0x80);
+        _ = apdu[7].Should().Be(0x08);
+        _ = apdu.Skip(8).Take(8).Should().BeEquivalentTo(ValidDesKey);
 
         // Second key block
-        _ = apdu[15].Should().Be(0x88); // Key type (AES-128)
-        _ = apdu[16].Should().Be(0x10); // Key length
-        _ = apdu.Skip(17).Take(16).Should().BeEquivalentTo(ValidAes128Key); // Key data
+        _ = apdu[17].Should().Be(0x88);
+        _ = apdu[18].Should().Be(0x10);
+        _ = apdu.Skip(19).Take(16).Should().BeEquivalentTo(ValidAes128Key);
 
-        _ = apdu[33].Should().Be(0x06); // LE (6 bytes expected response for 2 keys)
+        _ = apdu[^1].Should().Be(0x00);
     }
 
     [Test]
@@ -816,10 +897,11 @@ public class PutKeyCommandTests
 
         byte[]? apdu = command.ToApdu().ToApdu().Value;
 
-        _ = apdu[4].Should().Be(0x0D); // LC (13 bytes data including KCV)
-        _ = apdu.Skip(7).Take(8).Should().BeEquivalentTo(ValidDesKey); // Key data
-        _ = apdu.Skip(15).Take(3).Should().BeEquivalentTo(ValidKeyCheckValue); // Key check value
-        _ = apdu[18].Should().Be(0x03); // LE (3 bytes expected response)
+        _ = apdu[4].Should().Be(0x0F);
+        _ = apdu.Skip(8).Take(8).Should().BeEquivalentTo(ValidDesKey);
+        _ = apdu[16].Should().Be(0x03);
+        _ = apdu.Skip(17).Take(3).Should().BeEquivalentTo(ValidKeyCheckValue);
+        _ = apdu[^1].Should().Be(0x56);
     }
 
     [Test]
@@ -830,7 +912,7 @@ public class PutKeyCommandTests
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock1, keyDataBlock2];
         var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
-        _ = command.ExpectedResponseLength.Should().Be(6); // 3 bytes per key * 2 keys
+        _ = command.ExpectedResponseLength.Should().Be(7); // key version plus two 3-byte KCVs
     }
 
     [Test]
@@ -866,16 +948,17 @@ public class PutKeyCommandTests
         byte[]? data = command.Data;
 
         _ = data.Should().NotBeNull();
-        _ = data.Should().HaveCount(10); // Type + length + key data
-        _ = data![0].Should().Be(0x80); // DES key type
-        _ = data[1].Should().Be(0x08); // Key length
-        _ = data.Skip(2).Take(8).Should().BeEquivalentTo(ValidDesKey);
+        _ = data.Should().HaveCount(12);
+        _ = data![0].Should().Be(0x01);
+        _ = data[1].Should().Be(0x80);
+        _ = data[2].Should().Be(0x08);
+        _ = data.Skip(3).Take(8).Should().BeEquivalentTo(ValidDesKey);
     }
 
     [Test]
     public void PutKeyResponse_Parse_WithValidResponse_ReturnsSuccessResult()
     {
-        byte[] responseData = Convert.FromHexString("123456789ABC"); // 2 key check values
+        byte[] responseData = Convert.FromHexString("01123456789ABC");
 
         Result<PutKeyResponse, SmartCardError> result = PutKeyResponse.Parse(responseData);
 
@@ -889,7 +972,7 @@ public class PutKeyCommandTests
     [Test]
     public void PutKeyResponse_Parse_WithSingleKeyCheckValue_ReturnsSuccessResult()
     {
-        byte[] responseData = Convert.FromHexString("123456"); // 1 key check value
+        byte[] responseData = Convert.FromHexString("01123456");
 
         Result<PutKeyResponse, SmartCardError> result = PutKeyResponse.Parse(responseData);
 
@@ -900,15 +983,13 @@ public class PutKeyCommandTests
     }
 
     [Test]
-    public void PutKeyResponse_Parse_WithEmptyResponse_ReturnsSuccessResult()
+    public void PutKeyResponse_Parse_WithEmptyResponse_ReturnsFailure()
     {
         byte[] responseData = [];
 
         Result<PutKeyResponse, SmartCardError> result = PutKeyResponse.Parse(responseData);
 
-        _ = result.IsSuccess.Should().BeTrue();
-        var response = result.Value;
-        _ = response.KeyCheckValues.Should().HaveCount(0);
+        _ = result.IsFailure.Should().BeTrue();
     }
 
     [Test]
@@ -922,9 +1003,7 @@ public class PutKeyCommandTests
     }
 
     [Test]
-    [TestCase(1)]
     [TestCase(2)]
-    [TestCase(4)]
     [TestCase(5)]
     public void PutKeyResponse_Parse_WithInvalidResponseLength_ReturnsFailure(int length)
     {
@@ -934,9 +1013,7 @@ public class PutKeyCommandTests
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<SmartCardError>();
-        _ = result
-            .Error.Message.Should()
-            .Contain($"Invalid response length {length}, expected multiple of 3 bytes");
+        _ = result.Error.Message.Should().Contain($"Invalid response length {length}");
     }
 
     [Test]
@@ -978,17 +1055,16 @@ public class PutKeyCommandTests
         // Header
         _ = apdu[0].Should().Be(command.Cla); // CLA
         _ = apdu[1].Should().Be(command.Ins); // INS
-        _ = apdu[2].Should().Be((byte)command.UsageQualifier); // P1
-        _ = apdu[3].Should().Be((byte)command.KekIdentifier); // P2
+        _ = apdu[2].Should().Be(command.ReplacedKeyVersion);
+        _ = apdu[3].Should().Be(command.P2);
 
         // LC should match data length
         byte dataLength = apdu[4];
-        int expectedDataLength = keyDataBlock.ToBytes().Length;
+        int expectedDataLength = 1 + keyDataBlock.ToBytes().Length;
         _ = dataLength.Should().Be((byte)expectedDataLength);
 
-        // LE should be at the end and match expected response length
-        int leIndex = apdu.Length - 1;
-        _ = apdu[leIndex].Should().Be((byte)command.ExpectedResponseLength.Value);
+        // GP Card Spec 2.3.1, Table 11-64: PUT KEY uses Le=00.
+        _ = apdu.Should().HaveCount(5 + expectedDataLength);
     }
 
     [Test]
@@ -1002,13 +1078,13 @@ public class PutKeyCommandTests
         byte[]? apdu = command.ToApdu().ToApdu().Value;
 
         // Should handle large key data correctly
-        int expectedDataLength = 1 + 1 + 32 + 3; // Type + Length + Key + KCV
+        int expectedDataLength = 1 + 1 + 1 + 32 + 1 + 3;
         _ = apdu[4].Should().Be((byte)expectedDataLength); // LC
-        _ = apdu[^1].Should().Be(0x03); // LE (3 bytes expected response)
+        _ = apdu[^1].Should().Be(0x56);
 
         // Verify key data is properly embedded
-        int keyDataStart = 5; // After header and LC
-        _ = apdu[keyDataStart].Should().Be(0x8A); // AES-256 key type
+        int keyDataStart = 6; // After header, LC, and new key version
+        _ = apdu[keyDataStart].Should().Be(0x88);
         _ = apdu[keyDataStart + 1].Should().Be(0x20); // 32 bytes length
 
         // Verify actual key data
@@ -1016,7 +1092,7 @@ public class PutKeyCommandTests
         _ = keyData.Should().BeEquivalentTo(ValidAes256Key);
 
         // Verify KCV
-        byte[] kcvData = [.. apdu.Skip(keyDataStart + 2 + 32).Take(3)];
+        byte[] kcvData = [.. apdu.Skip(keyDataStart + 2 + 32 + 1).Take(3)];
         _ = kcvData.Should().BeEquivalentTo(ValidKeyCheckValue);
     }
 

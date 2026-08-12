@@ -8,7 +8,7 @@ using NUnit.Framework;
 namespace Gp4Net.Tests.Domain.CardInfo;
 
 /// <summary>
-/// Tests for KeyInformationTemplate parsing to verify E0 tag handling.
+/// Tests for Key Information Data defined by GP Card Specification v2.3.1, Table 11-28.
 /// </summary>
 [TestFixture]
 [Category("Unit")]
@@ -17,11 +17,7 @@ public class KeyInfoTemplateParsingTest
     [Test]
     public void Parse_E012Bytes_ExtractsThreeKeys()
     {
-        // From gp_pro_card_info_complete.json - actual GET DATA response without status
-        // E012 = tag E0, length 12 (18 bytes)
-        // C00401018810 = key 1: C0 tag, 04 length, 01 keyId, 01 version, 88 type, 10 length
-        // C00402018810 = key 2: C0 tag, 04 length, 02 keyId, 01 version, 88 type, 10 length
-        // C004030188   = key 3: C0 tag, 04 length, 03 keyId, 01 version, 88 type
+        // GP Card Specification v2.3.1, section 11.3.3.1.1 and Table 11-28.
         byte[] keyInfoBytes = Convert.FromHexString("E012C00401018810C00402018810C00403018810");
 
         // Parse
@@ -41,6 +37,9 @@ public class KeyInfoTemplateParsingTest
         // Verify keys
         _ = keyInfo.Keys[0].KeyId.Should().Be(1);
         _ = keyInfo.Keys[0].KeyVersion.Should().Be(1);
+        _ = keyInfo.Keys[0].Components[0].Type.Should().Be(0x88);
+        _ = keyInfo.Keys[0].Components[0].Length.Should().Be(0x10);
+        _ = keyInfo.Keys[0].KeyLength.Should().Be(128);
 
         _ = keyInfo.Keys[1].KeyId.Should().Be(2);
         _ = keyInfo.Keys[1].KeyVersion.Should().Be(1);

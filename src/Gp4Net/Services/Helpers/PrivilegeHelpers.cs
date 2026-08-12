@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
@@ -85,6 +87,19 @@ public static class PrivilegeHelpers
                     )
                 ),
         };
+    }
+
+    /// <summary>Decodes every set privilege using GP 2.3.1 Tables 11-7 through 11-9.</summary>
+    public static ImmutableList<Privilege> ToList(byte[] bytes)
+    {
+        return FromBytes(bytes)
+            .Match(
+                value =>
+                    Enum.GetValues<Privilege>()
+                        .Where(flag => flag != Privilege.None && value.HasFlag(flag))
+                        .ToImmutableList(),
+                _ => ImmutableList<Privilege>.Empty
+            );
     }
 
     /// <summary>

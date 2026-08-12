@@ -29,34 +29,29 @@ public class Scp03ProtocolValidationTests
         "404142434445464748494A4B4C4D4E4F"
     );
 
-    /// <summary>
-    /// GP SCP03 Section 6.2.1: Implementation Parameters
-    /// Tests that implementation parameters are correctly validated.
-    /// </summary>
+    /// <summary>SCP03 Amendment D v1.2, Table 5-1.</summary>
     [Test]
-    [TestCase(0x10, 128, "AES-128")]
-    [TestCase(0x11, 128, "AES-128 without R-MAC")]
-    [TestCase(0x20, 192, "AES-192")]
-    [TestCase(0x30, 256, "AES-256")]
-    [TestCase(0x60, 128, "AES-128 with random challenge")]
-    [TestCase(0x70, 128, "AES-128 with pseudo-random challenge")]
-    public void Scp03_Should_Validate_Implementation_Parameters(
+    [TestCase(0x00, false, false, false, false)]
+    [TestCase(0x01, true, false, false, false)]
+    [TestCase(0x10, false, true, false, false)]
+    [TestCase(0x20, false, false, true, false)]
+    [TestCase(0x31, true, true, true, false)]
+    [TestCase(0x60, false, false, true, true)]
+    [TestCase(0x71, true, true, true, true)]
+    public void Scp03_Should_Decode_Implementation_Parameter_Bitmap(
         byte implParam,
-        int expectedKeyLength,
-        string description
+        bool s16,
+        bool pseudoRandom,
+        bool rMac,
+        bool rEncryption
     )
     {
-        // Act - Get the key length for the implementation parameter
         var scpImpl = (ScpImplementation)implParam;
-        var keyLength = scpImpl.GetAesKeyLength();
 
-        // Assert
-        _ = keyLength
-            .Should()
-            .Be(
-                expectedKeyLength,
-                $"GP SCP03: i={implParam:X2} ({description}) should use {expectedKeyLength}-bit keys"
-            );
+        _ = scpImpl.UsesScp03S16Mode().Should().Be(s16);
+        _ = scpImpl.UsesScp03PseudoRandomChallenge().Should().Be(pseudoRandom);
+        _ = scpImpl.HasRMacSupport().Should().Be(rMac);
+        _ = scpImpl.HasScp03ResponseEncryption().Should().Be(rEncryption);
     }
 
     /// <summary>
@@ -232,6 +227,62 @@ public class Scp03ProtocolValidationTests
 
         _ = securedData[^8..].Should().Equal(expectedFullMac[..8]);
         _ = updatedState.MacChainingValue.Should().Equal(expectedFullMac);
+    }
+
+    [Test]
+    public void Scp03_CEncryption_Should_Encrypt_First_Command_With_Counter_One_Before_CMac()
+    {
+        // SCP03 1.1.2, 6.2.6: counter 1 protects the first command after
+        // EXTERNAL AUTHENTICATE; command data is encrypted before C-MAC is calculated.
+        byte[] sEnc = Convert.FromHexString("00112233445566778899AABBCCDDEEFF");
+        byte[] sMac = Convert.FromHexString("0102030405060708090A0B0C0D0E0F10");
+        var state = SecureChannelState
+            .Create(
+                new SessionKeys(sEnc, sMac, new byte[16]),
+                SecurityLevel.CDecryption,
+                CryptoService.ScpVersion.Scp03,
+                new byte[16],
+                0x70
+            )
+            .Value;
+        byte[] plaintext = Convert.FromHexString("0102030405060708");
+        var command = new WSCT.ISO7816.CommandAPDU(0x80, 0xE2, 0x80, 0x00, 8, plaintext);
+
+        var result = ScpService.Security.ApplyCommandSecurity(command, state).Value;
+
+        _ = result.newState.EncryptionCounter.Should().Be(1);
+        byte[] ciphertext = result.securedCommand.Udc[..^8];
+        _ = ciphertext.Should().NotEqual(plaintext);
+        byte[] decrypted = CryptoService
+            .ScpOperations.Scp03.RemoveCommandEncryption(
+                new WSCT.ISO7816.CommandAPDU(
+                    0x84,
+                    0xE2,
+                    0x80,
+                    0x00,
+                    (uint)ciphertext.Length,
+                    ciphertext
+                ).BinaryCommand,
+                sEnc,
+                1
+            )
+            .Value[5..];
+        _ = decrypted.Should().Equal(plaintext);
+    }
+
+    [Test]
+    public void SecureMessaging_Should_Mac_Transmitted_Cla_And_Preserve_Case2_Le()
+    {
+        // GP Card Spec 2.3.1, E.4.4 and SCP03 1.1.2, 6.2.4 require the
+        // modified CLA in the MAC input. ISO/IEC 7816-4 case 2 retains Le.
+        var select = new WSCT.ISO7816.CommandAPDU(Convert.FromHexString("00A4040000"));
+        var macInput = select.GetMacInput().Value.Bytes;
+        var secured = select.WithMac(new byte[8]).Value.BinaryCommand;
+
+        _ = macInput[0].Should().Be(0x04);
+        _ = secured[0].Should().Be(0x04);
+        _ = secured[^1].Should().Be(0x00);
+        _ = secured.Should().HaveCount(14);
     }
 
     /// <summary>

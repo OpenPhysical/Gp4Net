@@ -5,14 +5,14 @@ using System.Linq;
 using System.Text;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Domain.DataObjects;
 using JetBrains.Annotations;
-using static Gp4Net.Services.TlvService;
 
 namespace Gp4Net.Domain.CardInfo;
 
 /// <summary>
 /// Key Information Template parser for GlobalPlatform tag 0xE0.
-/// Based on GlobalPlatform Card Specification section 9.3.3.1.
+/// GlobalPlatform Card Specification v2.3.1, section 11.3.3.1.1.
 /// </summary>
 [PublicAPI]
 public class KeyInformationTemplate
@@ -46,92 +46,38 @@ public class KeyInformationTemplate
             return SmartCardError.InvalidArgument("Key information data cannot be null or empty");
         }
 
-        // Check if data starts with E0 tag and extract the content
-        byte[] contentToParse = data;
-        if (data.Length >= 2 && data[0] == 0xE0)
-        {
-            // This is an E0 tag, extract its content
-            int offset = 1;
-            int length = 0;
-
-            if ((data[1] & 0x80) == 0)
-            {
-                // Short form length
-                length = data[1];
-                offset = 2;
-            }
-            else
-            {
-                // Long form length
-                int lenLength = data[1] & 0x7F;
-                if (lenLength is > 0 and <= 4 && 2 + lenLength <= data.Length)
-                {
-                    offset = 2;
-                    for (int i = 0; i < lenLength; i++)
+        return KeyInfoTemplateCodec
+            .Decode(data)
+            .Map(template => new KeyInformationTemplate(
+                data,
+                template
+                    .Keys.Select(key =>
                     {
-                        length = length << 8 | data[offset++];
-                    }
-                }
-            }
-
-            if (length > 0 && offset + length <= data.Length)
-            {
-                contentToParse = new byte[length];
-                Array.Copy(data, offset, contentToParse, 0, length);
-            }
-        }
-
-        // Parse the content for C0 tags
-        return TlvParser
-            .ParseMultiple([.. contentToParse])
-            .Map(parseResult =>
-            {
-                IReadOnlyList<KeyEntry> keys = parseResult
-                    .Objects.Where(element =>
-                        element
-                            .Tag.ToNumber()
-                            .Match(onSuccess: tagNumber => tagNumber == 0xC0, onFailure: _ => false)
-                    )
-                    .Select(element => ParseKeyInformationData(element.TlvData.Bytes.ToArray()))
-                    .Where(maybeKey => maybeKey.HasValue)
-                    .Select(maybeKey => maybeKey.Value)
-                    .ToImmutableList();
-
-                return new KeyInformationTemplate(data, keys);
-            });
+                        IReadOnlyList<KeyType> keyTypes = key
+                            .Components.Select(component => ParseKeyType(component.Type))
+                            .Where(keyType => keyType != KeyType.Unknown)
+                            .ToImmutableList();
+                        return new KeyEntry
+                        {
+                            KeyId = key.KeyIdentifier,
+                            KeyVersion = key.KeyVersionNumber,
+                            Components = key.Components,
+                            KeyTypes = keyTypes,
+                        };
+                    })
+                    .ToImmutableList()
+            ));
     }
 
-    private static Maybe<KeyEntry> ParseKeyInformationData(byte[] data)
-    {
-        if (data.Length < 3)
-        {
-            return Maybe<KeyEntry>.None;
-        }
-
-        IReadOnlyList<KeyType> keyTypes = data.Skip(2)
-            .Select(ParseKeyType)
-            .Where(keyType => keyType != KeyType.Unknown)
-            .ToImmutableList();
-
-        return Maybe<KeyEntry>.From(
-            new KeyEntry
-            {
-                KeyId = data[0],
-                KeyVersion = data[1],
-                KeyTypes = keyTypes,
-            }
-        );
-    }
-
-    private static KeyType ParseKeyType(byte value)
+    private static KeyType ParseKeyType(ushort value)
     {
         return value switch
         {
             0x80 => KeyType.Des,
-            0x81 => KeyType.TripleDes2Key,
-            0x82 => KeyType.TripleDes3Key,
-            0x83 => KeyType.Des3,
+            0x85 => KeyType.PreSharedTls,
             0x88 => KeyType.Aes,
+            0x90 => KeyType.HmacSha1,
+            0x91 => KeyType.HmacSha1_160,
             0xA0 => KeyType.RsaPublicExponentECleartext,
             0xA1 => KeyType.RsaModulusNCleartext,
             0xA2 => KeyType.RsaModulusN,
@@ -141,7 +87,15 @@ public class KeyInformationTemplate
             0xA6 => KeyType.RsaChineseRemainderPq,
             0xA7 => KeyType.RsaChineseRemainderDpi,
             0xA8 => KeyType.RsaChineseRemainderDqi,
-            0xFF => KeyType.NotAvailable,
+            0xB0 => KeyType.EccPublic,
+            0xB1 => KeyType.EccPrivate,
+            0xB2 => KeyType.EccFieldP,
+            0xB3 => KeyType.EccFieldA,
+            0xB4 => KeyType.EccFieldB,
+            0xB5 => KeyType.EccGenerator,
+            0xB6 => KeyType.EccGeneratorOrder,
+            0xB7 => KeyType.EccCofactor,
+            0xF0 => KeyType.EccParametersReference,
             _ => KeyType.Unknown,
         };
     }
@@ -184,6 +138,11 @@ public record KeyEntry
     public required IReadOnlyList<KeyType> KeyTypes { get; init; } = [];
 
     /// <summary>
+    /// Key component type and length pairs from GP Card Specification v2.3.1 Tables 11-28 and 11-29.
+    /// </summary>
+    public required IReadOnlyList<KeyTypeAndLength> Components { get; init; } = [];
+
+    /// <summary>
     /// Gets the primary key type (first in the list).
     /// </summary>
     public Maybe<KeyType> PrimaryKeyType =>
@@ -192,20 +151,7 @@ public record KeyEntry
     /// <summary>
     /// Gets the key length in bits based on the primary key type.
     /// </summary>
-    public int KeyLength => PrimaryKeyType.Map(DetermineKeyLength).GetValueOrDefault(0);
-
-    private static int DetermineKeyLength(KeyType keyType)
-    {
-        return keyType switch
-        {
-            KeyType.Des => 64,
-            KeyType.TripleDes2Key => 128,
-            KeyType.TripleDes3Key => 192,
-            KeyType.Des3 => 192,
-            KeyType.Aes => 128, // Default AES, actual length may vary
-            _ => 0,
-        };
-    }
+    public int KeyLength => Components.Count > 0 ? Components[0].Length * 8 : 0;
 
     /// <summary>
     /// Formats the key entry as a human-readable string.
@@ -228,10 +174,10 @@ public enum KeyType
 {
     Unknown = 0,
     Des = 0x80,
-    TripleDes2Key = 0x81,
-    TripleDes3Key = 0x82,
-    Des3 = 0x83,
+    PreSharedTls = 0x85,
     Aes = 0x88,
+    HmacSha1 = 0x90,
+    HmacSha1_160 = 0x91,
     RsaPublicExponentECleartext = 0xA0,
     RsaModulusNCleartext = 0xA1,
     RsaModulusN = 0xA2,
@@ -241,7 +187,15 @@ public enum KeyType
     RsaChineseRemainderPq = 0xA6,
     RsaChineseRemainderDpi = 0xA7,
     RsaChineseRemainderDqi = 0xA8,
-    NotAvailable = 0xFF,
+    EccPublic = 0xB0,
+    EccPrivate = 0xB1,
+    EccFieldP = 0xB2,
+    EccFieldA = 0xB3,
+    EccFieldB = 0xB4,
+    EccGenerator = 0xB5,
+    EccGeneratorOrder = 0xB6,
+    EccCofactor = 0xB7,
+    EccParametersReference = 0xF0,
 }
 
 /// <summary>
@@ -254,10 +208,10 @@ public static class KeyTypeExtensions
         return keyType switch
         {
             KeyType.Des => "DES",
-            KeyType.TripleDes2Key => "3DES-2KEY",
-            KeyType.TripleDes3Key => "3DES-3KEY",
-            KeyType.Des3 => "3DES",
+            KeyType.PreSharedTls => "TLS-PSK",
             KeyType.Aes => "AES",
+            KeyType.HmacSha1 => "HMAC-SHA1",
+            KeyType.HmacSha1_160 => "HMAC-SHA1-160",
             KeyType.RsaPublicExponentECleartext => "RSA-PUB-E",
             KeyType.RsaModulusNCleartext => "RSA-MOD-N",
             KeyType.RsaModulusN => "RSA-MOD-N-ENC",
@@ -267,7 +221,15 @@ public static class KeyTypeExtensions
             KeyType.RsaChineseRemainderPq => "RSA-CRT-PQ",
             KeyType.RsaChineseRemainderDpi => "RSA-CRT-DPI",
             KeyType.RsaChineseRemainderDqi => "RSA-CRT-DQI",
-            KeyType.NotAvailable => "N/A",
+            KeyType.EccPublic => "ECC-PUBLIC",
+            KeyType.EccPrivate => "ECC-PRIVATE",
+            KeyType.EccFieldP => "ECC-P",
+            KeyType.EccFieldA => "ECC-A",
+            KeyType.EccFieldB => "ECC-B",
+            KeyType.EccGenerator => "ECC-G",
+            KeyType.EccGeneratorOrder => "ECC-N",
+            KeyType.EccCofactor => "ECC-K",
+            KeyType.EccParametersReference => "ECC-PARAMETERS",
             _ => $"Unknown(0x{(byte)keyType:X2})",
         };
     }

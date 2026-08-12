@@ -20,21 +20,24 @@ public static class WsctSecurityExtensions
     /// </summary>
     /// <param name="command">The command APDU to extract MAC input from.</param>
     /// <param name="macSize">Size of the MAC in bytes (default 8 for SCP02/03).</param>
+    /// <param name="modifyHeader">Uses the modified-APDU method from GP Card Specification v2.3.1 Appendix E.4.4.</param>
     /// <returns>A MacInput record containing the bytes for MAC calculation and extracted components.</returns>
     public static Result<MacInput, SmartCardError> GetMacInput(
         this CommandAPDU command,
-        int macSize = 8
+        int macSize = 8,
+        bool modifyHeader = true
     )
     {
         return Maybe<CommandAPDU>
             .From(command)
             .ToResult(SmartCardError.InvalidArgument("Command cannot be null"))
-            .Bind(cmd => ExtractMacInputInternal(cmd, macSize));
+            .Bind(cmd => ExtractMacInputInternal(cmd, macSize, modifyHeader));
     }
 
     private static Result<MacInput, SmartCardError> ExtractMacInputInternal(
         CommandAPDU command,
-        int macSize
+        int macSize,
+        bool modifyHeader
     )
     {
         var isSecured = (command.Cla & 0x04) != 0;
@@ -46,13 +49,14 @@ public static class WsctSecurityExtensions
             .From(fullCommand)
             .Where(bytes => bytes.Length >= 4)
             .ToResult(SmartCardError.InvalidData("Invalid command structure"))
-            .Bind(_ => BuildMacInput(command, isSecured, macSize));
+            .Bind(_ => BuildMacInput(command, isSecured, macSize, modifyHeader));
     }
 
     private static Result<MacInput, SmartCardError> BuildMacInput(
         CommandAPDU command,
         bool isSecured,
-        int macSize
+        int macSize,
+        bool modifyHeader
     )
     {
         var udc = Maybe<byte[]>.From(command.Udc);
@@ -62,11 +66,11 @@ public static class WsctSecurityExtensions
             return udc.Where(data => data.Length >= macSize)
                 .Match(
                     Some: data => ExtractSecuredMacInput(command, data, macSize),
-                    None: () => BuildUnsecuredMacInput(command, udc, macSize)
+                    None: () => BuildUnsecuredMacInput(command, udc, macSize, modifyHeader)
                 );
         }
 
-        return BuildUnsecuredMacInput(command, udc, macSize);
+        return BuildUnsecuredMacInput(command, udc, macSize, modifyHeader);
     }
 
     private static Result<MacInput, SmartCardError> ExtractSecuredMacInput(
@@ -116,11 +120,12 @@ public static class WsctSecurityExtensions
         // Copy header and Lc
         Array.Copy(binaryCommand, 0, macInputBytes, 0, dataStartPos);
 
-        // Normalize CLA per GP E.4.4: remove logical channel indication
+        // GP Card Spec 2.3.1, E.4.4 and SCP03 1.1.2, 6.2.4: clear the
+        // logical-channel bits and set the secure-messaging indication.
         bool isSecured = (command.Cla & 0x04) != 0;
         macInputBytes[0] = isSecured
-            ? Constants.Constants.Scp.Common.SECURE_CLA
-            : Constants.Constants.Scp.Common.STANDARD_CLA;
+            ? (byte)((command.Cla & 0xF0) | 0x04)
+            : (byte)(command.Cla & 0xF0);
 
         // Update Lc value if needed to reflect plaintext data size
         int secureLc = plaintextData.Length + macSize;
@@ -156,42 +161,40 @@ public static class WsctSecurityExtensions
     private static Result<MacInput, SmartCardError> BuildUnsecuredMacInput(
         CommandAPDU command,
         Maybe<byte[]> udc,
-        int macSize
+        int macSize,
+        bool modifyHeader
     )
     {
         var udcData = udc.GetValueOrDefault([]);
         int dataLength = udcData.Length;
-        int lcWithMac = dataLength + macSize;
-        if (lcWithMac < macSize)
-        {
-            lcWithMac = macSize;
-        }
+        int macInputLc = modifyHeader ? dataLength + macSize : dataLength;
 
         bool requiresExtendedLc =
-            lcWithMac > byte.MaxValue
+            macInputLc > byte.MaxValue
             || (command.BinaryCommand.Length > 5 && command.BinaryCommand[4] == 0x00);
 
-        int headerSize = requiresExtendedLc ? 4 + 3 : 4 + (lcWithMac > 0 ? 1 : 0);
+        int headerSize = requiresExtendedLc ? 4 + 3 : 4 + (macInputLc > 0 ? 1 : 0);
         int totalSize = headerSize + dataLength;
         var macInputBytes = new byte[totalSize];
 
         int offset = 0;
-        macInputBytes[offset++] = Constants.Constants.Scp.Common.SECURE_CLA;
+        // GP Card Specification v2.3.1, Appendix E.4.4; SCP03 Amendment D v1.2, section 6.2.4.
+        macInputBytes[offset++] = (byte)((command.Cla & 0xF0) | (modifyHeader ? 0x04 : 0x00));
         macInputBytes[offset++] = command.Ins;
         macInputBytes[offset++] = command.P1;
         macInputBytes[offset++] = command.P2;
 
-        if (lcWithMac > 0)
+        if (macInputLc > 0)
         {
             if (requiresExtendedLc)
             {
                 macInputBytes[offset++] = 0x00;
-                macInputBytes[offset++] = (byte)(lcWithMac >> 8);
-                macInputBytes[offset++] = (byte)(lcWithMac & 0xFF);
+                macInputBytes[offset++] = (byte)(macInputLc >> 8);
+                macInputBytes[offset++] = (byte)(macInputLc & 0xFF);
             }
             else
             {
-                macInputBytes[offset++] = (byte)lcWithMac;
+                macInputBytes[offset++] = (byte)macInputLc;
             }
         }
 
@@ -240,7 +243,29 @@ public static class WsctSecurityExtensions
             Array.Copy(plaintextData, 0, securedData, 0, plaintextData.Length);
         Array.Copy(mac, 0, securedData, plaintextData.Length, mac.Length);
 
-        // Create secured command with MAC appended
+        // Preserve a case-3 command as case 3. WSCT's object initializer turns
+        // Le=0 into an explicit trailing 00 even when the original APDU had no Le.
+        // SCP03 1.1.2, 6.2.4 appends C-MAC to the command data; it does not add Le.
+        // ISO/IEC 7816-4 command cases: a five-byte command with no data is
+        // case 2 (Le present), while case 1 is four bytes and case 3 has Lc+data.
+        bool hasLe =
+            plaintextData.Length == 0
+                ? plaintext.BinaryCommand.Length == 5
+                : plaintext.BinaryCommand.Length > 5 + plaintextData.Length;
+        if (!hasLe)
+        {
+            byte[] bytes =
+            [
+                (byte)(plaintext.Cla | 0x04),
+                plaintext.Ins,
+                plaintext.P1,
+                plaintext.P2,
+                (byte)securedData.Length,
+                .. securedData,
+            ];
+            return Result.Success<CommandAPDU, SmartCardError>(new CommandAPDU(bytes));
+        }
+
         var secured = new CommandAPDU
         {
             Cla = (byte)(plaintext.Cla | 0x04), // Set secure messaging bit
@@ -248,7 +273,7 @@ public static class WsctSecurityExtensions
             P1 = plaintext.P1,
             P2 = plaintext.P2,
             Udc = securedData,
-            Le = plaintext.Le, // WSCT preserves and handles Le properly
+            Le = plaintext.Le,
         };
 
         return Result.Success<CommandAPDU, SmartCardError>(secured);

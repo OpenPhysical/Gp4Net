@@ -81,9 +81,9 @@ public class BeginRMacSessionCommand
         CommandData = data.Map(d => (byte[])d.Clone());
         Mac = mac.Map(m => (byte[])m.Clone());
 
-        // Build the combined data field for IApduCommand interface
-        var combinedData = new List<byte>();
-        CommandData.Execute(d => combinedData.AddRange(d));
+        var commandData = CommandData.GetValueOrDefault([]);
+        var combinedData = new List<byte> { (byte)commandData.Length };
+        combinedData.AddRange(commandData);
         Mac.Execute(m => combinedData.AddRange(m));
         Data = [.. combinedData];
     }
@@ -103,15 +103,18 @@ public class BeginRMacSessionCommand
         Maybe<byte[]> mac = default
     )
     {
-        // Validate security level
-        if (!Enum.IsDefined(typeof(SecurityLevel), securityLevel))
+        // GP Card Specification v2.3.1, Table E-14; SCP03 Amendment D v1.2, Table 7-9.
+        if (
+            securityLevel
+            is not SecurityLevel.RMac
+                and not (SecurityLevel.RMac | SecurityLevel.REncryption)
+        )
         {
             return Result.Failure<BeginRMacSessionCommand, SmartCardError>(
                 SmartCardError.InvalidArgument($"Invalid security level: {securityLevel}")
             );
         }
 
-        // Validate CLA byte
         if (
             cla != GlobalPlatform.Cla.GP_STANDARD
             && cla != GlobalPlatform.Cla.R_MAC_SECURE
@@ -125,7 +128,10 @@ public class BeginRMacSessionCommand
             );
         }
 
-        // Validate MAC length if provided
+        var commandData = data.GetValueOrDefault([]);
+        if (commandData.Length > 24)
+            return SmartCardError.InvalidArgument("BEGIN R-MAC data must not exceed 24 bytes");
+
         var macValidation = mac.Match(
             m =>
                 m.Length != 8
@@ -141,7 +147,6 @@ public class BeginRMacSessionCommand
             return Result.Failure<BeginRMacSessionCommand, SmartCardError>(macValidation.Error);
         }
 
-        // Convert security level to P1 parameter
         byte p1 = (byte)securityLevel;
 
         return Result.Success<BeginRMacSessionCommand, SmartCardError>(
@@ -227,7 +232,6 @@ public class EndRMacSessionCommand
         P2 = p2;
         Mac = mac.Map(m => (byte[])m.Clone());
 
-        // Build the data field for IApduCommand interface
         Data = Mac.Match(m => (byte[])m.Clone(), () => []);
     }
 
@@ -244,15 +248,17 @@ public class EndRMacSessionCommand
         Maybe<byte[]> mac = default
     )
     {
-        // Validate security level
-        if (!Enum.IsDefined(typeof(SecurityLevel), securityLevel))
+        if (
+            securityLevel
+            is not SecurityLevel.RMac
+                and not (SecurityLevel.RMac | SecurityLevel.REncryption)
+        )
         {
             return Result.Failure<EndRMacSessionCommand, SmartCardError>(
                 SmartCardError.InvalidArgument($"Invalid security level: {securityLevel}")
             );
         }
 
-        // Validate CLA byte
         if (
             cla != GlobalPlatform.Cla.GP_STANDARD
             && cla != GlobalPlatform.Cla.R_MAC_SECURE
@@ -266,7 +272,6 @@ public class EndRMacSessionCommand
             );
         }
 
-        // Validate MAC length if provided
         var macValidation = mac.Match(
             m =>
                 m.Length != 8
@@ -282,7 +287,6 @@ public class EndRMacSessionCommand
             return Result.Failure<EndRMacSessionCommand, SmartCardError>(macValidation.Error);
         }
 
-        // P2 parameter to end session and return R-MAC
         byte p2 = GlobalPlatform.RMacParameters.P2_END_SESSION_RETURN_RMAC;
 
         return Result.Success<EndRMacSessionCommand, SmartCardError>(
@@ -296,8 +300,9 @@ public class EndRMacSessionCommand
     /// <returns>A result containing the CommandAPDU or an error.</returns>
     public Result<CommandAPDU, SmartCardError> ToCommandApdu()
     {
+        // GP Card Specification v2.3.1, Table E-18; SCP03 Amendment D v1.2, Table 7-11.
         return Result.Success<CommandAPDU, SmartCardError>(
-            new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data)
+            new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data, 0)
         );
     }
 

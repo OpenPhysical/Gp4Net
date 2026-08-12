@@ -48,17 +48,23 @@ public abstract record InstallCommand : IApduCommand
     /// <returns>A result containing the CommandAPDU or an error.</returns>
     public abstract Result<CommandAPDU, SmartCardError> ToCommandApdu();
 
+    // GP Card Specification v2.3.1, Table 11-41.
     /// <inheritdoc/>
-    public byte P1
-    {
-        get { return (byte)Type; }
-    }
+    public byte P1 => (byte)((byte)Type | (MoreCommands ? 0x80 : 0x00));
 
+    // GP Card Specification v2.3.1, section 11.5.2.2.
     /// <inheritdoc/>
-    public byte P2
-    {
-        get { return 0x00; }
-    }
+    public byte P2 => (byte)Sequence;
+
+    /// <summary>
+    /// Gets whether another INSTALL command component follows.
+    /// </summary>
+    public bool MoreCommands { get; }
+
+    /// <summary>
+    /// Gets the combined-operation position encoded in P2.
+    /// </summary>
+    public InstallSequence Sequence { get; }
 
     /// <inheritdoc/>
     public abstract byte[] Data { get; }
@@ -114,9 +120,15 @@ public abstract record InstallCommand : IApduCommand
     /// <summary>
     /// Base constructor for InstallCommand.
     /// </summary>
-    private protected InstallCommand(ImmutableArray<byte> packageAid)
+    private protected InstallCommand(
+        ImmutableArray<byte> packageAid,
+        bool moreCommands = false,
+        InstallSequence sequence = InstallSequence.NoInformation
+    )
     {
         PackageAid = packageAid;
+        MoreCommands = moreCommands;
+        Sequence = sequence;
     }
 
     /// <summary>
@@ -162,10 +174,7 @@ public abstract record InstallCommand : IApduCommand
     public sealed record InstallForLoadCommand : InstallCommand
     {
         /// <inheritdoc/>
-        public override InstallType Type
-        {
-            get { return InstallType.ForLoad; }
-        }
+        public override InstallType Type { get; }
 
         /// <summary>
         /// Gets the security domain AID (optional).
@@ -191,14 +200,18 @@ public abstract record InstallCommand : IApduCommand
         /// Initializes a new instance of InstallForLoadCommand.
         /// </summary>
         private InstallForLoadCommand(
+            InstallType type,
             ImmutableArray<byte> packageAid,
             ImmutableArray<byte> securityDomainAid,
             ImmutableArray<byte> hash,
             ImmutableArray<byte> loadParameters,
-            ImmutableArray<byte> installToken
+            ImmutableArray<byte> installToken,
+            bool moreCommands,
+            InstallSequence sequence
         )
-            : base(packageAid)
+            : base(packageAid, moreCommands, sequence)
         {
+            Type = type;
             SecurityDomainAid = securityDomainAid;
             Hash = hash;
             LoadParameters = loadParameters;
@@ -209,17 +222,66 @@ public abstract record InstallCommand : IApduCommand
         /// Creates a new INSTALL [for load] command with validation.
         /// </summary>
         /// <param name="packageAid">The package AID.</param>
-        /// <param name="maxDataBlockSize">Optional maximum data block size parameter.</param>
+        /// <param name="loadParameters">Optional Load Parameters TLVs.</param>
         /// <param name="securityDomainAid">Optional security domain AID.</param>
         /// <param name="hash">Optional hash of the load file.</param>
         /// <param name="installToken">Optional install token.</param>
+        /// <param name="moreCommands">Whether another INSTALL component follows.</param>
         /// <returns>A Result containing the command or an error.</returns>
         public static Result<InstallForLoadCommand, SmartCardError> Create(
             byte[] packageAid,
-            Maybe<ushort> maxDataBlockSize = default,
+            Maybe<byte[]> loadParameters = default,
             Maybe<byte[]> securityDomainAid = default,
             Maybe<byte[]> hash = default,
-            Maybe<byte[]> installToken = default
+            Maybe<byte[]> installToken = default,
+            bool moreCommands = false
+        )
+        {
+            return CreateCore(
+                InstallType.ForLoad,
+                InstallSequence.NoInformation,
+                packageAid,
+                loadParameters,
+                securityDomainAid,
+                hash,
+                installToken,
+                moreCommands
+            );
+        }
+
+        /// <summary>
+        /// Creates the first command of a combined load, install, and make-selectable operation.
+        /// </summary>
+        public static Result<InstallForLoadCommand, SmartCardError> CreateCombined(
+            byte[] packageAid,
+            Maybe<byte[]> loadParameters = default,
+            Maybe<byte[]> securityDomainAid = default,
+            Maybe<byte[]> hash = default,
+            Maybe<byte[]> installToken = default,
+            bool moreCommands = false
+        )
+        {
+            return CreateCore(
+                InstallType.ForLoadInstallAndMakeSelectable,
+                InstallSequence.BeginCombinedOperation,
+                packageAid,
+                loadParameters,
+                securityDomainAid,
+                hash,
+                installToken,
+                moreCommands
+            );
+        }
+
+        private static Result<InstallForLoadCommand, SmartCardError> CreateCore(
+            InstallType type,
+            InstallSequence sequence,
+            byte[] packageAid,
+            Maybe<byte[]> loadParameters,
+            Maybe<byte[]> securityDomainAid,
+            Maybe<byte[]> hash,
+            Maybe<byte[]> installToken,
+            bool moreCommands
         )
         {
             var packageAidResult = ValidatePackageAid(packageAid);
@@ -230,21 +292,15 @@ public abstract record InstallCommand : IApduCommand
                 );
             }
 
-            // Convert maxDataBlockSize to load parameters if provided
-            Maybe<byte[]> loadParameters = maxDataBlockSize.Map(size => new byte[]
-            {
-                0xC9,
-                0x02,
-                (byte)(size >> 8),
-                (byte)(size & 0xFF),
-            });
-
             var command = new InstallForLoadCommand(
+                type,
                 packageAidResult.Value,
                 ToImmutableByteArray(securityDomainAid),
                 ToImmutableByteArray(hash),
                 ToImmutableByteArray(loadParameters),
-                ToImmutableByteArray(installToken)
+                ToImmutableByteArray(installToken),
+                moreCommands,
+                sequence
             );
 
             return Result.Success<InstallForLoadCommand, SmartCardError>(command);
@@ -317,14 +373,7 @@ public abstract record InstallCommand : IApduCommand
         public override Result<CommandAPDU, SmartCardError> ToCommandApdu()
         {
             return Result.Success<CommandAPDU, SmartCardError>(
-                new CommandAPDU(
-                    COMMAND_CLA,
-                    COMMAND_INS,
-                    (byte)InstallType.ForLoad,
-                    0x00,
-                    (uint)Data.Length,
-                    Data
-                )
+                new CommandAPDU(COMMAND_CLA, COMMAND_INS, P1, P2, (uint)Data.Length, Data)
             );
         }
 
@@ -380,15 +429,20 @@ public abstract record InstallCommand : IApduCommand
             ImmutableArray<byte> moduleAid,
             ImmutableArray<byte> privileges,
             ImmutableArray<byte> installParameters,
-            ImmutableArray<byte> installToken
+            ImmutableArray<byte> installToken,
+            bool moreCommands,
+            InstallSequence sequence
         )
-            : base(packageAid)
+            : base(packageAid, moreCommands, sequence)
         {
             Type = type;
             AppletAid = appletAid;
             ModuleAid = moduleAid;
             Privileges = privileges.IsDefaultOrEmpty ? [0x00] : privileges;
-            InstallParameters = installParameters;
+            // GP Card Specification v2.3.1, Table 11-49: C9 is mandatory.
+            InstallParameters = installParameters.IsDefaultOrEmpty
+                ? [0xC9, 0x00]
+                : installParameters;
             InstallToken = installToken;
         }
 
@@ -401,6 +455,7 @@ public abstract record InstallCommand : IApduCommand
         /// <param name="privileges">The application privileges.</param>
         /// <param name="installParameters">Optional install parameters.</param>
         /// <param name="installToken">Optional install token.</param>
+        /// <param name="moreCommands">Whether another INSTALL component follows.</param>
         /// <returns>A Result containing the command or an error.</returns>
         public static Result<InstallForInstallCommand, SmartCardError> Create(
             byte[] packageAid,
@@ -408,7 +463,8 @@ public abstract record InstallCommand : IApduCommand
             byte[] applicationAid,
             byte[] privileges,
             Maybe<byte[]> installParameters = default,
-            Maybe<byte[]> installToken = default
+            Maybe<byte[]> installToken = default,
+            bool moreCommands = false
         )
         {
             var packageAidResult = ValidatePackageAid(packageAid);
@@ -447,7 +503,9 @@ public abstract record InstallCommand : IApduCommand
                 [.. moduleAid],
                 [.. privileges],
                 ToImmutableByteArray(installParameters),
-                ToImmutableByteArray(installToken)
+                ToImmutableByteArray(installToken),
+                moreCommands,
+                InstallSequence.NoInformation
             );
 
             return Result.Success<InstallForInstallCommand, SmartCardError>(command);
@@ -462,6 +520,7 @@ public abstract record InstallCommand : IApduCommand
         /// <param name="privileges">The application privileges.</param>
         /// <param name="installParameters">Optional install parameters.</param>
         /// <param name="installToken">Optional install token.</param>
+        /// <param name="moreCommands">Whether another INSTALL component follows.</param>
         /// <returns>A Result containing the command or an error.</returns>
         public static Result<InstallForInstallCommand, SmartCardError> CreateAndMakeSelectable(
             byte[] packageAid,
@@ -469,7 +528,8 @@ public abstract record InstallCommand : IApduCommand
             byte[] applicationAid,
             byte[] privileges,
             Maybe<byte[]> installParameters = default,
-            Maybe<byte[]> installToken = default
+            Maybe<byte[]> installToken = default,
+            bool moreCommands = false
         )
         {
             var packageAidResult = ValidatePackageAid(packageAid);
@@ -508,10 +568,48 @@ public abstract record InstallCommand : IApduCommand
                 [.. moduleAid],
                 [.. privileges],
                 ToImmutableByteArray(installParameters),
-                ToImmutableByteArray(installToken)
+                ToImmutableByteArray(installToken),
+                moreCommands,
+                InstallSequence.NoInformation
             );
 
             return Result.Success<InstallForInstallCommand, SmartCardError>(command);
+        }
+
+        /// <summary>
+        /// Creates the final command of a combined load, install, and make-selectable operation.
+        /// </summary>
+        public static Result<InstallForInstallCommand, SmartCardError> CreateCombinedFinal(
+            byte[] packageAid,
+            byte[] moduleAid,
+            byte[] applicationAid,
+            byte[] privileges,
+            Maybe<byte[]> installParameters = default,
+            Maybe<byte[]> installToken = default,
+            bool moreCommands = false
+        )
+        {
+            var result = CreateAndMakeSelectable(
+                packageAid,
+                moduleAid,
+                applicationAid,
+                privileges,
+                installParameters,
+                installToken,
+                moreCommands
+            );
+
+            return result.Map(command => new InstallForInstallCommand(
+                command.Type,
+                command.PackageAid,
+                command.AppletAid,
+                command.ModuleAid,
+                command.Privileges,
+                command.InstallParameters,
+                command.InstallToken,
+                command.MoreCommands,
+                InstallSequence.EndCombinedOperation
+            ));
         }
 
         /// <inheritdoc/>
@@ -578,7 +676,7 @@ public abstract record InstallCommand : IApduCommand
         public override Result<CommandAPDU, SmartCardError> ToCommandApdu()
         {
             return Result.Success<CommandAPDU, SmartCardError>(
-                new CommandAPDU(COMMAND_CLA, COMMAND_INS, (byte)Type, 0x00, (uint)Data.Length, Data)
+                new CommandAPDU(COMMAND_CLA, COMMAND_INS, P1, P2, (uint)Data.Length, Data)
             );
         }
 
@@ -589,6 +687,258 @@ public abstract record InstallCommand : IApduCommand
         {
             return "INSTALL [for install]";
         }
+    }
+
+    /// <summary>
+    /// INSTALL command for make-selectable, extradition, registry-update, and personalization.
+    /// </summary>
+    public sealed record InstallForManagementCommand : InstallCommand
+    {
+        private readonly ImmutableArray<byte> data;
+
+        /// <inheritdoc/>
+        public override InstallType Type { get; }
+
+        private InstallForManagementCommand(
+            InstallType type,
+            ImmutableArray<byte> applicationAid,
+            ImmutableArray<byte> data,
+            bool moreCommands
+        )
+            : base(applicationAid, moreCommands)
+        {
+            Type = type;
+            this.data = data;
+        }
+
+        /// <inheritdoc/>
+        public override byte[] Data => [.. data];
+
+        /// <summary>
+        /// Creates INSTALL [for make selectable].
+        /// </summary>
+        public static Result<InstallForManagementCommand, SmartCardError> CreateForMakeSelectable(
+            byte[] applicationAid,
+            byte[] privileges,
+            Maybe<byte[]> parameters = default,
+            Maybe<byte[]> token = default,
+            bool moreCommands = false
+        )
+        {
+            var aidResult = ValidateRequiredAid(applicationAid, "Application AID");
+            if (aidResult.IsFailure)
+            {
+                return Result.Failure<InstallForManagementCommand, SmartCardError>(aidResult.Error);
+            }
+
+            if (privileges is null || privileges.Length is not (1 or 3))
+            {
+                return Result.Failure<InstallForManagementCommand, SmartCardError>(
+                    SmartCardError.InvalidArgument("Privileges must contain one or three bytes.")
+                );
+            }
+
+            // GP Card Specification v2.3.1, Table 11-44.
+            var data = BuildLvData(
+                ImmutableArray<byte>.Empty,
+                ImmutableArray<byte>.Empty,
+                aidResult.Value,
+                [.. privileges],
+                ToImmutableByteArray(parameters),
+                ToImmutableByteArray(token)
+            );
+
+            return Result.Success<InstallForManagementCommand, SmartCardError>(
+                new InstallForManagementCommand(
+                    InstallType.ForMakeSelectable,
+                    aidResult.Value,
+                    data,
+                    moreCommands
+                )
+            );
+        }
+
+        /// <summary>
+        /// Creates INSTALL [for extradition].
+        /// </summary>
+        public static Result<InstallForManagementCommand, SmartCardError> CreateForExtradition(
+            byte[] securityDomainAid,
+            byte[] applicationOrLoadFileAid,
+            Maybe<byte[]> parameters = default,
+            Maybe<byte[]> token = default,
+            bool moreCommands = false
+        )
+        {
+            var securityDomainResult = ValidateRequiredAid(
+                securityDomainAid,
+                "Security Domain AID"
+            );
+            if (securityDomainResult.IsFailure)
+            {
+                return Result.Failure<InstallForManagementCommand, SmartCardError>(
+                    securityDomainResult.Error
+                );
+            }
+
+            var targetResult = ValidateRequiredAid(
+                applicationOrLoadFileAid,
+                "Application or Executable Load File AID"
+            );
+            if (targetResult.IsFailure)
+            {
+                return Result.Failure<InstallForManagementCommand, SmartCardError>(
+                    targetResult.Error
+                );
+            }
+
+            // GP Card Specification v2.3.1, Table 11-45.
+            var data = BuildLvData(
+                securityDomainResult.Value,
+                ImmutableArray<byte>.Empty,
+                targetResult.Value,
+                ImmutableArray<byte>.Empty,
+                ToImmutableByteArray(parameters),
+                ToImmutableByteArray(token)
+            );
+
+            return Result.Success<InstallForManagementCommand, SmartCardError>(
+                new InstallForManagementCommand(
+                    InstallType.ForExtradition,
+                    targetResult.Value,
+                    data,
+                    moreCommands
+                )
+            );
+        }
+
+        /// <summary>
+        /// Creates INSTALL [for registry update].
+        /// </summary>
+        public static Result<InstallForManagementCommand, SmartCardError> CreateForRegistryUpdate(
+            Maybe<byte[]> securityDomainAid = default,
+            Maybe<byte[]> applicationAid = default,
+            Maybe<byte[]> privileges = default,
+            Maybe<byte[]> parameters = default,
+            Maybe<byte[]> token = default,
+            bool moreCommands = false
+        )
+        {
+            var securityDomain = ToImmutableByteArray(securityDomainAid);
+            var application = ToImmutableByteArray(applicationAid);
+            var privilegeBytes = ToImmutableByteArray(privileges);
+
+            if (!IsOptionalAidValid(securityDomain) || !IsOptionalAidValid(application))
+            {
+                return Result.Failure<InstallForManagementCommand, SmartCardError>(
+                    SmartCardError.InvalidArgument("AIDs must contain five through sixteen bytes.")
+                );
+            }
+
+            if (!privilegeBytes.IsDefaultOrEmpty && privilegeBytes.Length is not (1 or 3))
+            {
+                return Result.Failure<InstallForManagementCommand, SmartCardError>(
+                    SmartCardError.InvalidArgument(
+                        "Privileges must be empty or contain one or three bytes."
+                    )
+                );
+            }
+
+            // GP Card Specification v2.3.1, Table 11-46.
+            var data = BuildLvData(
+                securityDomain,
+                ImmutableArray<byte>.Empty,
+                application,
+                privilegeBytes,
+                ToImmutableByteArray(parameters),
+                ToImmutableByteArray(token)
+            );
+
+            return Result.Success<InstallForManagementCommand, SmartCardError>(
+                new InstallForManagementCommand(
+                    InstallType.ForRegistryUpdate,
+                    application,
+                    data,
+                    moreCommands
+                )
+            );
+        }
+
+        /// <summary>
+        /// Creates INSTALL [for personalization].
+        /// </summary>
+        public static Result<InstallForManagementCommand, SmartCardError> CreateForPersonalization(
+            byte[] applicationAid,
+            bool moreCommands = false
+        )
+        {
+            var aidResult = ValidateRequiredAid(applicationAid, "Application AID");
+            if (aidResult.IsFailure)
+            {
+                return Result.Failure<InstallForManagementCommand, SmartCardError>(aidResult.Error);
+            }
+
+            // GP Card Specification v2.3.1, Table 11-47.
+            var data = BuildLvData(
+                ImmutableArray<byte>.Empty,
+                ImmutableArray<byte>.Empty,
+                aidResult.Value,
+                ImmutableArray<byte>.Empty,
+                ImmutableArray<byte>.Empty,
+                ImmutableArray<byte>.Empty
+            );
+
+            return Result.Success<InstallForManagementCommand, SmartCardError>(
+                new InstallForManagementCommand(
+                    InstallType.ForPersonalization,
+                    aidResult.Value,
+                    data,
+                    moreCommands
+                )
+            );
+        }
+
+        /// <inheritdoc/>
+        public override Result<CommandAPDU, SmartCardError> ToCommandApdu()
+        {
+            return Result.Success<CommandAPDU, SmartCardError>(
+                new CommandAPDU(COMMAND_CLA, COMMAND_INS, P1, P2, (uint)Data.Length, Data)
+            );
+        }
+
+        /// <inheritdoc/>
+        public override string ToString() => $"INSTALL [{Type}]";
+
+        private static ImmutableArray<byte> BuildLvData(params ImmutableArray<byte>[] fields)
+        {
+            var bytes = ImmutableArray.CreateBuilder<byte>();
+            foreach (var field in fields)
+            {
+                bytes.Add((byte)field.Length);
+                bytes.AddRange(field);
+            }
+
+            return bytes.ToImmutable();
+        }
+
+        private static Result<ImmutableArray<byte>, SmartCardError> ValidateRequiredAid(
+            byte[] aid,
+            string name
+        )
+        {
+            if (aid is null || aid.Length is < 5 or > 16)
+            {
+                return Result.Failure<ImmutableArray<byte>, SmartCardError>(
+                    SmartCardError.InvalidArgument(
+                        $"{name} must contain five through sixteen bytes."
+                    )
+                );
+            }
+
+            return Result.Success<ImmutableArray<byte>, SmartCardError>([.. aid]);
+        }
+
+        private static bool IsOptionalAidValid(ImmutableArray<byte> aid) =>
+            aid.IsDefaultOrEmpty || aid.Length is >= 5 and <= 16;
     }
 }
 
@@ -616,6 +966,41 @@ public enum InstallType : byte
     /// INSTALL [for install and make selectable] - combines install and make selectable.
     /// </summary>
     ForInstallAndMakeSelectable = 0x0C,
+
+    /// <summary>
+    /// INSTALL [for load, install and make selectable].
+    /// </summary>
+    ForLoadInstallAndMakeSelectable = 0x0E,
+
+    /// <summary>
+    /// INSTALL [for extradition].
+    /// </summary>
+    ForExtradition = 0x10,
+
+    /// <summary>
+    /// INSTALL [for personalization].
+    /// </summary>
+    ForPersonalization = 0x20,
+
+    /// <summary>
+    /// INSTALL [for registry update].
+    /// </summary>
+    ForRegistryUpdate = 0x40,
+}
+
+/// <summary>
+/// INSTALL P2 values for combined operations.
+/// </summary>
+public enum InstallSequence : byte
+{
+    /// <summary>No combined-operation information.</summary>
+    NoInformation = 0x00,
+
+    /// <summary>Beginning of a combined operation.</summary>
+    BeginCombinedOperation = 0x01,
+
+    /// <summary>End of a combined operation.</summary>
+    EndCombinedOperation = 0x03,
 }
 
 /// <summary>
@@ -630,20 +1015,20 @@ public static class InstallCommandBuilder
     /// <param name="packageAid">The package AID.</param>
     /// <param name="securityDomainAid">Optional security domain AID.</param>
     /// <param name="hash">Optional hash of the load file.</param>
-    /// <param name="maxDataBlockSize">Optional maximum data block size.</param>
+    /// <param name="loadParameters">Optional Load Parameters TLVs.</param>
     /// <param name="installToken">Optional install token.</param>
     /// <returns>A Result containing the command or an error.</returns>
     public static Result<InstallCommand.InstallForLoadCommand, SmartCardError> CreateForLoad(
         byte[] packageAid,
         Maybe<byte[]> securityDomainAid = default,
         Maybe<byte[]> hash = default,
-        Maybe<ushort> maxDataBlockSize = default,
+        Maybe<byte[]> loadParameters = default,
         Maybe<byte[]> installToken = default
     )
     {
         return InstallCommand.InstallForLoadCommand.Create(
             packageAid,
-            maxDataBlockSize,
+            loadParameters,
             securityDomainAid,
             hash,
             installToken
@@ -744,10 +1129,7 @@ public record InstallCommandResponse(ImmutableArray<byte> Data, StatusWord Statu
     /// <summary>
     /// Creates a failed response.
     /// </summary>
-    public static InstallCommandResponse Failure(
-        ushort statusWord,
-        Maybe<byte[]> data = default
-    ) =>
+    public static InstallCommandResponse Failure(ushort statusWord, Maybe<byte[]> data = default) =>
         new(
             data.Match(bytes => bytes.ToImmutableArray(), () => ImmutableArray<byte>.Empty),
             statusWord

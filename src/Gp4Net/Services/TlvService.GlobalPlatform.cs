@@ -363,85 +363,8 @@ public static partial class TlvService
         /// </summary>
         private static ImmutableList<Privilege> ParsePrivileges(byte[] privilegeBytes)
         {
-            if (privilegeBytes is null || privilegeBytes.Length == 0)
-            {
-                return ImmutableList<Privilege>.Empty;
-            }
-
-            // Use LINQ to generate all privileges based on bit flags
-            var allPrivileges = new[]
-            {
-                // First byte (byte 0 = bits 7-0)
-                (
-                    privilegeBytes.Length >= 1 && (privilegeBytes[0] & 0x80) != 0,
-                    Privilege.SecurityDomain
-                ),
-                (
-                    privilegeBytes.Length >= 1 && (privilegeBytes[0] & 0x40) != 0,
-                    Privilege.DapVerification
-                ),
-                (
-                    privilegeBytes.Length >= 1 && (privilegeBytes[0] & 0x20) != 0,
-                    Privilege.DelegatedManagement
-                ),
-                (privilegeBytes.Length >= 1 && (privilegeBytes[0] & 0x10) != 0, Privilege.CardLock),
-                (
-                    privilegeBytes.Length >= 1 && (privilegeBytes[0] & 0x08) != 0,
-                    Privilege.CardTerminate
-                ),
-                (
-                    privilegeBytes.Length >= 1 && (privilegeBytes[0] & 0x04) != 0,
-                    Privilege.CardReset
-                ),
-                (
-                    privilegeBytes.Length >= 1 && (privilegeBytes[0] & 0x02) != 0,
-                    Privilege.CvmManagement
-                ),
-                (
-                    privilegeBytes.Length >= 1 && (privilegeBytes[0] & 0x01) != 0,
-                    Privilege.TrustedPath
-                ),
-                // Second byte (byte 1 = bits 15-8)
-                (
-                    privilegeBytes.Length >= 2 && (privilegeBytes[1] & 0x80) != 0,
-                    Privilege.AuthorizedManagement
-                ),
-                (
-                    privilegeBytes.Length >= 2 && (privilegeBytes[1] & 0x40) != 0,
-                    Privilege.TokenVerification
-                ),
-                (
-                    privilegeBytes.Length >= 2 && (privilegeBytes[1] & 0x20) != 0,
-                    Privilege.GlobalDelete
-                ),
-                (
-                    privilegeBytes.Length >= 2 && (privilegeBytes[1] & 0x10) != 0,
-                    Privilege.GlobalLock
-                ),
-                (
-                    privilegeBytes.Length >= 2 && (privilegeBytes[1] & 0x08) != 0,
-                    Privilege.GlobalRegistry
-                ),
-                (
-                    privilegeBytes.Length >= 2 && (privilegeBytes[1] & 0x04) != 0,
-                    Privilege.FinalApplication
-                ),
-                (
-                    privilegeBytes.Length >= 2 && (privilegeBytes[1] & 0x02) != 0,
-                    Privilege.GlobalService
-                ),
-                (
-                    privilegeBytes.Length >= 2 && (privilegeBytes[1] & 0x01) != 0,
-                    Privilege.ReceiptGeneration
-                ),
-                // Third byte (byte 2 = bits 23-16)
-                (
-                    privilegeBytes.Length >= 3 && (privilegeBytes[2] & 0x01) != 0,
-                    Privilege.MandatedDapVerification
-                ),
-            };
-
-            return allPrivileges.Where(p => p.Item1).Select(p => p.Item2).ToImmutableList();
+            // GP Card Spec 2.3.1, Tables 11-7 through 11-9.
+            return Helpers.PrivilegeHelpers.ToList(privilegeBytes);
         }
 
         /// <summary>
@@ -663,7 +586,7 @@ public static partial class TlvService
             }
 
             byte lifecycleState = lifecycleTlv.TlvData.Bytes[0];
-            if (!IsValidApplicationLifecycleState(lifecycleState))
+            if (!GlobalPlatformLifecycle.IsRegistryState(lifecycleState))
             {
                 return SmartCardError.InvalidResponse(
                     $"Invalid lifecycle state: 0x{lifecycleState:X2}"
@@ -685,23 +608,6 @@ public static partial class TlvService
                 privileges,
                 executableLoadFile
             );
-        }
-
-        /// <summary>
-        /// Validates if the provided lifecycle state value is valid for ApplicationStatusEntry.
-        /// </summary>
-        private static bool IsValidApplicationLifecycleState(byte state)
-        {
-            return state switch
-            {
-                0x01 => true, // Loaded
-                0x03 => true, // Installed
-                0x07 => true, // Selectable
-                0x0F => true, // Personalized
-                0x83 => true, // Blocked
-                0x87 => true, // Locked
-                _ => false,
-            };
         }
     }
 }

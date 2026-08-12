@@ -26,6 +26,7 @@ public class InstallCommandTests
         "2020202020202020202020202020202020202020"
     );
     private readonly byte[] _validInstallToken = Convert.FromHexString("20EEDD243F094FAD");
+    private readonly byte[] _validLoadParameters = Convert.FromHexString("C6020800");
     private readonly byte[] _validInstallParameters = Convert.FromHexString("C9020800");
 
     [Test]
@@ -50,7 +51,7 @@ public class InstallCommandTests
         Result<InstallCommand.InstallForLoadCommand, SmartCardError> result =
             InstallCommand.InstallForLoadCommand.Create(
                 _validPackageAid,
-                maxDataBlockSize: Maybe<ushort>.From((ushort)2048),
+                loadParameters: Maybe<byte[]>.From(_validLoadParameters),
                 securityDomainAid: Maybe<byte[]>.From(_validSecurityDomainAid),
                 hash: Maybe<byte[]>.From(_validHash),
                 installToken: Maybe<byte[]>.From(_validInstallToken)
@@ -64,24 +65,22 @@ public class InstallCommandTests
         _ = command.Hash.Should().BeEquivalentTo(_validHash);
         _ = command.InstallToken.Should().BeEquivalentTo(_validInstallToken);
 
-        // Verify max data block size is encoded correctly in load parameters
-        byte[] expectedLoadParams = [0xC9, 0x02, 0x08, 0x00]; // 2048 = 0x0800
-        _ = command.LoadParameters.Should().BeEquivalentTo(expectedLoadParams);
+        _ = command.LoadParameters.Should().BeEquivalentTo(_validLoadParameters);
     }
 
     [Test]
-    public void InstallForLoadCommand_Create_WithMaxDataBlockSize_EncodesCorrectly()
+    public void InstallForLoadCommand_Create_WithLoadParameters_PreservesTlvs()
     {
         Result<InstallCommand.InstallForLoadCommand, SmartCardError> result =
             InstallCommand.InstallForLoadCommand.Create(
                 _validPackageAid,
-                maxDataBlockSize: Maybe<ushort>.From((ushort)1024)
+                loadParameters: Maybe<byte[]>.From(_validLoadParameters)
             );
 
         _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
-        byte[] expectedLoadParams = [0xC9, 0x02, 0x04, 0x00]; // 1024 = 0x0400
-        _ = command.LoadParameters.Should().BeEquivalentTo(expectedLoadParams);
+        // GP Card Specification v2.3.1, Table 11-48: C6 is a Load Parameters tag.
+        _ = command.LoadParameters.Should().BeEquivalentTo(_validLoadParameters);
     }
 
     [Test]
@@ -133,7 +132,7 @@ public class InstallCommandTests
         var command = InstallCommand
             .InstallForLoadCommand.Create(
                 _validPackageAid,
-                maxDataBlockSize: Maybe<ushort>.From((ushort)2048),
+                loadParameters: Maybe<byte[]>.From(_validLoadParameters),
                 securityDomainAid: Maybe<byte[]>.From(_validSecurityDomainAid),
                 hash: Maybe<byte[]>.From(_validHash),
                 installToken: Maybe<byte[]>.From(_validInstallToken)
@@ -168,12 +167,14 @@ public class InstallCommandTests
         _ = data.Skip(offset).Take(_validHash.Length).Should().BeEquivalentTo(_validHash);
         offset += _validHash.Length;
 
-        // Load Parameters (encoded max data block size)
-        _ = data[offset].Should().Be(0x04); // Length of C9 02 08 00
+        // GP Card Specification v2.3.1, Tables 11-42 and 11-48.
+        _ = data[offset].Should().Be((byte)_validLoadParameters.Length);
         offset++;
-        byte[] expectedLoadParams = [0xC9, 0x02, 0x08, 0x00];
-        _ = data.Skip(offset).Take(4).Should().BeEquivalentTo(expectedLoadParams);
-        offset += 4;
+        _ = data.Skip(offset)
+            .Take(_validLoadParameters.Length)
+            .Should()
+            .BeEquivalentTo(_validLoadParameters);
+        offset += _validLoadParameters.Length;
 
         // Install Token
         _ = data[offset].Should().Be((byte)_validInstallToken.Length);
@@ -241,7 +242,8 @@ public class InstallCommandTests
         _ = command.ModuleAid.Should().BeEquivalentTo(_validModuleAid);
         _ = command.AppletAid.Should().BeEquivalentTo(_validAppletAid);
         _ = command.Privileges.Should().BeEquivalentTo(_validPrivileges);
-        _ = command.InstallParameters.IsDefaultOrEmpty.Should().BeTrue();
+        // GP Card Specification v2.3.1, Tables 11-43 and 11-49.
+        _ = command.InstallParameters.Should().Equal(0xC9, 0x00);
         _ = command.InstallToken.IsDefaultOrEmpty.Should().BeTrue();
     }
 
@@ -439,9 +441,10 @@ public class InstallCommandTests
             .BeEquivalentTo(_validPrivileges);
         offset += _validPrivileges.Length;
 
-        // Install Parameters (empty)
-        _ = data[offset].Should().Be(0x00);
-        offset++;
+        // GP Card Specification v2.3.1, Tables 11-43 and 11-49.
+        _ = data[offset].Should().Be(0x02);
+        _ = data.Skip(offset + 1).Take(2).Should().Equal(0xC9, 0x00);
+        offset += 3;
 
         // Install Token (empty)
         _ = data[offset].Should().Be(0x00);
@@ -565,7 +568,7 @@ public class InstallCommandTests
                 _validPackageAid,
                 securityDomainAid: Maybe<byte[]>.From(_validSecurityDomainAid),
                 hash: Maybe<byte[]>.From(_validHash),
-                maxDataBlockSize: Maybe<ushort>.From((ushort)2048),
+                loadParameters: Maybe<byte[]>.From(_validLoadParameters),
                 installToken: Maybe<byte[]>.From(_validInstallToken)
             );
 
@@ -705,33 +708,37 @@ public class InstallCommandTests
     }
 
     [Test]
-    public void InstallForLoadCommand_WithLargeMaxDataBlockSize_EncodesCorrectly()
+    public void InstallForLoadCommand_Data_UsesLoadParameterTag()
     {
         Result<InstallCommand.InstallForLoadCommand, SmartCardError> result =
             InstallCommand.InstallForLoadCommand.Create(
                 _validPackageAid,
-                maxDataBlockSize: Maybe<ushort>.From((ushort)65535)
+                loadParameters: Maybe<byte[]>.From(_validLoadParameters)
             );
 
         _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
-        byte[] expectedLoadParams = [0xC9, 0x02, 0xFF, 0xFF]; // 65535 = 0xFFFF
-        _ = command.LoadParameters.Should().BeEquivalentTo(expectedLoadParams);
+        // GP Card Specification v2.3.1, Tables 11-42 and 11-48.
+        _ = command
+            .Data.Should()
+            .Equal(Convert.FromHexString("08A000000003000000000004C602080000"));
     }
 
     [Test]
-    public void InstallForLoadCommand_WithMinimumMaxDataBlockSize_EncodesCorrectly()
+    public void InstallForInstallCommand_WithoutParameters_EmitsEmptyC9()
     {
-        Result<InstallCommand.InstallForLoadCommand, SmartCardError> result =
-            InstallCommand.InstallForLoadCommand.Create(
+        Result<InstallCommand.InstallForInstallCommand, SmartCardError> result =
+            InstallCommand.InstallForInstallCommand.Create(
                 _validPackageAid,
-                maxDataBlockSize: Maybe<ushort>.From((ushort)1)
+                _validModuleAid,
+                _validAppletAid,
+                _validPrivileges
             );
 
         _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
-        byte[] expectedLoadParams = [0xC9, 0x02, 0x00, 0x01]; // 1 = 0x0001
-        _ = command.LoadParameters.Should().BeEquivalentTo(expectedLoadParams);
+        // GP Card Specification v2.3.1, Table 11-49: C9 is mandatory and may be empty.
+        _ = command.InstallParameters.Should().Equal(0xC9, 0x00);
     }
 
     [Test]

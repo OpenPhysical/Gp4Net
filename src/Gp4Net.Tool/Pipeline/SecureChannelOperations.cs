@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
@@ -164,13 +165,29 @@ public static class SecureChannelOperations
         byte keyVersion
     )
     {
-        return keysetName switch
+        if (keysetName.Contains(':'))
         {
-            "gp_test_keys" => GpTestKeys.CreateRawTestKeyset(keyVersion),
-            _
-                => Result.Failure<RawKeyset, SmartCardError>(
-                    SmartCardError.InvalidArgument($"Unknown keyset: {keysetName}")
-                ),
-        };
+            string[] keys = keysetName.Split(':');
+            if (keys.Length != 3)
+                return SmartCardError.InvalidArgument("Explicit keyset must contain ENC:MAC:DEK.");
+            return Result.Try(
+                () =>
+                    RawKeyset
+                        .Create(
+                            Convert.FromHexString(keys[0]),
+                            Convert.FromHexString(keys[1]),
+                            Convert.FromHexString(keys[2]),
+                            keyVersion
+                        )
+                        .Value,
+                _ => SmartCardError.InvalidArgument("Explicit keyset contains invalid hex keys.")
+            );
+        }
+
+        return keysetName is "gp_test_keys" or "gp_test"
+            ? GpTestKeys.CreateRawTestKeyset(keyVersion)
+            : Result.Failure<RawKeyset, SmartCardError>(
+                SmartCardError.InvalidArgument($"Unknown keyset: {keysetName}")
+            );
     }
 }

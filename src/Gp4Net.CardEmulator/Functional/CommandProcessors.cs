@@ -383,9 +383,8 @@ public static class CommandProcessors
 
         switch (state.ScpVersion)
         {
-            // Check if pseudo-random challenge generation is required (SCP03 i=70)
-            case 0x03 when state.ScpImplementation == ScpImplementation.Scp03I70:
-                // SCP03 i=70: Use pseudo-random challenge generation
+            // SCP03 Amendment D v1.2, Table 5-1: b5 selects pseudo-random challenge generation.
+            case 0x03 when state.ScpImplementation.UsesScp03PseudoRandomChallenge():
                 return GeneratePseudoRandomChallenge(request, state, config, rngContext);
             case 0x02:
             {

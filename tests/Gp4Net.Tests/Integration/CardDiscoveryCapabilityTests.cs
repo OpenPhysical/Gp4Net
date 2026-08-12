@@ -39,7 +39,7 @@ public class CardDiscoveryCapabilityTests
             "6728A00D800103810500102060708201078103E5BEC082031E030083010284010285017B86010C87017B"
         );
 
-        // GET DATA 0x00C1 (Security Domain Info) - Contains security domain information
+        // GP Card Specification v2.3.1, section 11.3.2.1: C1 is the default-KVN counter.
         public static readonly byte[] SecurityDomainInfo0X00C1P71Key01 = Convert.FromHexString(
             "C103000001"
         );
@@ -133,7 +133,7 @@ public class CardDiscoveryCapabilityTests
     [Test]
     public void SecurityDomainInfo_P71_ParsesWithCodec()
     {
-        // Test SecurityDomainInfoCodec against both P71 configurations
+        // GP Card Specification v2.3.1, section 11.3.2.1: C1 is the default-KVN counter.
         Result<SecurityDomainInfo, SmartCardError> sdInfo1 = SecurityDomainInfoCodec.Decode(
             P71CardResponses.SecurityDomainInfo0X00C1P71Key01
         );
@@ -141,13 +141,11 @@ public class CardDiscoveryCapabilityTests
             P71CardResponses.SecurityDomainInfo0X00C1P71Key19
         );
 
-        _ = sdInfo1.IsSuccess.Should().BeTrue("P71 Security Domain Info (key 01) should decode");
-        _ = sdInfo2.IsSuccess.Should().BeTrue("P71 Security Domain Info (key 19) should decode");
+        _ = sdInfo1.IsSuccess.Should().BeTrue("the two-byte or three-byte C1 value is valid");
+        _ = sdInfo2.IsSuccess.Should().BeTrue("the two-byte or three-byte C1 value is valid");
 
-        // C103000001 = Security Domain with key version 01
-        // C103000019 = Security Domain with key version 19 (0x13 in hex)
-        _ = sdInfo1.Value.Should().NotBeNull();
-        _ = sdInfo2.Value.Should().NotBeNull();
+        _ = sdInfo1.Value.Value.Should().Be(0x01);
+        _ = sdInfo2.Value.Value.Should().Be(0x19);
     }
 
     [Test]
@@ -226,9 +224,7 @@ public class CardDiscoveryCapabilityTests
         _ = cardCapResult
             .IsFailure.Should()
             .BeTrue("Empty card capabilities data should fail to decode");
-        _ = sdInfoResult
-            .IsFailure.Should()
-            .BeTrue("Empty security domain info should fail to decode");
+        _ = sdInfoResult.IsFailure.Should().BeTrue("C1 requires a two-byte or three-byte counter");
         _ = keyInfoResult
             .IsFailure.Should()
             .BeTrue("Empty key info template should fail to decode");
@@ -247,7 +243,7 @@ public class CardDiscoveryCapabilityTests
         );
         _ = capabilitiesResult.IsSuccess.Should().BeTrue("Card capabilities should be parseable");
 
-        // Step 2: Parse security domain info to get key version information
+        // GP Card Specification v2.3.1, section 11.3.2.1.
         Result<SecurityDomainInfo, SmartCardError> sdInfoResult = SecurityDomainInfoCodec.Decode(
             P71CardResponses.SecurityDomainInfo0X00C1P71Key19
         );

@@ -638,23 +638,11 @@ public static class CardInfoTableBuilder
         ScpImplementation implementation
     )
     {
-        // For SCP02, use the bitmap-based description system from extension methods
         if (scpVersion == 0x02)
-        {
             return implementation.GetDescription();
-        }
-
-        // For SCP03 and other protocols, use explicit descriptions
-        return implementation switch
-        {
-            ScpImplementation.Scp03I10 => "AES-128",
-            ScpImplementation.Scp03I20 => "AES-192",
-            ScpImplementation.Scp03I30 => "AES-256",
-            ScpImplementation.Scp03I11 => "AES-128 (no R-MAC)",
-            ScpImplementation.Scp03I60 => "Random card challenge",
-            ScpImplementation.Scp03I70 => "Pseudo-random card challenge",
-            _ => $"Implementation 0x{(byte)implementation:X2}",
-        };
+        return scpVersion == 0x03
+            ? implementation.GetScp03Description()
+            : $"Implementation 0x{(byte)implementation:X2}";
     }
 
     /// <summary>
@@ -731,39 +719,21 @@ public static class CardInfoTableBuilder
         if (parts.Length >= 6)
         {
             var scp = parts[5];
-            var impl = parts.Length > 6 ? parts[6] : "0";
+            byte implementation = 0;
+            bool hasImplementation =
+                parts.Length > 6 && byte.TryParse(parts[6], out implementation);
+            string impl = hasImplementation ? $"{implementation:X2}" : "00";
             return scp switch
             {
-                "2" => $"SCP02 with i={impl} (3DES, {GetScp02ImplDescription(impl)})",
-                "3" => $"SCP03 with i={impl} (AES, {GetScp03ImplDescription(impl)})",
+                "2" when hasImplementation
+                    => $"SCP02 with i={impl} (3DES, {((ScpImplementation)implementation).GetDescription()})",
+                "3" when hasImplementation
+                    => $"SCP03 with i={impl} (AES, {((ScpImplementation)implementation).GetScp03Description()})",
                 _ => $"SCP{scp} with i={impl}",
             };
         }
         return "Unknown SCP";
     }
-
-    private static string GetScp02ImplDescription(string impl) =>
-        impl switch
-        {
-            "21" => "3 Secure Channel Keys, C-MAC, no ICV",
-            "25" => "3 Secure Channel Keys, C-MAC and C-DECRYPTION, no ICV",
-            "45" => "3 Secure Channel Keys, C-MAC and C-DECRYPTION, ICV",
-            "55" => "3 Secure Channel Keys, C-MAC and C-DECRYPTION, ICV, explicit initiation",
-            "15" => "3 Secure Channel Keys, C-MAC, ICV, explicit initiation",
-            _ => "Implementation " + impl,
-        };
-
-    private static string GetScp03ImplDescription(string impl) =>
-        impl switch
-        {
-            "10" => "Authentication and C-DECRYPTION using AES",
-            "11" => "Authentication, C-MAC and C-DECRYPTION using AES",
-            "30" => "Authentication using AES-GCM",
-            "31" => "Authentication and C-MAC using AES-GCM",
-            "70" => "Authentication and C-DECRYPTION using AES-CBC",
-            "71" => "Authentication, C-MAC and C-DECRYPTION using AES-CBC",
-            _ => "Implementation " + impl,
-        };
 
     /// <summary>
     /// Extracts the OID section from CardDataInfo.ToString() output.

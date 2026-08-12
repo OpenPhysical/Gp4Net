@@ -24,6 +24,14 @@ public record SecureChannelState(
     ImmutableArray<byte> LastStrippedCommand
 )
 {
+    /// <summary>Key version selected by INITIALIZE UPDATE for this session.</summary>
+    public byte KeyVersion { get; init; }
+
+    /// <summary>
+    /// SCP02 R-MAC ICV. GP Card Specification v2.3.1, Appendix E.3.2 and E.4.5.
+    /// </summary>
+    public MacChainingState ResponseMacChaining { get; init; } = MacChaining;
+
     /// <summary>
     /// Creates a new secure channel state with the encryption counter incremented.
     /// Used for R-ENC operations where each encryption operation must use a unique counter.
@@ -135,6 +143,31 @@ public record SecureChannelState(
         get { return MacChaining.ToArray(); }
     }
 
+    /// <summary>SCP02 R-MAC ICV; GP Card Specification v2.3.1, Appendix E.4.5.</summary>
+    public byte[] ResponseMacChainingValue
+    {
+        get { return ResponseMacChaining.ToArray(); }
+    }
+
+    public Result<SecureChannelState, SmartCardError> UpdateResponseMacChaining(
+        MacChainingState newMacChaining
+    )
+    {
+        return Maybe<MacChainingState>
+            .From(newMacChaining)
+            .Match(
+                Some: macChaining =>
+                    Result.Success<SecureChannelState, SmartCardError>(
+                        this with
+                        {
+                            ResponseMacChaining = macChaining
+                        }
+                    ),
+                None: () =>
+                    SmartCardError.InvalidArgument("Response MAC chaining state cannot be null")
+            );
+    }
+
     /// <summary>
     /// Gets the SCP protocol version.
     /// Alias for ProtocolVersion for compatibility.
@@ -200,7 +233,6 @@ public record SecureChannelState(
             );
         }
 
-        // Create the MAC chaining state
         var macChainingResult = MacChainingState.Create(
             initialMacChainingValue,
             protocolVersion,
@@ -212,7 +244,6 @@ public record SecureChannelState(
             return macChainingResult.Error;
         }
 
-        // Generate cryptographically secure session ID
         byte[] sessionId = new byte[8];
         var secureRandom = new SecureRandom();
         secureRandom.NextBytes(sessionId);
@@ -223,7 +254,7 @@ public record SecureChannelState(
                 securityLevel,
                 protocolVersion,
                 macChainingResult.Value,
-                0, // Start with counter = 0 per GP specification
+                0,
                 [.. sessionId],
                 implementationParameter,
                 ImmutableArray<byte>.Empty
@@ -259,10 +290,6 @@ public record SecureChannelState(
             return SmartCardError.InvalidData($"Invalid protocol version: 0x{ProtocolVersion:X2}");
         }
 
-        // Encryption counter starts at 0 and increments with each encryption operation
-        // No validation needed for counter value
-
-        // Validate security level combinations
         if (HasResponseEncryption && !HasResponseMac)
         {
             return SmartCardError.InvalidData("R-ENC requires R-MAC to be enabled");

@@ -29,6 +29,8 @@ public class StoreDataCommandTests
     [Test]
     public void ToApdu_WithPlainData_ReturnsCorrectApdu()
     {
+        // GP Card Spec 2.3.1, Tables 11-88/89: a single case-3 block uses
+        // P1.b8=1, no structure flags, and block number P2=00.
         // Arrange
         byte[] data = [0x01, 0x02, 0x03];
 
@@ -43,7 +45,7 @@ public class StoreDataCommandTests
         {
             byte[] apdu = apduResult.Value;
             _ = apdu.Should()
-                .BeEquivalentTo(new byte[] { 0x80, 0xE2, 0x00, 0x00, 0x03, 0x01, 0x02, 0x03 });
+                .BeEquivalentTo(new byte[] { 0x80, 0xE2, 0x80, 0x00, 0x03, 0x01, 0x02, 0x03 });
         }
     }
 
@@ -71,7 +73,8 @@ public class StoreDataCommandTests
                 // Assert
                 _ = apdu[0].Should().Be(0x80); // CLA
                 _ = apdu[1].Should().Be(0xE2); // INS
-                _ = apdu[2].Should().Be(0x80); // P1 (DGI format)
+                // GP Card Spec 2.3.1, Table 11-89: last block 80 + DGI 08.
+                _ = apdu[2].Should().Be(0x88);
                 _ = apdu[3].Should().Be(0x00); // P2 (First or only block)
                 _ = apdu[4].Should().Be(0x04); // LC
                 _ = apdu[5..].Should().BeEquivalentTo(new byte[] { 0x7F, 0x0D, 0x01, 0x01 }); // Data
@@ -109,7 +112,8 @@ public class StoreDataCommandTests
         Result<StoreDataCommand, SmartCardError> result = StoreDataCommand.CreateWithFormat(
             StoreDataCommand.DataStructureFormat.BerTlv,
             StoreDataCommand.BlockFormat.MoreBlocks,
-            [0x01]
+            [0x01],
+            blockNumber: 0x01
         );
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
@@ -121,8 +125,10 @@ public class StoreDataCommandTests
             // Assert - Verify APDU byte structure
             _ = apduBytes[0].Should().Be(0x80); // CLA
             _ = apduBytes[1].Should().Be(0xE2); // INS
-            _ = apduBytes[2].Should().Be(0x60); // P1 (BER-TLV format)
-            _ = apduBytes[3].Should().Be(0x01); // P2 (More blocks)
+            // GP Card Spec 2.3.1, Table 11-89: BER-TLV is P1=10 and P2 is
+            // the sequential block number, independent of the last-block flag.
+            _ = apduBytes[2].Should().Be(0x10);
+            _ = apduBytes[3].Should().Be(0x01);
             _ = apduBytes[4].Should().Be(0x01); // LC (data length)
             _ = apduBytes[5].Should().Be(0x01); // Data
         }

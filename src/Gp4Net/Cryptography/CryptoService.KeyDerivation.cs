@@ -454,14 +454,24 @@ public static partial class CryptoService
                         Constants.Constants.Scp.Scp02.KeyDerivationConstants.SDek
                     );
 
+                    // GP Card Spec 2.3.1, E.4.1: S-RMAC uses derivation constant 01 02
+                    // and is distinct from S-MAC, whose derivation constant is 01 01.
+                    var sRmacResult = DeriveScp02SessionKey(
+                        keySet.MacKey,
+                        seqCounter,
+                        Constants.Constants.Scp.Scp02.KeyDerivationConstants.SrMac
+                    );
+
                     return sMacResult.Bind(sMac =>
                         sEncResult.Bind(sEnc =>
-                            sDekResult.Map(sDek => new SessionKeys(
-                                sEnc,
-                                sMac,
-                                sMac,
-                                Maybe<byte[]>.From(sDek)
-                            ))
+                            sRmacResult.Bind(sRmac =>
+                                sDekResult.Map(sDek => new SessionKeys(
+                                    sEnc,
+                                    sMac,
+                                    sRmac,
+                                    Maybe<byte[]>.From(sDek)
+                                ))
+                            )
                         )
                     );
                 });
@@ -499,19 +509,12 @@ public static partial class CryptoService
                 context.CardChallenge
             );
 
-            // Derive S-DEK key (GlobalPlatform SCP03: derivation constant 0x08)
-            var sDekResult = DeriveScp03SessionKey(
-                keySet.DekKey,
-                context.HostChallenge,
-                context.CardChallenge,
-                0x08 // S-DEK derivation constant per GP spec
-            );
-
             return sEncResult.Bind(sEnc =>
                 sMacResult.Bind(sMac =>
-                    sRmacResult.Bind(sRmac =>
-                        sDekResult.Map(sDek => new SessionKeys(sEnc, sMac, sRmac, sDek))
-                    )
+                    sRmacResult.Map(sRmac =>
+                    // SCP03 1.1.2, 6.1 and 6.2.8: SCP03 derives no session
+                    // key for sensitive-data encryption. PUT KEY uses static Key-DEK.
+                    new SessionKeys(sEnc, sMac, sRmac, keySet.DekKey))
                 )
             );
         }

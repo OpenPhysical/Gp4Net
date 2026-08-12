@@ -405,12 +405,27 @@ public class GetStatusCommandTests
     public void GetStatusResponse_Parse_WithInvalidLifecycleState_ReturnsFailure()
     {
         byte[] aid = Convert.FromHexString("A0000000031010");
-        byte[] e3 = BuildAppEntry(aid, 0xFF, [0x80, 0x00, 0x00]);
+        byte[] e3 = BuildAppEntry(aid, 0x02, [0x80, 0x00, 0x00]);
 
         Result<GetStatusResponse, SmartCardError> result = GetStatusResponse.Parse(e3);
 
         _ = result.IsFailure.Should().BeTrue();
-        _ = result.Error.Message.Should().Contain("Invalid lifecycle state: 0xFF");
+        _ = result.Error.Message.Should().Contain("Invalid lifecycle state: 0x02");
+    }
+
+    [TestCase(0x37)]
+    [TestCase(0xFF)]
+    public void GetStatusResponse_Parse_Should_Preserve_Legal_BitOriented_Lifecycle(byte state)
+    {
+        // GP Card Spec 2.3.1, Tables 11-4 and 11-6: applications may use
+        // b7-b4 with b3-b1=111, and FF is the card TERMINATED state.
+        byte[] aid = Convert.FromHexString("A000000003000000");
+        byte[] e3 = BuildAppEntry(aid, state, state == 0xFF ? [0x80] : [0x00]);
+
+        var result = GetStatusResponse.Parse(e3);
+
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Applications[0].RawLifecycleState.Should().Be(state);
     }
 
     [Test]

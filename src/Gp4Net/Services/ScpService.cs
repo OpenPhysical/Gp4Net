@@ -238,9 +238,12 @@ public static partial class ScpService
             // Query card capabilities first (optional, may fail)
             _ = await QueryCardCapabilities(cardService, cancellationToken);
 
-            // Generate host challenge (8 bytes for maximum compatibility)
-            byte[] hostChallenge = new byte[8];
-            Random.Shared.NextBytes(hostChallenge);
+            // GP Card Spec 2.3.1, B.4.3 and SCP03 1.1.2, 5.2 require a fresh
+            // unpredictable host challenge for each authentication attempt.
+            var challengeResult = CryptoService.Rng.GenerateHostChallenge();
+            if (challengeResult.IsFailure)
+                return challengeResult.Error;
+            byte[] hostChallenge = challengeResult.Value;
 
             IReadOnlyList<byte> candidateKeyVersions = await ResolveCandidateKeyVersions(
                 cardService,
@@ -492,9 +495,11 @@ public static partial class ScpService
             CancellationToken cancellationToken
         )
         {
-            // Generate host challenge
-            byte[] hostChallenge = new byte[Scp.Scp02.HOST_CHALLENGE_LENGTH];
-            Random.Shared.NextBytes(hostChallenge);
+            // GP Card Spec 2.3.1, B.4.3 requires a fresh random host challenge.
+            var challengeResult = CryptoService.Rng.GenerateHostChallenge();
+            if (challengeResult.IsFailure)
+                return challengeResult.Error;
+            byte[] hostChallenge = challengeResult.Value;
 
             // Send INITIALIZE UPDATE
             return await SendInitializeUpdate(
@@ -535,9 +540,11 @@ public static partial class ScpService
             CancellationToken cancellationToken
         )
         {
-            // Generate host challenge
-            byte[] hostChallenge = new byte[Scp.Scp03.HOST_CHALLENGE_LENGTH];
-            Random.Shared.NextBytes(hostChallenge);
+            // SCP03 1.1.2, 5.2 requires a fresh random host challenge.
+            var challengeResult = CryptoService.Rng.GenerateHostChallenge();
+            if (challengeResult.IsFailure)
+                return challengeResult.Error;
+            byte[] hostChallenge = challengeResult.Value;
 
             // Send INITIALIZE UPDATE
             return await SendInitializeUpdate(
@@ -932,13 +939,20 @@ public static partial class ScpService
         ) =>
             GetInitialMacChainingValue(context, externalAuthenticateMac)
                 .Bind(initialChaining =>
-                    SecureChannelState.Create(
-                        context.SessionKeys,
-                        securityLevel,
-                        context.Protocol,
-                        initialChaining,
-                        context.InitializeUpdateResponse.ImplementationParameter
-                    )
+                    SecureChannelState
+                        .Create(
+                            context.SessionKeys,
+                            securityLevel,
+                            context.Protocol,
+                            initialChaining,
+                            context.InitializeUpdateResponse.ImplementationParameter
+                        )
+                        .Map(state =>
+                            state with
+                            {
+                                KeyVersion = context.InitializeUpdateResponse.KeyVersion,
+                            }
+                        )
                 );
 
         private static Result<byte[], SmartCardError> GetInitialMacChainingValue(

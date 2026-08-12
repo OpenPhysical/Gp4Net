@@ -617,24 +617,24 @@ public static partial class Constants
 
             // Byte 3 privileges (MSB on wire, bits 23-16)
             /// <summary>
-            /// Receipt generation privilege (bit 0 of byte 3).
+            /// Receipt generation privilege (bit 7 of byte 3).
             /// </summary>
-            ReceiptGeneration = 0x00010000,
+            ReceiptGeneration = 0x00800000,
 
             /// <summary>
-            /// Ciphered Load File Data Block privilege (bit 1 of byte 3).
+            /// Ciphered Load File Data Block privilege (bit 6 of byte 3).
             /// </summary>
-            CipheredLoadFileDataBlock = 0x00020000,
+            CipheredLoadFileDataBlock = 0x00400000,
 
             /// <summary>
-            /// Contactless activation privilege (bit 2 of byte 3).
+            /// Contactless activation privilege (bit 5 of byte 3).
             /// </summary>
-            ContactlessActivation = 0x00040000,
+            ContactlessActivation = 0x00200000,
 
             /// <summary>
-            /// Contactless self-activation privilege (bit 3 of byte 3).
+            /// Contactless self-activation privilege (bit 4 of byte 3).
             /// </summary>
-            ContactlessSelfActivation = 0x00080000,
+            ContactlessSelfActivation = 0x00100000,
         }
     }
 }

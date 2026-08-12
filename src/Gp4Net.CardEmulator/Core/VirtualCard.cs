@@ -855,7 +855,10 @@ public partial class VirtualCard : IVirtualCard
     {
         const ushort loadContextTag = 0xFFFF; // Internal tag for load context storage
 
-        if (state.DataObjects.TryGetValue(loadContextTag, out byte[]? contextData) && contextData is not null)
+        if (
+            state.DataObjects.TryGetValue(loadContextTag, out byte[]? contextData)
+            && contextData is not null
+        )
         {
             // Deserialize existing context
             return DeserializeLoadContext(contextData);
@@ -1400,6 +1403,16 @@ public partial class VirtualCard : IVirtualCard
                 SmartCardError.WrongLength()
             );
 
+        byte replacedKeyVersion = command[2];
+        if (
+            replacedKeyVersion != 0x00
+            && !state.InstalledKeys.ContainsKey(replacedKeyVersion)
+            && !config.StaticKeys.ContainsKey(replacedKeyVersion)
+        )
+            return Result.Failure<(ApduResponse, CardState), SmartCardError>(
+                SmartCardError.ReferencedDataNotFound()
+            );
+
         // Parse PUT KEY command data
         int dataOffset = 5;
         byte keyVersion = command[dataOffset]; // First byte is new key version
@@ -1407,7 +1420,7 @@ public partial class VirtualCard : IVirtualCard
 
         // Parse key data according to GlobalPlatform Card Specification v2.3.1 Section 11.5.5
         // Expected format: KVN + (key_type + key_length + key_data + KCV_length + KCV) repeated
-        return ParsePutKeyDataWithKcv(command, dataOffset, lc - 1)
+        return ParsePutKeyDataWithKcv(command, dataOffset, lc - 1, state)
             .Bind(parsedData => ValidateProvidedKcvs(parsedData))
             .Bind(validatedData => CreateAndInstallNewKeyset(validatedData, keyVersion, state));
     }
@@ -1418,24 +1431,78 @@ public partial class VirtualCard : IVirtualCard
     private static Result<PutKeyData, SmartCardError> ParsePutKeyDataWithKcv(
         byte[] command,
         int dataOffset,
-        int remainingLength
+        int remainingLength,
+        CardState state
     )
     {
-        // Expected format per GP specification: keys followed by KCVs
-        // Simplified: 3 x 16-byte keys + 3 x 3-byte KCVs = 57 bytes total
-        return remainingLength >= 57
-            ? Result.Success<PutKeyData, SmartCardError>(
-                new PutKeyData(
-                    EncKey: command.Skip(dataOffset).Take(16).ToArray(),
-                    MacKey: command.Skip(dataOffset + 16).Take(16).ToArray(),
-                    DekKey: command.Skip(dataOffset + 32).Take(16).ToArray(),
-                    EncKcv: command.Skip(dataOffset + 48).Take(3).ToArray(),
-                    MacKcv: command.Skip(dataOffset + 51).Take(3).ToArray(),
-                    DekKcv: command.Skip(dataOffset + 54).Take(3).ToArray()
+        return state
+            .SecureChannel.ToResult(SmartCardError.SecurityStatusNotSatisfied())
+            .Bind(channel =>
+                channel.SessionKeys.Dek.ToResult(
+                    SmartCardError.SecurityStatusNotSatisfied("Secure channel DEK is unavailable")
                 )
             )
-            : Result.Failure<PutKeyData, SmartCardError>(
-                SmartCardError.WrongLength("Insufficient data for keys and KCVs")
+            .Bind(dek =>
+                Result.Try(
+                    () =>
+                    {
+                        int end = dataOffset + remainingLength;
+                        var keys = new List<byte[]>();
+                        var kcvs = new List<byte[]>();
+                        bool? aes = null;
+                        while (dataOffset < end)
+                        {
+                            byte type = command[dataOffset++];
+                            bool blockIsAes = type == 0x88;
+                            aes ??= blockIsAes;
+                            if (aes.Value != blockIsAes)
+                                throw new InvalidOperationException(
+                                    "Mixed key algorithms are not supported"
+                                );
+                            int componentLength = command[dataOffset++];
+                            byte[] componentBlock = command
+                                .Skip(dataOffset)
+                                .Take(componentLength)
+                                .ToArray();
+                            dataOffset += componentLength;
+                            int blockSize = blockIsAes ? 16 : 8;
+                            int clearLength = componentLength;
+                            if (componentLength % blockSize != 0)
+                            {
+                                clearLength = componentBlock[0];
+                                componentBlock = componentBlock.Skip(1).ToArray();
+                            }
+                            var protocol = blockIsAes
+                                ? Cryptography.CryptoService.ScpVersion.Scp03
+                                : Cryptography.CryptoService.ScpVersion.Scp02;
+                            keys.Add(
+                                global::Gp4Net.Services.GlobalPlatform.KeyChange.Unwrap(
+                                    componentBlock,
+                                    clearLength,
+                                    protocol,
+                                    dek
+                                )
+                            );
+                            int kcvLength = command[dataOffset++];
+                            kcvs.Add(command.Skip(dataOffset).Take(kcvLength).ToArray());
+                            dataOffset += kcvLength;
+                        }
+                        if (keys.Count != 3 || kcvs.Any(kcv => kcv.Length != 3))
+                            throw new InvalidOperationException(
+                                "PUT KEY must contain ENC, MAC, and DEK with 3-byte KCVs"
+                            );
+                        return new PutKeyData(
+                            keys[0],
+                            keys[1],
+                            keys[2],
+                            kcvs[0],
+                            kcvs[1],
+                            kcvs[2],
+                            aes == true
+                        );
+                    },
+                    ex => SmartCardError.InvalidArgument(ex.Message)
+                )
             );
     }
 
@@ -1444,12 +1511,21 @@ public partial class VirtualCard : IVirtualCard
     /// </summary>
     private static Result<PutKeyData, SmartCardError> ValidateProvidedKcvs(PutKeyData keyData)
     {
-        return CalculateAesKcv(keyData.EncKey)
-            .Bind(computedEncKcv => ValidateSingleKcv(keyData.EncKcv, computedEncKcv, "ENC"))
-            .Bind(_ => CalculateAesKcv(keyData.MacKey))
-            .Bind(computedMacKcv => ValidateSingleKcv(keyData.MacKcv, computedMacKcv, "MAC"))
-            .Bind(_ => CalculateAesKcv(keyData.DekKey))
-            .Bind(computedDekKcv => ValidateSingleKcv(keyData.DekKcv, computedDekKcv, "DEK"))
+        byte[] encKcv = global::Gp4Net.Services.GlobalPlatform.KeyChange.CalculateKcv(
+            keyData.EncKey,
+            keyData.Aes
+        );
+        byte[] macKcv = global::Gp4Net.Services.GlobalPlatform.KeyChange.CalculateKcv(
+            keyData.MacKey,
+            keyData.Aes
+        );
+        byte[] dekKcv = global::Gp4Net.Services.GlobalPlatform.KeyChange.CalculateKcv(
+            keyData.DekKey,
+            keyData.Aes
+        );
+        return ValidateSingleKcv(keyData.EncKcv, encKcv, "ENC")
+            .Bind(_ => ValidateSingleKcv(keyData.MacKcv, macKcv, "MAC"))
+            .Bind(_ => ValidateSingleKcv(keyData.DekKcv, dekKcv, "DEK"))
             .Map(_ => keyData);
     }
 
@@ -1478,29 +1554,38 @@ public partial class VirtualCard : IVirtualCard
         CardState state
     )
     {
-        return Scp03KeySet
-            .Create(
-                encKey: keyData.EncKey,
-                macKey: keyData.MacKey,
-                dekKey: keyData.DekKey,
-                keyVersion: keyVersion
-            )
-            .Map(newKeySet =>
-            {
-                var newState = state.WithInstalledKey(keyVersion, newKeySet);
+        Result<IKeySet, SmartCardError> keySet = keyData.Aes
+            ? Scp03KeySet
+                .Create(
+                    encKey: keyData.EncKey,
+                    macKey: keyData.MacKey,
+                    dekKey: keyData.DekKey,
+                    keyVersion: keyVersion
+                )
+                .Bind(keys => Result.Success<IKeySet, SmartCardError>(keys))
+            : Scp02KeySet
+                .Create(
+                    encKey: keyData.EncKey,
+                    macKey: keyData.MacKey,
+                    dekKey: keyData.DekKey,
+                    keyVersion: keyVersion
+                )
+                .Bind(keys => Result.Success<IKeySet, SmartCardError>(keys));
+        return keySet.Map(newKeySet =>
+        {
+            var newState = state
+                .WithInstalledKey(keyVersion, newKeySet)
+                .WithDefaultKeyVersion(keyVersion);
 
-                // Create response with key version and computed KCVs
-                byte[] response = new byte[10];
-                response[0] = keyVersion;
-                Array.Copy(keyData.EncKcv, 0, response, 1, 3);
-                Array.Copy(keyData.MacKcv, 0, response, 4, 3);
-                Array.Copy(keyData.DekKcv, 0, response, 7, 3);
+            // Create response with key version and computed KCVs
+            byte[] response = new byte[10];
+            response[0] = keyVersion;
+            Array.Copy(keyData.EncKcv, 0, response, 1, 3);
+            Array.Copy(keyData.MacKcv, 0, response, 4, 3);
+            Array.Copy(keyData.DekKcv, 0, response, 7, 3);
 
-                return (
-                    new ApduResponse(response, Constants.Constants.StatusWords.Success),
-                    newState
-                );
-            });
+            return (new ApduResponse(response, Constants.Constants.StatusWords.Success), newState);
+        });
     }
 
     /// <summary>
@@ -1512,7 +1597,8 @@ public partial class VirtualCard : IVirtualCard
         byte[] DekKey,
         byte[] EncKcv,
         byte[] MacKcv,
-        byte[] DekKcv
+        byte[] DekKcv,
+        bool Aes
     );
 
     /// <summary>

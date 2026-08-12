@@ -88,31 +88,31 @@ public static partial class Constants
             [PublicAPI]
             public static class Implementations
             {
-                /// <summary>SCP02 i=00 - No R-MAC, no R-ENC.</summary>
+                /// <summary>SCP02 i=00; GP Card Specification v2.3.1, Table E-1.</summary>
                 public const byte I00 = 0x00;
 
-                /// <summary>SCP02 i=02 - R-MAC only.</summary>
+                /// <summary>SCP02 i=02; GP Card Specification v2.3.1, Table E-1.</summary>
                 public const byte I02 = 0x02;
 
-                /// <summary>SCP02 i=04 - R-ENC only.</summary>
+                /// <summary>SCP02 i=04; GP Card Specification v2.3.1, Table E-1.</summary>
                 public const byte I04 = 0x04;
 
-                /// <summary>SCP02 i=05 - R-MAC and R-ENC.</summary>
+                /// <summary>SCP02 i=05; GP Card Specification v2.3.1, Table E-1.</summary>
                 public const byte I05 = 0x05;
 
-                /// <summary>SCP02 i=0A - R-MAC only, challenge verification.</summary>
+                /// <summary>SCP02 i=0A; GP Card Specification v2.3.1, Table E-1.</summary>
                 public const byte I0_A = 0x0A;
 
-                /// <summary>SCP02 i=15 - R-MAC and R-ENC with different padding.</summary>
+                /// <summary>SCP02 i=15; GP Card Specification v2.3.1, Table E-1.</summary>
                 public const byte I15 = 0x15;
 
-                /// <summary>SCP02 i=35 - R-MAC and R-ENC with enhanced features.</summary>
+                /// <summary>SCP02 i=35; GP Card Specification v2.3.1, Table E-1.</summary>
                 public const byte I35 = 0x35;
 
-                /// <summary>SCP02 i=55 - Enhanced security with R-MAC and R-ENC.</summary>
+                /// <summary>SCP02 i=55; GP Card Specification v2.3.1, Table E-1.</summary>
                 public const byte I55 = 0x55;
 
-                /// <summary>SCP02 i=75 - Maximum security with all features.</summary>
+                /// <summary>SCP02 i=75; GP Card Specification v2.3.1, Table E-1.</summary>
                 public const byte I75 = 0x75;
 
                 /// <summary>All valid SCP02 implementation parameters.</summary>
@@ -243,26 +243,58 @@ public static partial class Constants
             [PublicAPI]
             public static class Implementations
             {
-                /// <summary>SCP03 i=00 - No R-MAC, no R-ENC.</summary>
+                /// <summary>SCP03 i=00: S8, random challenge, no response protection.</summary>
                 public const byte I00 = 0x00;
 
-                /// <summary>SCP03 i=10 - R-MAC only.</summary>
+                /// <summary>SCP03 i=01: S16, random challenge, no response protection.</summary>
+                public const byte I01 = 0x01;
+
+                /// <summary>SCP03 i=10: S8, pseudo-random challenge, no response protection.</summary>
                 public const byte I10 = 0x10;
 
-                /// <summary>SCP03 i=11 - R-MAC with enhanced features.</summary>
+                /// <summary>SCP03 i=11: S16, pseudo-random challenge, no response protection.</summary>
                 public const byte I11 = 0x11;
 
-                /// <summary>SCP03 i=20 - R-ENC only.</summary>
+                /// <summary>SCP03 i=20: S8, random challenge, R-MAC.</summary>
                 public const byte I20 = 0x20;
 
-                /// <summary>SCP03 i=60 - R-MAC and R-ENC with random card challenge.</summary>
+                /// <summary>SCP03 i=21: S16, random challenge, R-MAC.</summary>
+                public const byte I21 = 0x21;
+
+                /// <summary>SCP03 i=30: S8, pseudo-random challenge, R-MAC.</summary>
+                public const byte I30 = 0x30;
+
+                /// <summary>SCP03 i=31: S16, pseudo-random challenge, R-MAC.</summary>
+                public const byte I31 = 0x31;
+
+                /// <summary>SCP03 i=60: S8, random challenge, R-MAC and R-ENC.</summary>
                 public const byte I60 = 0x60;
 
-                /// <summary>SCP03 i=70 - R-MAC and R-ENC with pseudo-random card challenge.</summary>
+                /// <summary>SCP03 i=61: S16, random challenge, R-MAC and R-ENC.</summary>
+                public const byte I61 = 0x61;
+
+                /// <summary>SCP03 i=70: S8, pseudo-random challenge, R-MAC and R-ENC.</summary>
                 public const byte I70 = 0x70;
 
+                /// <summary>SCP03 i=71: S16, pseudo-random challenge, R-MAC and R-ENC.</summary>
+                public const byte I71 = 0x71;
+
                 /// <summary>All valid SCP03 implementation parameters.</summary>
-                public static readonly byte[] All = [I00, I10, I11, I20, I60, I70];
+                public static readonly byte[] All =
+                [
+                    I00,
+                    I01,
+                    I10,
+                    I11,
+                    I20,
+                    I21,
+                    I30,
+                    I31,
+                    I60,
+                    I61,
+                    I70,
+                    I71
+                ];
             }
         }
 

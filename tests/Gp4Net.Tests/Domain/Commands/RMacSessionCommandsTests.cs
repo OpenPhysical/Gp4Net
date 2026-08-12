@@ -4,6 +4,7 @@ using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using NUnit.Framework;
+using WSCT.ISO7816;
 
 namespace Gp4Net.Tests.Domain.Commands;
 
@@ -69,6 +70,30 @@ public class RMacSessionCommandsTests
     }
 
     [Test]
+    public void BeginRMacSessionCommand_Should_Encode_Lv_Data()
+    {
+        // GP Card Specification v2.3.1, Tables E-13 and E-16;
+        // SCP03 Amendment D v1.2, sections 7.1.3.2 and 7.1.3.5.
+        var command = BeginRMacSessionCommand.Create(SecurityLevel.RMac, data: new byte[] { 1, 2 });
+
+        CommandAPDU apdu = command.Value.ToCommandApdu().Value;
+
+        _ = apdu.BinaryCommand.Should().Equal(0x80, 0x7A, 0x10, 0x01, 0x03, 0x02, 0x01, 0x02);
+    }
+
+    [Test]
+    public void BeginRMacSessionCommand_Should_Encode_Empty_Lv_Data()
+    {
+        // GP Card Specification v2.3.1, Table E-16: the length byte is mandatory.
+        var command = BeginRMacSessionCommand.Create(SecurityLevel.RMac);
+
+        _ = command
+            .Value.ToCommandApdu()
+            .Value.BinaryCommand.Should()
+            .Equal(0x80, 0x7A, 0x10, 0x01, 0x01, 0x00);
+    }
+
+    [Test]
     public void EndRMacSessionCommand_Create_WithValidSecurityLevel_ReturnsSuccess()
     {
         Result<EndRMacSessionCommand, SmartCardError> result = EndRMacSessionCommand.Create(
@@ -98,6 +123,19 @@ public class RMacSessionCommandsTests
         );
 
         _ = result.Value.ToString().Should().Be("END R-MAC SESSION");
+    }
+
+    [Test]
+    public void EndRMacSessionCommand_Should_Include_Le()
+    {
+        // GP Card Specification v2.3.1, Table E-18;
+        // SCP03 Amendment D v1.2, Table 7-11.
+        var command = EndRMacSessionCommand.Create(SecurityLevel.RMac);
+
+        _ = command
+            .Value.ToCommandApdu()
+            .Value.BinaryCommand.Should()
+            .Equal(0x80, 0x78, 0x00, 0x03, 0x00, 0x00);
     }
 
     [Test]

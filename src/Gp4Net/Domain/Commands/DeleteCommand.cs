@@ -30,7 +30,7 @@ public class DeleteCommand : IApduCommand
         /// <summary>
         /// Delete object only.
         /// </summary>
-        DeleteObjectOnly = 0x80,
+        DeleteObjectOnly = 0x00,
     }
 
     /// <summary>
@@ -47,6 +47,9 @@ public class DeleteCommand : IApduCommand
         /// Delete with related objects.
         /// </summary>
         WithRelated = 0x80,
+
+        /// <summary>Key-reference data; P2 is 00 per GP 2.3.1 Table 11-22.</summary>
+        ByKey = 0x01,
     }
 
     /// <summary>
@@ -117,7 +120,7 @@ public class DeleteCommand : IApduCommand
     /// </summary>
     public byte P2
     {
-        get { return (byte)Target; }
+        get { return Target == DeleteTarget.WithRelated ? (byte)0x80 : (byte)0x00; }
     }
 
     /// <summary>
@@ -129,11 +132,12 @@ public class DeleteCommand : IApduCommand
     }
 
     /// <summary>
-    /// Gets the expected response length. DELETE commands do not use LE byte per GP traces.
+    /// Gets the expected response length.
     /// </summary>
     public Maybe<int> ExpectedResponseLength
     {
-        get { return Maybe<int>.None; }
+        // GP Card Spec 2.3.1, Table 11-20: Le=00 is mandatory.
+        get { return Maybe<int>.From(0); }
     }
 
     /// <summary>
@@ -225,8 +229,9 @@ public class DeleteCommand : IApduCommand
             // Add token if present
             if (tokenToUse.HasValue && tokenToUse.Value.Length > 0)
             {
-                // Based on trace analysis, deletion token is appended directly
-                // without TLV wrapping: just the raw token bytes
+                // GP Card Spec 2.3.1, Table 11-23: the Delete Token is data object 9E.
+                data.Add(0x9E);
+                data.Add((byte)tokenToUse.Value.Length);
                 data.AddRange(tokenToUse.Value);
             }
         }
@@ -550,7 +555,7 @@ public class DeleteCommand : IApduCommand
         byte[] keyReference = [keyIdentifier, keyVersion];
         return new DeleteCommand(
             DeleteType.DeleteObjectOnly,
-            DeleteTarget.ByAid,
+            DeleteTarget.ByKey,
             [keyReference],
             deletionToken
         );

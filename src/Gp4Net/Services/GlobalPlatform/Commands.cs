@@ -215,7 +215,7 @@ public static class Commands
                 => InstallCommand
                     .InstallForLoadCommand.Create(
                         packageAid,
-                        maxDataBlockSize: Maybe<ushort>.None,
+                        loadParameters: Maybe<byte[]>.None,
                         securityDomainAid: Maybe<byte[]>.None,
                         hash: Maybe<byte[]>.None,
                         installToken: Maybe<byte[]>.None

@@ -337,6 +337,22 @@ public class LoadCommandTests
     }
 
     [Test]
+    public void CreateFromCapFileExtended_Should_Not_Skip_Data_After_First_Block_Header()
+    {
+        // GP Card Spec 2.3.1, 11.6.2 and Table 11-58: C4 wraps the complete
+        // Load File Data Block stream.
+        byte[] cap = Enumerable.Range(0, 600).Select(i => (byte)i).ToArray();
+        var blocks = LoadCommand.CreateFromCapFileExtended(cap, 245, true).Value;
+
+        byte[] reconstructed = blocks
+            .SelectMany((block, index) => index == 0 ? block.Data[4..] : block.Data)
+            .ToArray();
+
+        _ = reconstructed.Should().Equal(cap);
+        _ = blocks.Select(block => block.BlockNumber).Should().Equal(0, 1, 2);
+    }
+
+    [Test]
     public void ToApdu_IncludesLeField()
     {
         byte[] data = TestData;

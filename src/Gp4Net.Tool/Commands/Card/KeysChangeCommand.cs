@@ -1,13 +1,18 @@
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
+using Gp4Net.Services.GlobalPlatform;
+using Gp4Net.Tool.Commands.Common;
+using Gp4Net.Tool.Extensions;
 using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
+using Spectre.Console;
 using Spectre.Console.Cli;
 
 namespace Gp4Net.Tool.Commands.Card;
@@ -32,26 +37,36 @@ public class KeysChangeCommand : IPipelineCommand<KeysChangeCommand.Settings>
     /// <returns>0 if successful, 1 if failed.</returns>
     public async Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
     {
-        return await context.ExecuteAsync(async ctx =>
+        var validation = ValidateSettings(settings);
+        if (validation.IsFailure)
         {
-            // Validate required parameters functionally
-            var result = await ValidateSettings(settings)
-                .Bind(_ =>
-                {
-                    ctx.Display.Info("Starting key change operation...");
-                    return Result.Success<bool, SmartCardError>(true);
-                })
-                .Bind(_ => PerformKeyChange(ctx, settings));
+            context.Display.Error(validation.Error.Message);
+            return 1;
+        }
 
-            return result.Match(
-                success => 0,
-                error =>
-                {
-                    ctx.Display.Error($"Key change failed: {error.Message}");
-                    return 1;
-                }
-            );
-        });
+        var connected = await context.RequireCardConnection(settings.GetReaderName());
+        if (connected.IsFailure)
+        {
+            context.Display.Error($"Card connection failed: {connected.Error.Message}");
+            return 1;
+        }
+
+        var secured = await connected.Value.RequireSecureChannel(settings.ToSecureChannelRequest());
+        if (secured.IsFailure)
+        {
+            context.Display.Error($"Secure channel establishment failed: {secured.Error.Message}");
+            return 1;
+        }
+
+        var result = await PerformKeyChange(secured.Value, settings);
+        return result.Match(
+            _ => 0,
+            error =>
+            {
+                context.Display.Error($"Key change failed: {error.Message}");
+                return 1;
+            }
+        );
     }
 
     /// <summary>
@@ -74,49 +89,91 @@ public class KeysChangeCommand : IPipelineCommand<KeysChangeCommand.Settings>
         Settings settings
     )
     {
-        return await ResolveNewKeyset(context, settings)
-            .Bind(async keyset => await ExecuteKeyChange(context, keyset));
+        var channel = context.CardService.Context.Get<Gp4Net.Domain.SecureChannelState>(
+            "SecureChannelSession"
+        );
+        if (channel.HasNoValue || channel.Value.KeyVersion == 0x00)
+            return SmartCardError.InvalidResponse(
+                "The active key version could not be autodetected from INITIALIZE UPDATE."
+            );
+
+        byte activeVersion = channel.Value.KeyVersion;
+        var defaultVersions = KeyChange.GetDefaultVersions(activeVersion);
+        if (defaultVersions.IsFailure)
+            return defaultVersions.Error;
+        byte defaultReplacedVersion = defaultVersions.Value.ReplacedVersion;
+        byte replacedVersion = ParseVersion(settings.ReplaceKeyVersion, defaultReplacedVersion);
+        byte nextVersion = defaultVersions.Value.NewVersion;
+        byte newVersion = ParseVersion(settings.NewKeyVersion, nextVersion);
+        var resolved = ResolveNewKeyset(settings, channel.Value.ProtocolVersion, newVersion);
+        if (resolved.IsFailure)
+            return resolved.Error;
+
+        using var keyset = resolved.Value;
+        context.Display.Info(
+            $"Replace key version {replacedVersion:X2} with {keyset.KeyVersion:X2} "
+                + $"({(keyset is Scp02KeySet ? "SCP02" : "SCP03")})"
+        );
+
+        if (settings.DryRun)
+        {
+            context.Display.Info("Dry run complete; no keys were changed.");
+            return true;
+        }
+        if (!settings.Force && !AnsiConsole.Confirm("Permanently replace the card keys?", false))
+            return SmartCardError.InvalidArgument("Key change cancelled.");
+
+        return await ExecuteKeyChange(context, keyset, replacedVersion);
     }
 
     private static Result<IKeySet, SmartCardError> ResolveNewKeyset(
-        ICliExecutionContext context,
-        Settings settings
+        Settings settings,
+        Gp4Net.Cryptography.CryptoService.ScpVersion protocol,
+        byte newVersion
     )
     {
-        return context.KeysetResolver.ResolveKeyset(
-            settings.NewKeyset,
-            new Dictionary<string, string>(), // Empty keyset params
-            Maybe<byte[]>.None, // No explicit enc key
-            Maybe<byte[]>.None, // No explicit mac key
-            Maybe<byte[]>.None, // No explicit dek key
-            0x01,
-            Maybe<InitializeUpdateResponse>.None // No card response
-        );
+        return KeysetParser.ParseKeysetSpecification(settings.NewKeyset, protocol, newVersion);
     }
 
-    private static Task<Result<bool, SmartCardError>> ExecuteKeyChange(
+    private static async Task<Result<bool, SmartCardError>> ExecuteKeyChange(
         ICliExecutionContext context,
-        IKeySet newKeyset
+        IKeySet newKeyset,
+        byte replacedVersion
     )
     {
         context.Display.Info("New keyset resolved from configuration");
         context.Display.Info($"New key version: {newKeyset.KeyVersion:X2}");
         context.Display.Info($"Protocol: {(newKeyset is Scp02KeySet ? "SCP02" : "SCP03")}");
 
-        context.Display.Error("Key change functionality not yet implemented with static services.");
-        return Task.FromResult(
-            Result.Failure<bool, SmartCardError>(
-                SmartCardError.Unsupported(
-                    "Key change functionality needs to be implemented using static GlobalPlatformService methods"
-                )
-            )
+        var response = await KeyChange.ExecuteAsync(
+            context.CardService,
+            newKeyset,
+            replacedVersion
         );
+        return response.Map(result =>
+        {
+            context.Display.Info(
+                $"Keys changed successfully; card confirmed key version {result.KeyVersion:X2}."
+            );
+            context.Display.Info(
+                "Reconnect with the new keys before issuing another secure command."
+            );
+            return true;
+        });
     }
+
+    private static byte ParseVersion(string value, byte defaultValue) =>
+        string.IsNullOrWhiteSpace(value)
+            ? defaultValue
+            : byte.Parse(
+                value.Replace("0x", "", System.StringComparison.OrdinalIgnoreCase),
+                NumberStyles.HexNumber
+            );
 
     /// <summary>
     /// Settings for the keys change command.
     /// </summary>
-    public class Settings : CommandSettings
+    public class Settings : SecureCommandSettings
     {
         /// <summary>
         /// Gets or sets the new keyset specification.
@@ -126,5 +183,21 @@ public class KeysChangeCommand : IPipelineCommand<KeysChangeCommand.Settings>
             "New keyset specification (e.g., 'visa2:00000000000000000000000000000000' or 'gp_test_keys')"
         )]
         public string NewKeyset { get; set; } = string.Empty;
+
+        [CommandOption("--new-key-version")]
+        [Description("New key version (hex; default is active + 1, with 7F/FF becoming 01)")]
+        public string NewKeyVersion { get; set; } = string.Empty;
+
+        [CommandOption("--replace-key-version")]
+        [Description("Existing key version (hex; default is autodetected by INITIALIZE UPDATE)")]
+        public string ReplaceKeyVersion { get; set; } = string.Empty;
+
+        [CommandOption("-f|--force")]
+        [Description("Skip the destructive-operation confirmation")]
+        public bool Force { get; set; }
+
+        [CommandOption("--dry-run")]
+        [Description("Resolve and display the change without sending PUT KEY")]
+        public bool DryRun { get; set; }
     }
 }

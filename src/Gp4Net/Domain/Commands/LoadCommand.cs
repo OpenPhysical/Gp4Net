@@ -439,39 +439,31 @@ public class LoadCommand : IApduCommand
     private static IList<LoadCommand> CreateLoadBlocksExtended(byte[] capFileData, int maxBlockSize)
     {
         uint totalSize = (uint)capFileData.Length;
-
-        // Use functional approach to generate blocks
-        return Enumerable
-            .Range(0, int.MaxValue)
-            .Select(blockIndex => new
-            {
-                BlockNumber = (byte)(blockIndex & 0xFF),
-                Offset = blockIndex * maxBlockSize
-            })
-            .TakeWhile(block => block.Offset < capFileData.Length)
-            .Select(block =>
-            {
-                int remainingBytes = capFileData.Length - block.Offset;
-                int effectiveBlockSize = maxBlockSize;
-
-                // For first block, account for TLV header overhead
-                if (block.BlockNumber == 0)
-                {
-                    int tlvHeaderSize = CalculateTlvHeaderSize(totalSize);
-                    effectiveBlockSize = Math.Max(1, maxBlockSize - tlvHeaderSize);
-                }
-
-                int blockSize = Math.Min(remainingBytes, effectiveBlockSize);
-                byte[] blockData = new byte[blockSize];
-                Array.Copy(capFileData, block.Offset, blockData, 0, blockSize);
-
-                bool isFinalBlock = block.Offset + blockSize >= capFileData.Length;
-                var totalCapSize =
-                    block.BlockNumber == 0 ? Maybe<uint>.From(totalSize) : Maybe<uint>.None;
-
-                return new LoadCommand(block.BlockNumber, blockData, isFinalBlock, totalCapSize);
-            })
-            .ToList();
+        var blocks = new List<LoadCommand>();
+        int offset = 0;
+        byte blockNumber = 0;
+        while (offset < capFileData.Length)
+        {
+            // GP Card Spec 2.3.1, 11.6.2 and Table 11-58: C4 and its BER
+            // length occur only in block zero.
+            int overhead = blockNumber == 0 ? CalculateTlvHeaderSize(totalSize) : 0;
+            int blockSize = Math.Min(
+                capFileData.Length - offset,
+                Math.Max(1, maxBlockSize - overhead)
+            );
+            byte[] blockData = capFileData[offset..(offset + blockSize)];
+            offset += blockSize;
+            blocks.Add(
+                new LoadCommand(
+                    blockNumber,
+                    blockData,
+                    offset == capFileData.Length,
+                    blockNumber == 0 ? Maybe<uint>.From(totalSize) : Maybe<uint>.None
+                )
+            );
+            blockNumber++;
+        }
+        return blocks;
     }
 }
 

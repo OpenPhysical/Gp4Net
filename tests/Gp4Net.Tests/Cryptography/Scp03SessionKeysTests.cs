@@ -173,7 +173,7 @@ public class Scp03SessionKeysTests
             keySet192,
             HostChallenge,
             CardChallenge,
-            Maybe<ScpImplementation>.From(ScpImplementation.Scp03I20) // Use i=20 for AES-192
+            Maybe<ScpImplementation>.From(ScpImplementation.Scp03I70)
         );
         Assert.That(context192Result.IsSuccess, Is.True, "Failed to create context for AES-192");
         var session192Result = CryptoService.KeyDerivation.DeriveSessionKeys(
@@ -190,7 +190,7 @@ public class Scp03SessionKeysTests
             keySet256,
             HostChallenge,
             CardChallenge,
-            Maybe<ScpImplementation>.From(ScpImplementation.Scp03I30) // Use i=30 for AES-256
+            Maybe<ScpImplementation>.From(ScpImplementation.Scp03I70)
         );
         Assert.That(context256Result.IsSuccess, Is.True, "Failed to create context for AES-256");
         var session256Result = CryptoService.KeyDerivation.DeriveSessionKeys(
@@ -240,6 +240,11 @@ public class Scp03SessionKeysTests
         Assert.That(result1.IsSuccess, Is.True, "First derivation should succeed");
         var keys1 = result1.Value;
 
+        // SCP03 1.1.2, 6.1 and 6.2.8: key-sensitive data uses static Key-DEK;
+        // SCP03 does not derive an S-DEK from the per-session challenges.
+        Assert.That(keys1.Dek.HasValue, Is.True);
+        Assert.That(keys1.Dek.Value, Is.EqualTo(keySet.DekKey));
+
         var result2 = CryptoService.KeyDerivation.DeriveSessionKeys(context);
         Assert.That(result2.IsSuccess, Is.True, "Second derivation should succeed");
         var keys2 = result2.Value;
@@ -259,15 +264,13 @@ public class Scp03SessionKeysTests
     }
 
     [Test]
-    public void Should_Handle_Pseudo_Random_Card_Challenge_With_I_60_And_70()
+    public void Should_Derive_The_Same_Keys_For_Random_And_Pseudo_Random_Modes()
     {
-        // Per GP Card Spec v2.3.1 Section E.5.1.3.2
-        // When i=60 or i=70, card challenge includes pseudo-random component
+        // SCP03 Amendment D v1.2, Table 5-1: i=60 is random and i=70 is pseudo-random.
         var keySetResult = Scp03KeySet.Create(MasterKey, MasterKey, MasterKey, 0x01);
         Assert.That(keySetResult.IsSuccess, Is.True);
         var keySet = keySetResult.Value;
 
-        // Test i=60 (random card challenge)
         var context60Result = KeyDerivationContext.CreateForScp03(
             keySet,
             HostChallenge,
@@ -281,7 +284,6 @@ public class Scp03SessionKeysTests
         Assert.That(sessionKeys60Result.IsSuccess, Is.True, "i=60 should be supported");
         var sessionKeys60 = sessionKeys60Result.Value;
 
-        // Test i=70 (pseudo-random card challenge)
         var context70Result = KeyDerivationContext.CreateForScp03(
             keySet,
             HostChallenge,
@@ -295,7 +297,6 @@ public class Scp03SessionKeysTests
         Assert.That(sessionKeys70Result.IsSuccess, Is.True, "i=70 should be supported");
         var sessionKeys70 = sessionKeys70Result.Value;
 
-        // Implementation parameter affects challenge generation but not derived keys
         Assert.That(sessionKeys60.SEnc, Is.EqualTo(sessionKeys70.SEnc));
         Assert.That(sessionKeys60.SMac, Is.EqualTo(sessionKeys70.SMac));
         Assert.That(sessionKeys60.SrMac, Is.EqualTo(sessionKeys70.SrMac));

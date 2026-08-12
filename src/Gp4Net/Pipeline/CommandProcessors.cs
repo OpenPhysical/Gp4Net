@@ -116,7 +116,7 @@ public static class CommandProcessors
         // Apply secure channel wrapping using ScpService with proper functional handling
         environment.Logger.LogDebug(
             "Applying command security using ScpService for protocol {Protocol:X2}",
-            secureChannelState.ProtocolVersion
+            (byte)secureChannelState.ProtocolVersion
         );
 
         return Task.FromResult(
@@ -138,7 +138,7 @@ public static class CommandProcessors
                             {
                                 environment.Logger.LogInformation(
                                     "[VERBOSE] Post-wrap APDU: Secured with SCP{Protocol:X2} -> {WrappedBytes}",
-                                    secureChannelState.ProtocolVersion,
+                                    (byte)secureChannelState.ProtocolVersion,
                                     Convert.ToHexString(wrappedBytes)
                                 );
                                 LogApduStructure(
@@ -331,7 +331,7 @@ public static class CommandProcessors
                         // Apply secure channel response unwrapping if needed
                         if (environment.SecureChannel.HasValue)
                         {
-                            var unwrapper = CreateSecureChannelResponseUnwrapper(environment);
+                            var unwrapper = CreateSecureChannelResponseUnwrapper();
                             return Task.FromResult(unwrapper(transportResult));
                         }
 
@@ -387,338 +387,37 @@ public static class CommandProcessors
     public static Func<
         CommandResult,
         Result<CommandResult, SmartCardError>
-    > CreateSecureChannelResponseUnwrapper(CommandEnvironment environment)
+    > CreateSecureChannelResponseUnwrapper()
     {
         return result =>
         {
-            // Check if secure channel unwrapping is needed
-            if (!environment.SecureChannel.HasValue)
-            {
+            if (!result.UpdatedEnvironment.SecureChannel.HasValue)
                 return Result.Success<CommandResult, SmartCardError>(result);
-            }
 
-            var channelState = environment.SecureChannel.Value;
-
-            // Combine response data and status word for unwrapping
             byte[] responseBytes = CombineResponseBytes(result.Data, result.StatusWord);
-
-            // Unwrap the complete response
-            var unwrapResult = UnwrapSecureChannelResponse(responseBytes, channelState);
-
-            return unwrapResult.Match(
-                unwrappedData =>
+            var securedResponse = new WSCT.ISO7816.ResponseAPDU(responseBytes);
+            return ScpService
+                .Security.RemoveResponseSecurity(
+                    securedResponse,
+                    result.UpdatedEnvironment.SecureChannel.Value
+                )
+                .Map(unwrapped =>
                 {
-                    // Extract unwrapped data and status word
-                    if (unwrappedData.Length < 2)
-                    {
-                        return Result.Failure<CommandResult, SmartCardError>(
-                            SmartCardError.CryptographicError("Unwrapped response too short")
-                        );
-                    }
-
-                    ushort unwrappedStatusWord = (ushort)(
-                        unwrappedData[^2] << 8 | unwrappedData[^1]
+                    byte[] plaintext = unwrapped.plaintextResponse.ToBytes();
+                    ushort statusWord = (ushort)(plaintext[^2] << 8 | plaintext[^1]);
+                    CommandEnvironment updatedEnvironment =
+                        result.UpdatedEnvironment.WithSecureChannel(unwrapped.newState);
+                    return CommandResult.Success(
+                        plaintext[..^2],
+                        statusWord,
+                        updatedEnvironment,
+                        result.Metadata with
+                        {
+                            SecureChannelUnwrapped = true
+                        }
                     );
-                    byte[] unwrappedResponseData = unwrappedData[..^2];
-
-                    var metadata = new CommandMetadata(SecureChannelUnwrapped: true);
-                    return Result.Success<CommandResult, SmartCardError>(
-                        CommandResult.Success(
-                            unwrappedResponseData,
-                            unwrappedStatusWord,
-                            result.UpdatedEnvironment,
-                            metadata
-                        )
-                    );
-                },
-                error => Result.Failure<CommandResult, SmartCardError>(error)
-            );
+                });
         };
-    }
-
-    /// <summary>
-    /// Functional secure channel response unwrapper.
-    /// </summary>
-    /// <param name="encryptedResponse">The encrypted response data.</param>
-    /// <param name="channelState">The secure channel state containing keys and counters.</param>
-    /// <returns>A result containing the decrypted response or an error.</returns>
-    private static Result<byte[], SmartCardError> UnwrapSecureChannelResponse(
-        byte[] encryptedResponse,
-        SecureChannelState channelState
-    )
-    {
-        if (encryptedResponse == null || encryptedResponse.Length == 0)
-        {
-            return Result.Success<byte[], SmartCardError>([]);
-        }
-
-        // Implement proper SCP02/SCP03 response unwrapping based on protocol version
-        if (channelState.ProtocolVersion == CryptoService.ScpVersion.Scp02)
-        {
-            return UnwrapScp02Response(encryptedResponse, channelState);
-        }
-
-        if (channelState.ProtocolVersion == CryptoService.ScpVersion.Scp03)
-        {
-            return UnwrapScp03Response(encryptedResponse, channelState);
-        }
-
-        return Result.Failure<byte[], SmartCardError>(
-            new UnsupportedProtocolError($"Unsupported SCP version: {channelState.ProtocolVersion}")
-        );
-    }
-
-    /// <summary>
-    /// Unwraps SCP02 encrypted response using functional cryptographic operations.
-    /// </summary>
-    private static Result<byte[], SmartCardError> UnwrapScp02Response(
-        byte[] encryptedResponse,
-        SecureChannelState channelState
-    )
-    {
-        if (encryptedResponse.Length < 2)
-        {
-            return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.InvalidArgument("Response too short for SCP02 unwrapping")
-            );
-        }
-
-        // Extract status word (last 2 bytes)
-        byte[] statusWord = encryptedResponse[^2..];
-        byte[] responseData = encryptedResponse[..^2];
-
-        // Check if response is encrypted (has MAC)
-        if ((channelState.SecurityLevel & SecurityLevel.RMac) == 0)
-        {
-            // No unwrapping needed - return data + status word
-            byte[] noUnwrapResult = new byte[responseData.Length + statusWord.Length];
-            Array.Copy(responseData, 0, noUnwrapResult, 0, responseData.Length);
-            Array.Copy(statusWord, 0, noUnwrapResult, responseData.Length, statusWord.Length);
-            return Result.Success<byte[], SmartCardError>(noUnwrapResult);
-        }
-
-        // Verify and strip MAC (last 8 bytes before status word)
-        if (responseData.Length < 8)
-        {
-            return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.CryptographicError("Response too short to contain MAC")
-            );
-        }
-
-        byte[] mac = responseData[^8..];
-        byte[] dataWithoutMac = responseData[..^8];
-
-        // Use SCP02 MAC verification with session keys from channelState
-        return VerifyScp02ResponseMac(dataWithoutMac, mac, statusWord, channelState)
-            .Bind(isValid =>
-            {
-                if (!isValid)
-                {
-                    return Result.Failure<byte[], SmartCardError>(
-                        SmartCardError.CryptographicError("SCP02 response MAC verification failed")
-                    );
-                }
-
-                // Decrypt response data if encryption is enabled
-                if ((channelState.SecurityLevel & SecurityLevel.REncryption) != 0)
-                {
-                    return DecryptScp02ResponseData(dataWithoutMac, channelState)
-                        .Map(decryptedData =>
-                        {
-                            byte[] result = new byte[decryptedData.Length + statusWord.Length];
-                            Array.Copy(decryptedData, 0, result, 0, decryptedData.Length);
-                            Array.Copy(
-                                statusWord,
-                                0,
-                                result,
-                                decryptedData.Length,
-                                statusWord.Length
-                            );
-                            return result;
-                        });
-                }
-
-                // Return data + status word
-                byte[] result = new byte[dataWithoutMac.Length + statusWord.Length];
-                Array.Copy(dataWithoutMac, 0, result, 0, dataWithoutMac.Length);
-                Array.Copy(statusWord, 0, result, dataWithoutMac.Length, statusWord.Length);
-                return Result.Success<byte[], SmartCardError>(result);
-            });
-    }
-
-    /// <summary>
-    /// Unwraps SCP03 encrypted response using functional cryptographic operations.
-    /// </summary>
-    private static Result<byte[], SmartCardError> UnwrapScp03Response(
-        byte[] encryptedResponse,
-        SecureChannelState channelState
-    )
-    {
-        if (encryptedResponse.Length < 2)
-        {
-            return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.InvalidArgument("Response too short for SCP03 unwrapping")
-            );
-        }
-
-        // Extract status word (last 2 bytes)
-        byte[] statusWord = encryptedResponse[^2..];
-        byte[] responseData = encryptedResponse[..^2];
-
-        // Check if response has MAC
-        if ((channelState.SecurityLevel & SecurityLevel.RMac) == 0)
-        {
-            // No unwrapping needed - return data + status word
-            byte[] noUnwrapResult = new byte[responseData.Length + statusWord.Length];
-            Array.Copy(responseData, 0, noUnwrapResult, 0, responseData.Length);
-            Array.Copy(statusWord, 0, noUnwrapResult, responseData.Length, statusWord.Length);
-            return Result.Success<byte[], SmartCardError>(noUnwrapResult);
-        }
-
-        // Verify and strip MAC (last 16 bytes before status word for AES-CMAC)
-        if (responseData.Length < 16)
-        {
-            return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.CryptographicError("Response too short to contain AES-CMAC")
-            );
-        }
-
-        byte[] mac = responseData[^16..];
-        byte[] dataWithoutMac = responseData[..^16];
-
-        // Use SCP03 AES-CMAC verification with session keys from channelState
-        return VerifyScp03ResponseMac(dataWithoutMac, mac, statusWord, channelState)
-            .Bind(isValid =>
-            {
-                if (!isValid)
-                {
-                    return Result.Failure<byte[], SmartCardError>(
-                        SmartCardError.CryptographicError("SCP03 response MAC verification failed")
-                    );
-                }
-
-                // Decrypt response data if encryption is enabled
-                if ((channelState.SecurityLevel & SecurityLevel.REncryption) != 0)
-                {
-                    return DecryptScp03ResponseData(dataWithoutMac, channelState)
-                        .Map(decryptedData =>
-                        {
-                            byte[] result = new byte[decryptedData.Length + statusWord.Length];
-                            Array.Copy(decryptedData, 0, result, 0, decryptedData.Length);
-                            Array.Copy(
-                                statusWord,
-                                0,
-                                result,
-                                decryptedData.Length,
-                                statusWord.Length
-                            );
-                            return result;
-                        });
-                }
-
-                // Return data + status word
-                byte[] result = new byte[dataWithoutMac.Length + statusWord.Length];
-                Array.Copy(dataWithoutMac, 0, result, 0, dataWithoutMac.Length);
-                Array.Copy(statusWord, 0, result, dataWithoutMac.Length, statusWord.Length);
-                return Result.Success<byte[], SmartCardError>(result);
-            });
-    }
-
-    /// <summary>
-    /// Verifies SCP02 response MAC using centralized SCP operations.
-    /// </summary>
-    private static Result<bool, SmartCardError> VerifyScp02ResponseMac(
-        byte[] responseData,
-        byte[] receivedMac,
-        byte[] statusWord,
-        SecureChannelState channelState
-    )
-    {
-        // Construct complete response: response data + status word
-        byte[] fullResponse = [.. responseData, .. statusWord];
-
-        // Use centralized SCP02 response MAC calculation with proper chaining
-        return CryptoService
-            .ScpOperations.Scp02.CalculateResponseMac(
-                fullResponse,
-                channelState.SessionKeys.SrMac,
-                channelState.MacChainingValue
-            )
-            .Map(calculatedMac =>
-            {
-                // Compare MACs using constant-time comparison (truncate to 8 bytes)
-                var truncated = calculatedMac[..Constants.Constants.Scp.Scp03.MAC_SIZE];
-                return CryptoService.Utils.CompareBytes(truncated, receivedMac);
-            });
-    }
-
-    /// <summary>
-    /// Verifies SCP03 response MAC using centralized SCP operations.
-    /// </summary>
-    private static Result<bool, SmartCardError> VerifyScp03ResponseMac(
-        byte[] responseData,
-        byte[] receivedMac,
-        byte[] statusWord,
-        SecureChannelState channelState
-    )
-    {
-        // Construct complete response: response data + status word
-        byte[] fullResponse = [.. responseData, .. statusWord];
-
-        // Use centralized SCP03 response MAC calculation with proper chaining
-        return CryptoService
-            .ScpOperations.Scp03.CalculateResponseMac(
-                fullResponse,
-                channelState.SessionKeys.SrMac,
-                channelState.MacChainingValue
-            )
-            .Map(calculatedMac =>
-            {
-                // Compare MACs using constant-time comparison
-                return CryptoService.Utils.CompareBytes(calculatedMac, receivedMac);
-            });
-    }
-
-    /// <summary>
-    /// Decrypts SCP02 response data using centralized cipher operations.
-    /// </summary>
-    private static Result<byte[], SmartCardError> DecryptScp02ResponseData(
-        byte[] encryptedData,
-        SecureChannelState channelState
-    )
-    {
-        if (encryptedData.Length == 0)
-        {
-            return Result.Success<byte[], SmartCardError>([]);
-        }
-
-        // Use centralized cipher operation with SCP02 parameters (zero IV for response decryption)
-        return CryptoService.Cipher.Decrypt3DesCbc(
-            channelState.SessionKeys.SEnc,
-            Constants.Constants.Scp.Common.ZeroIv8,
-            encryptedData
-        );
-    }
-
-    /// <summary>
-    /// Decrypts SCP03 response data using centralized cipher operations.
-    /// </summary>
-    private static Result<byte[], SmartCardError> DecryptScp03ResponseData(
-        byte[] encryptedData,
-        SecureChannelState channelState
-    )
-    {
-        if (encryptedData.Length == 0)
-        {
-            return Result.Success<byte[], SmartCardError>([]);
-        }
-
-        // Use centralized cipher operation with SCP03 parameters (zero IV for response decryption)
-        return CryptoService.Cipher.DecryptAesCbc(
-            channelState.SessionKeys.SEnc,
-            Constants.Constants.Scp.Common.ZeroIv16,
-            encryptedData
-        );
     }
 
     /// <summary>
@@ -759,7 +458,7 @@ public static class CommandProcessors
 
     /// <summary>
     /// Creates a processor that executes the complete command pipeline.
-    /// Secure channel unwrapping is now integrated into ExecuteTransport.
+    /// ExecuteTransport verifies secure-channel response protection.
     /// </summary>
     public static CommandProcessor CreatePipeline(
         bool enableLogging = true,
@@ -770,7 +469,7 @@ public static class CommandProcessors
         [
             enableLogging ? LogCommand : FunctionComposition.Identity,
             enableSecureChannel ? WrapSecureChannel : FunctionComposition.Identity,
-            ExecuteTransport, // Now includes secure channel unwrapping
+            ExecuteTransport,
             enableLogging ? LogResponse : FunctionComposition.Identity,
         ];
 

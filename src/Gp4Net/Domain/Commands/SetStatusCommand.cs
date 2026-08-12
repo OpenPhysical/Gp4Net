@@ -53,7 +53,7 @@ public sealed class SetStatusCommand : IApduCommand
     /// Creates a SET STATUS command.
     /// </summary>
     /// <param name="aid">The AID of the target (empty for card-level operations).</param>
-    /// <param name="p1">The P1 parameter (lifecycle state transition).</param>
+    /// <param name="p1">The requested life-cycle state.</param>
     /// <returns>The command or an error.</returns>
     public static Result<SetStatusCommand, SmartCardError> Create(byte[] aid, byte p1)
     {
@@ -70,13 +70,15 @@ public sealed class SetStatusCommand : IApduCommand
         byte p1
     )
     {
-        // P2 is always 0x00 for SET STATUS
-        byte p2 = 0x00;
+        // GP Card Spec 2.3.1, 11.10.2 and Tables 11-85/86: P1 selects
+        // ISD (80) or Application/SSD (40); P2 carries the requested state.
+        byte statusType = aid.Length == 0 ? (byte)0x80 : (byte)0x40;
+        byte stateControl = p1;
 
         // For card-level operations (empty AID), we send a zero-length data field
         byte[] data = aid.Length > 0 ? aid : [];
 
-        return new SetStatusCommand(p1, p2, data);
+        return new SetStatusCommand(statusType, stateControl, data);
     }
 
     /// <summary>

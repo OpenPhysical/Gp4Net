@@ -234,8 +234,8 @@ public static class Scp03CommandProcessors
     {
         // Generate SCP03 card challenge per GlobalPlatform Card Specification v2.3.1 Section 6.2.2.1
 
-        // Check if pseudo-random challenge generation is required (i=70)
-        if (state.ScpImplementation == ScpImplementation.Scp03I70)
+        // SCP03 Amendment D v1.2, Table 5-1: b5 selects pseudo-random challenge generation.
+        if (state.ScpImplementation.UsesScp03PseudoRandomChallenge())
         {
             // Using pseudo-random challenge generation (i=70)
 
@@ -997,14 +997,20 @@ public static class Scp03CommandProcessors
         keySet = null;
 
         // Check installed keys first
-        if (state.InstalledKeys.TryGetValue(keyVersion, out IKeySet? installedKeys) && installedKeys is not null)
+        if (
+            state.InstalledKeys.TryGetValue(keyVersion, out IKeySet? installedKeys)
+            && installedKeys is not null
+        )
         {
             keySet = installedKeys;
             return true;
         }
 
         // Then check static keys
-        if (config.StaticKeys.TryGetValue(keyVersion, out IKeySet? staticKeys) && staticKeys is not null)
+        if (
+            config.StaticKeys.TryGetValue(keyVersion, out IKeySet? staticKeys)
+            && staticKeys is not null
+        )
         {
             keySet = staticKeys;
             return true;

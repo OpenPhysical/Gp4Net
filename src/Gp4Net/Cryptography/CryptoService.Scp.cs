@@ -215,12 +215,15 @@ public static partial class CryptoService
                     return Result.Success<byte[], SmartCardError>(command);
 
                 byte lc = command[4];
-                if (lc == 0 || command.Length < 5 + lc)
+                if (lc <= Scp.Scp02.MAC_SIZE || command.Length < 5 + lc)
                     return Result.Success<byte[], SmartCardError>(command);
 
-                // Extract data to encrypt
-                byte[] dataToEncrypt = new byte[lc];
-                Array.Copy(command, 5, dataToEncrypt, 0, lc);
+                // GP Card Spec 2.3.1, E.4.6: calculate and append C-MAC first,
+                // then encrypt only the command data preceding that C-MAC.
+                int clearDataLength = lc - Scp.Scp02.MAC_SIZE;
+                byte[] dataToEncrypt = new byte[clearDataLength];
+                Array.Copy(command, 5, dataToEncrypt, 0, clearDataLength);
+                byte[] mac = command[(5 + clearDataLength)..(5 + lc)];
 
                 // For SCP02 C-ENC, use zero IV with automatic padding
                 return Cipher
@@ -228,16 +231,18 @@ public static partial class CryptoService
                     .Map(encryptedData =>
                     {
                         // Build new command with encrypted data
+                        bool hasLe = command.Length > 5 + lc;
                         byte[] newCommand = new byte[
-                            5 + encryptedData.Length + (command.Length > 5 + lc ? 1 : 0)
+                            5 + encryptedData.Length + mac.Length + (hasLe ? 1 : 0)
                         ];
                         Array.Copy(command, 0, newCommand, 0, 4); // CLA INS P1 P2
                         newCommand[0] |= Scp.Common.SECURE_MESSAGING_CLA_BIT; // Set secure messaging bit
                         newCommand[4] = (byte)(encryptedData.Length + Scp.Scp02.MAC_SIZE); // New Lc includes MAC
                         Array.Copy(encryptedData, 0, newCommand, 5, encryptedData.Length);
+                        Array.Copy(mac, 0, newCommand, 5 + encryptedData.Length, mac.Length);
 
                         // Copy Le if present
-                        if (command.Length > 5 + lc)
+                        if (hasLe)
                             newCommand[^1] = command[^1];
 
                         return newCommand;
@@ -451,7 +456,9 @@ public static partial class CryptoService
                         ];
                         Array.Copy(command, 0, newCommand, 0, 4); // CLA INS P1 P2
                         newCommand[0] |= Scp.Common.SECURE_MESSAGING_CLA_BIT; // Set secure messaging bit
-                        newCommand[4] = (byte)(encryptedData.Length + Scp.Scp03.MAC_SIZE); // New Lc includes MAC
+                        // SCP03 1.1.2, 6.2.6: encryption precedes C-MAC. The MAC
+                        // wrapper adds the eight-byte MAC and adjusts Lc afterwards.
+                        newCommand[4] = (byte)encryptedData.Length;
                         Array.Copy(encryptedData, 0, newCommand, 5, encryptedData.Length);
 
                         // Copy Le if present
@@ -612,10 +619,11 @@ public static partial class CryptoService
                 byte[] context
             )
             {
-                // Validate MAC key length
-                if (macKey.Length != Scp.Scp03.SESSION_KEY_SIZE)
+                // SCP03 1.1.2, Table 6-1 and 6.2.1: AES-128, AES-192, and AES-256
+                // static keys derive session keys of the corresponding length.
+                if (macKey.Length is not (16 or 24 or 32))
                     return Result.Failure<byte[], SmartCardError>(
-                        new InvalidLengthError("macKey", Scp.Scp03.SESSION_KEY_SIZE, macKey.Length)
+                        SmartCardError.InvalidArgument("SCP03 MAC key must be 16, 24, or 32 bytes.")
                     );
 
                 // Validate context length (8 byte host challenge + 8 byte card challenge)

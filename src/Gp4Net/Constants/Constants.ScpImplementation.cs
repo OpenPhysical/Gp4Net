@@ -55,7 +55,6 @@ public enum ScpImplementation : byte
     /// <summary>
     /// SCP02 i=15: Explicit mode, modified APDU, zero ICV, ICV encryption, 3 keys, unspecified challenge, no R-MAC
     /// Bitmap: 00010101 (b1=1, b2=0, b3=1, b4=0, b5=1, b6=0, b7=0)
-    /// Most common SCP02 implementation (CLR mode)
     /// </summary>
     Scp02I15 = 0x15,
 
@@ -92,7 +91,6 @@ public enum ScpImplementation : byte
     /// <summary>
     /// SCP02 i=35: Explicit mode, modified APDU, zero ICV, ICV encryption, 3 keys, unspecified challenge, R-MAC support
     /// Bitmap: 00110101 (b1=1, b2=0, b3=1, b4=0, b5=1, b6=1, b7=0)
-    /// CLR mode with R-MAC support (MAC mode)
     /// </summary>
     Scp02I35 = 0x35,
 
@@ -129,7 +127,6 @@ public enum ScpImplementation : byte
     /// <summary>
     /// SCP02 i=55: Explicit mode, modified APDU, zero ICV, ICV encryption, 3 keys, well-known challenge, no R-MAC
     /// Bitmap: 01010101 (b1=1, b2=0, b3=1, b4=0, b5=1, b6=0, b7=1)
-    /// CLR mode with well-known challenge (ENC mode)
     /// </summary>
     Scp02I55 = 0x55,
 
@@ -160,8 +157,6 @@ public enum ScpImplementation : byte
     /// <summary>
     /// SCP02 i=75: Explicit mode, modified APDU, zero ICV, ICV encryption, 3 keys, well-known challenge, R-MAC support
     /// Bitmap: 01110101 (b1=1, b2=0, b3=1, b4=0, b5=1, b6=1, b7=1)
-    /// Full security mode (RENC mode) - CLR + well-known challenge + R-MAC
-    /// GP Pro has bugs with this mode, but our implementation is correct
     /// </summary>
     Scp02I75 = 0x75,
 
@@ -171,45 +166,41 @@ public enum ScpImplementation : byte
     /// </summary>
     Scp02I7A = 0x7A,
 
-    // ==========================================
-    // SCP03 Implementation Options
-    // ==========================================
+    /// <summary>SCP03 i=00: S8, random challenge, no response protection.</summary>
+    Scp03I00 = 0x00,
 
-    /// <summary>
-    /// SCP03 i=10: AES with 128-bit keys
-    /// Standard SCP03 implementation
-    /// </summary>
+    /// <summary>SCP03 i=01: S16, random challenge, no response protection.</summary>
+    Scp03I01 = 0x01,
+
+    /// <summary>SCP03 i=10: S8, pseudo-random challenge, no response protection.</summary>
     Scp03I10 = 0x10,
 
-    /// <summary>
-    /// SCP03 i=11: AES with 128-bit keys, no response MAC
-    /// Per GlobalPlatform SCP03 v1.1.1 Section 6.2.5
-    /// Response MAC calculation and verification is disabled
-    /// </summary>
+    /// <summary>SCP03 i=11: S16, pseudo-random challenge, no response protection.</summary>
     Scp03I11 = 0x11,
 
-    /// <summary>
-    /// SCP03 i=20: AES with 192-bit keys
-    /// </summary>
+    /// <summary>SCP03 i=20: S8, random challenge, R-MAC.</summary>
     Scp03I20 = 0x20,
 
-    /// <summary>
-    /// SCP03 i=30: AES with 256-bit keys
-    /// </summary>
+    /// <summary>SCP03 i=21: S16, random challenge, R-MAC.</summary>
+    Scp03I21 = 0x21,
+
+    /// <summary>SCP03 i=30: S8, pseudo-random challenge, R-MAC.</summary>
     Scp03I30 = 0x30,
 
-    /// <summary>
-    /// SCP03 i=60: AES with 128-bit keys, random card challenge
-    /// Per GlobalPlatform SCP03 v1.1.1 Section 6.2.1
-    /// Card generates truly random challenge instead of pseudo-random
-    /// </summary>
+    /// <summary>SCP03 i=31: S16, pseudo-random challenge, R-MAC.</summary>
+    Scp03I31 = 0x31,
+
+    /// <summary>SCP03 i=60: S8, random challenge, R-MAC and R-ENC.</summary>
     Scp03I60 = 0x60,
 
-    /// <summary>
-    /// SCP03 i=70: AES with 128-bit keys, pseudo-random card challenge
-    /// Card challenge derived using KDF instead of random
-    /// </summary>
+    /// <summary>SCP03 i=61: S16, random challenge, R-MAC and R-ENC.</summary>
+    Scp03I61 = 0x61,
+
+    /// <summary>SCP03 i=70: S8, pseudo-random challenge, R-MAC and R-ENC.</summary>
     Scp03I70 = 0x70,
+
+    /// <summary>SCP03 i=71: S16, pseudo-random challenge, R-MAC and R-ENC.</summary>
+    Scp03I71 = 0x71,
 }
 
 /// <summary>
@@ -340,22 +331,30 @@ public static class ScpImplementationExtensions
         };
     }
 
-    /// <summary>
-    /// Gets the AES key length in bits for SCP03 implementations.
-    /// </summary>
-    /// <param name="impl">The SCP implementation to check</param>
-    /// <returns>Key length in bits, or 0 if not SCP03</returns>
-    public static int GetAesKeyLength(this ScpImplementation impl)
+    /// <summary>SCP03 Amendment D v1.2, Table 5-1: b1 selects S16 mode.</summary>
+    public static bool UsesScp03S16Mode(this ScpImplementation impl) => ((byte)impl & 0x01) != 0;
+
+    /// <summary>SCP03 Amendment D v1.2, Table 5-1: b5 selects pseudo-random challenge generation.</summary>
+    public static bool UsesScp03PseudoRandomChallenge(this ScpImplementation impl) =>
+        ((byte)impl & 0x10) != 0;
+
+    /// <summary>SCP03 Amendment D v1.2, Table 5-1: b7 and b6 set together enable R-ENC.</summary>
+    public static bool HasScp03ResponseEncryption(this ScpImplementation impl) =>
+        ((byte)impl & 0x60) == 0x60;
+
+    /// <summary>SCP03 Amendment D v1.2, Table 5-1.</summary>
+    public static string GetScp03Description(this ScpImplementation impl)
     {
-        byte value = (byte)impl;
-        return (value & 0xF0) switch
-        {
-            0x10 => 128, // SCP03 AES-128
-            0x20 => 192, // SCP03 AES-192
-            0x30 => 256, // SCP03 AES-256
-            0x60 => 128, // SCP03 AES-128 with random challenge
-            0x70 => 128, // SCP03 AES-128 with pseudo-random challenge
-            _ => 0, // Not an SCP03 implementation
-        };
+        string responseProtection = impl.HasScp03ResponseEncryption()
+            ? "R-MAC and R-ENC"
+            : impl.HasRMacSupport()
+                ? "R-MAC"
+                : "No response protection";
+        return string.Join(
+            ", ",
+            impl.UsesScp03S16Mode() ? "S16" : "S8",
+            impl.UsesScp03PseudoRandomChallenge() ? "Pseudo-random challenge" : "Random challenge",
+            responseProtection
+        );
     }
 }

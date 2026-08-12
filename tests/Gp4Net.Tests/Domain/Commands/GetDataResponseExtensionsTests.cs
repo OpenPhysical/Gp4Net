@@ -123,8 +123,8 @@ public class GetDataResponseExtensionsTests
     [Test]
     public void ParseAsKeyInformation_WithValidData_ReturnsKeyInformationTemplate()
     {
-        // Arrange - Sample key information template data (tag E0)
-        byte[] data = Convert.FromHexString("E010C00401018810C00402018810C00403018810");
+        // GP Card Specification v2.3.1, section 11.3.3.1.1 and Table 11-28.
+        byte[] data = Convert.FromHexString("E012C00401018810C00402018810C00403018810");
 
         // Act
         Maybe<KeyInformationTemplate> result = data.ParseAsKeyInformation();

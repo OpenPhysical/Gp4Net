@@ -78,24 +78,30 @@ public class PutKeyCommand : IApduCommand
     /// </summary>
     public IReadOnlyList<KeyDataBlock> KeyDataBlocks { get; }
 
+    public byte ReplacedKeyVersion { get; }
+
+    public byte NewKeyVersion { get; }
+
+    public byte FirstKeyIdentifier { get; }
+
     /// <summary>
     /// Converts this command to a CommandAPDU.
     /// </summary>
     /// <returns>A result containing the CommandAPDU or an error.</returns>
     public Result<CommandAPDU, SmartCardError> ToCommandApdu()
     {
-        var expectedLength = KeyDataBlocks.Count * 3;
+        // GP Card Spec 2.3.1, 11.8.2.1 and 11.8.2.2, Tables 11-65/66:
+        // P1 names the existing KVN; P2 is the first key ID with b8 set for multiple keys.
         var data = Data;
 
         return Result.Success<CommandAPDU, SmartCardError>(
             new CommandAPDU(
                 GlobalPlatform.Cla.GP_STANDARD,
                 GlobalPlatform.Ins.PUT_KEY,
-                (byte)UsageQualifier,
-                (byte)KekIdentifier,
+                ReplacedKeyVersion,
+                (byte)(FirstKeyIdentifier | (KeyDataBlocks.Count > 1 ? 0x80 : 0x00)),
                 (uint)data.Length,
-                data,
-                (uint)expectedLength
+                data
             )
         );
     }
@@ -105,7 +111,7 @@ public class PutKeyCommand : IApduCommand
     /// </summary>
     public byte P1
     {
-        get { return (byte)UsageQualifier; }
+        get { return ReplacedKeyVersion; }
     }
 
     /// <summary>
@@ -113,7 +119,7 @@ public class PutKeyCommand : IApduCommand
     /// </summary>
     public byte P2
     {
-        get { return (byte)KekIdentifier; }
+        get { return (byte)(FirstKeyIdentifier | (KeyDataBlocks.Count > 1 ? 0x80 : 0x00)); }
     }
 
     /// <summary>
@@ -123,7 +129,9 @@ public class PutKeyCommand : IApduCommand
     {
         get
         {
-            List<byte> data = [];
+            // GP Card Spec 2.3.1, 11.8.2.3, Table 11-67: new KVN precedes the
+            // sequential key data fields identified by P2, P2+1, and P2+2.
+            List<byte> data = [NewKeyVersion];
             foreach (var block in KeyDataBlocks)
             {
                 data.AddRange(block.ToBytes());
@@ -137,7 +145,7 @@ public class PutKeyCommand : IApduCommand
     /// </summary>
     public Maybe<int> ExpectedResponseLength
     {
-        get { return Maybe<int>.From(KeyDataBlocks.Count * 3); }
+        get { return Maybe<int>.From(1 + KeyDataBlocks.Count * 3); }
     }
 
     /// <summary>
@@ -151,15 +159,24 @@ public class PutKeyCommand : IApduCommand
     /// <summary>
     /// Initializes a new instance of the PutKeyCommand class.
     /// </summary>
+    /// <param name="replacedKeyVersion">Existing key version, or zero when adding.</param>
+    /// <param name="newKeyVersion">Version assigned to the supplied keys.</param>
+    /// <param name="firstKeyIdentifier">Identifier of the first supplied key.</param>
     /// <param name="usageQualifier">The key usage qualifier.</param>
     /// <param name="kekIdentifier">The key encryption key identifier.</param>
     /// <param name="keyDataBlocks">The key data blocks.</param>
     private PutKeyCommand(
+        byte replacedKeyVersion,
+        byte newKeyVersion,
+        byte firstKeyIdentifier,
         KeyUsageQualifier usageQualifier,
         KeyEncryptionKeyIdentifier kekIdentifier,
         IList<KeyDataBlock> keyDataBlocks
     )
     {
+        ReplacedKeyVersion = replacedKeyVersion;
+        NewKeyVersion = newKeyVersion;
+        FirstKeyIdentifier = firstKeyIdentifier;
         UsageQualifier = usageQualifier;
         KekIdentifier = kekIdentifier;
         KeyDataBlocks = new List<KeyDataBlock>(keyDataBlocks);
@@ -190,10 +207,39 @@ public class PutKeyCommand : IApduCommand
         var usageQualifier =
             keyDataBlocks.Count == 1 ? KeyUsageQualifier.SingleKey : KeyUsageQualifier.MultipleKeys;
 
-        // For now, we always use plain text (no key encryption)
-        var kekIdentifier = KeyEncryptionKeyIdentifier.None;
+        return CreateReplacement(0x00, keyVersion, 0x01, keyDataBlocks);
+    }
 
-        return new PutKeyCommand(usageQualifier, kekIdentifier, keyDataBlocks);
+    public static Result<PutKeyCommand, SmartCardError> CreateReplacement(
+        byte replacedKeyVersion,
+        byte newKeyVersion,
+        byte firstKeyIdentifier,
+        IList<KeyDataBlock> keyDataBlocks
+    )
+    {
+        if (newKeyVersion is 0x00 or > 0x7F)
+            return SmartCardError.InvalidArgument("New key version must be between 01 and 7F.");
+        if (replacedKeyVersion > 0x7F)
+            return SmartCardError.InvalidArgument(
+                "Replaced key version must be between 00 and 7F."
+            );
+        if (firstKeyIdentifier > 0x7F)
+            return SmartCardError.InvalidArgument(
+                "First key identifier must be between 00 and 7F."
+            );
+        if (keyDataBlocks is not { Count: > 0 })
+            return SmartCardError.InvalidArgument("At least one key data block is required.");
+
+        var usageQualifier =
+            keyDataBlocks.Count == 1 ? KeyUsageQualifier.SingleKey : KeyUsageQualifier.MultipleKeys;
+        return new PutKeyCommand(
+            replacedKeyVersion,
+            newKeyVersion,
+            firstKeyIdentifier,
+            usageQualifier,
+            KeyEncryptionKeyIdentifier.CurrentKek,
+            keyDataBlocks
+        );
     }
 
     /// <summary>
@@ -260,14 +306,14 @@ public class KeyDataBlock
         Des = 0x80,
 
         /// <summary>
-        /// 3DES key (double length).
+        /// DES key with two key components.
         /// </summary>
-        TripleDes2Key = 0x81,
+        TripleDes2Key = 0x80,
 
         /// <summary>
-        /// 3DES key (triple length).
+        /// DES key with three key components.
         /// </summary>
-        TripleDes3Key = 0x82,
+        TripleDes3Key = 0x80,
 
         /// <summary>
         /// AES key (128 bits).
@@ -277,12 +323,12 @@ public class KeyDataBlock
         /// <summary>
         /// AES key (192 bits).
         /// </summary>
-        Aes192 = 0x89,
+        Aes192 = 0x88,
 
         /// <summary>
         /// AES key (256 bits).
         /// </summary>
-        Aes256 = 0x8A,
+        Aes256 = 0x88,
 
         /// <summary>
         /// RSA public key.
@@ -350,13 +396,8 @@ public class KeyDataBlock
 
         result.AddRange(Value);
 
-        KeyCheckValue.Execute(kcv =>
-        {
-            if (kcv.Length > 0)
-            {
-                result.AddRange(kcv);
-            }
-        });
+        result.Add((byte)KeyCheckValue.Match(kcv => kcv.Length, () => 0));
+        KeyCheckValue.Execute(result.AddRange);
 
         return [.. result];
     }
@@ -372,9 +413,36 @@ public class KeyDataBlock
         return ValidateKeyValue(keyValue, expectedLength, keyName)
             .Bind(validKey =>
                 ValidateKeyCheckValue(keyCheckValue, keyName)
-                    .Bind(validCheck => Result.Success<KeyDataBlock, SmartCardError>(
-                        new KeyDataBlock(keyType, validKey, validCheck)
-                    ))
+                    .Bind(validCheck =>
+                        Result.Success<KeyDataBlock, SmartCardError>(
+                            new KeyDataBlock(keyType, validKey, validCheck)
+                        )
+                    )
+            );
+    }
+
+    public static Result<KeyDataBlock, SmartCardError> CreatePrepared(
+        KeyType keyType,
+        byte[] componentBlock,
+        byte[] keyCheckValue
+    )
+    {
+        return Maybe<byte[]>
+            .From(componentBlock)
+            .ToResult(SmartCardError.InvalidArgument("Key component block cannot be null."))
+            .Bind(block =>
+                block.Length is > 0 and <= 255
+                    ? ValidateKeyCheckValue(Maybe<byte[]>.From(keyCheckValue), keyType.ToString())
+                        .Bind(kcv =>
+                            Result.Success<KeyDataBlock, SmartCardError>(
+                                new KeyDataBlock(keyType, block, kcv)
+                            )
+                        )
+                    : Result.Failure<KeyDataBlock, SmartCardError>(
+                        SmartCardError.InvalidArgument(
+                            "Key component block must contain 1 to 255 bytes."
+                        )
+                    )
             );
     }
 
@@ -545,6 +613,8 @@ public class KeyDataBlock
 [PublicAPI]
 public class PutKeyResponse
 {
+    public byte KeyVersion { get; }
+
     /// <summary>
     /// Gets the key check values for the installed keys.
     /// </summary>
@@ -555,7 +625,11 @@ public class PutKeyResponse
     /// </summary>
     /// <param name="keyCheckValues">The key check values.</param>
     public PutKeyResponse(IList<byte[]> keyCheckValues)
+        : this(0x00, keyCheckValues) { }
+
+    public PutKeyResponse(byte keyVersion, IList<byte[]> keyCheckValues)
     {
+        KeyVersion = keyVersion;
         KeyCheckValues = new List<byte[]>(keyCheckValues?.Select(kcv => (byte[])kcv.Clone()) ?? []);
     }
 
@@ -571,22 +645,22 @@ public class PutKeyResponse
             return SmartCardError.InvalidArgument("Response data cannot be null.");
         }
 
-        if (response.Length % 3 != 0)
+        if (response.Length < 1 || (response.Length - 1) % 3 != 0)
         {
             return SmartCardError.InvalidResponse(
-                $"Invalid response length {response.Length}, expected multiple of 3 bytes for key check values."
+                $"Invalid response length {response.Length}, expected a key version followed by 3-byte key check values."
             );
         }
 
         List<byte[]> keyCheckValues = [];
 
         // Each key check value is 3 bytes
-        for (int i = 0; i + 2 < response.Length; i += 3)
+        for (int i = 1; i + 2 < response.Length; i += 3)
         {
             byte[] kcv = [.. response.Skip(i).Take(3)];
             keyCheckValues.Add(kcv);
         }
 
-        return new PutKeyResponse(keyCheckValues);
+        return new PutKeyResponse(response[0], keyCheckValues);
     }
 }
