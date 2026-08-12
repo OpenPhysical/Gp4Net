@@ -151,49 +151,6 @@ public class Scp03ProtocolValidationTests
     }
 
     /// <summary>
-    /// GP SCP03 Section 6.2.4: MAC Chaining
-    /// Validates that MAC chaining value is properly maintained across commands.
-    /// </summary>
-    [Test]
-    public void Scp03_Should_Maintain_Mac_Chaining_Value()
-    {
-        // Arrange - Initial MAC chaining value is zero
-        var initialMacChaining = new byte[16]; // All zeros for SCP03
-
-        // After first command, MAC chaining should be the MAC of that command
-        var firstCommandMac = new byte[]
-        {
-            0xAA,
-            0xBB,
-            0xCC,
-            0xDD,
-            0xEE,
-            0xFF,
-            0x11,
-            0x22,
-            0x33,
-            0x44,
-            0x55,
-            0x66,
-            0x77,
-            0x88,
-            0x99,
-            0x00
-        };
-
-        // Act - Update MAC chaining value
-        var updatedChaining = UpdateMacChaining(initialMacChaining, firstCommandMac);
-
-        // Assert
-        _ = updatedChaining
-            .Should()
-            .BeEquivalentTo(firstCommandMac, "MAC chaining should be updated to last MAC");
-        _ = updatedChaining
-            .Should()
-            .NotBeEquivalentTo(initialMacChaining, "MAC chaining should change after command");
-    }
-
-    /// <summary>
     /// GP SCP03 Section 6.2.4: the command APDU contains the truncated C-MAC,
     /// but the next command chaining value is the full 16-byte AES-CMAC.
     /// </summary>
@@ -360,27 +317,6 @@ public class Scp03ProtocolValidationTests
     }
 
     /// <summary>
-    /// GP SCP03 Section 6.2.6: Counter Management
-    /// Tests that encryption counter is properly incremented.
-    /// </summary>
-    [Test]
-    public void Scp03_Should_Increment_Encryption_Counter()
-    {
-        // Arrange
-        uint initialCounter = 1;
-
-        // Act - Process multiple encrypted commands
-        var counter1 = IncrementEncryptionCounter(initialCounter);
-        var counter2 = IncrementEncryptionCounter(counter1);
-        var counter3 = IncrementEncryptionCounter(counter2);
-
-        // Assert
-        _ = counter1.Should().Be(2, "Counter should increment to 2");
-        _ = counter2.Should().Be(3, "Counter should increment to 3");
-        _ = counter3.Should().Be(4, "Counter should increment to 4");
-    }
-
-    /// <summary>
     /// GP SCP03 Section 6.3: Protocol Rules
     /// Tests that secure channel requires proper security level.
     /// </summary>
@@ -404,33 +340,6 @@ public class Scp03ProtocolValidationTests
         _ = (withFullSecurity != SecurityLevel.None)
             .Should()
             .BeTrue("Full security should enable secure channel");
-    }
-
-    /// <summary>
-    /// GP SCP03 Section 6.2.1.1: Card Challenge Generation
-    /// Tests that card challenge meets specification requirements.
-    /// </summary>
-    [Test]
-    [TestCase(0x60, "Random challenge")]
-    [TestCase(0x70, "Pseudo-random challenge")]
-    public void Scp03_Should_Generate_Valid_Card_Challenge(byte implParam, string description)
-    {
-        // Arrange
-        var challengeLength = 8; // SCP03 always uses 8-byte challenges
-
-        // Act - Generate challenge based on implementation parameter
-        var challenge = GenerateCardChallenge(implParam, challengeLength);
-
-        // Assert
-        _ = challenge.Length.Should().Be(8, $"SCP03 {description} should be 8 bytes");
-
-        // For pseudo-random (i=70), verify it includes counter component
-        if (implParam == 0x70)
-        {
-            // First 3 bytes should be the encryption counter (initially zero)
-            var counterBytes = challenge[..3];
-            _ = counterBytes.Should().NotBeNull("Pseudo-random challenge should include counter");
-        }
     }
 
     /// <summary>
@@ -469,43 +378,5 @@ public class Scp03ProtocolValidationTests
             level |= SecurityLevel.REncryption;
 
         return level;
-    }
-
-    private static byte[] UpdateMacChaining(byte[] currentChaining, byte[] lastMac)
-    {
-        // In SCP03, MAC chaining value is the full MAC of the previous command
-        return (byte[])lastMac.Clone();
-    }
-
-    private static uint IncrementEncryptionCounter(uint counter)
-    {
-        // SCP03 increments counter for each encrypted command
-        return counter + 1;
-    }
-
-    private static byte[] GenerateCardChallenge(byte implParam, int length)
-    {
-        var challenge = new byte[length];
-
-        if (implParam == 0x70)
-        {
-            // Pseudo-random: counter (3 bytes) + random (5 bytes)
-            // For testing, just create a deterministic challenge
-            challenge[0] = 0x00; // Counter MSB
-            challenge[1] = 0x00; // Counter
-            challenge[2] = 0x01; // Counter LSB
-            challenge[3] = 0xAA; // Pseudo-random
-            challenge[4] = 0xBB;
-            challenge[5] = 0xCC;
-            challenge[6] = 0xDD;
-            challenge[7] = 0xEE;
-        }
-        else
-        {
-            // Random challenge - fill with test data using functional approach
-            challenge = Enumerable.Range(0, length).Select(i => (byte)(0x10 + i)).ToArray();
-        }
-
-        return challenge;
     }
 }

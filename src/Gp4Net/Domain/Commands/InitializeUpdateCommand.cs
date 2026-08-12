@@ -5,6 +5,7 @@
 
 using System;
 using CSharpFunctionalExtensions;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Core.Functional;
 using Gp4Net.Transport;
@@ -534,9 +535,6 @@ public class InitializeUpdateResponse
         byte[] response
     )
     {
-        // Per GP spec and trace analysis: SCP03 responses are 32 bytes, SCP02 are typically 28-30 bytes
-        // Minimum 28 bytes per GP spec, but allow extra fields that some implementations include
-        // Real-world traces show responses up to 35+ bytes with vendor-specific extensions
         if (response.Length < 28)
             return Result.Failure<InitializeUpdateResponse, SmartCardError>(
                 SmartCardError.InvalidData(
@@ -568,13 +566,13 @@ public class InitializeUpdateResponse
         {
             case 0x02: // SCP02
             {
-                // SCP02 requires exactly 28 bytes minimum per GP spec Table E-8:
+                // SCP02 requires exactly 28 bytes per GP Card Specification Table E-8:
                 // Key diversification data (10) + Key info (2) + Sequence Counter (2) + Card challenge (6) + Card cryptogram (8) = 28
-                if (response.Length < 28)
+                if (response.Length != 28)
                 {
                     return Result.Failure<InitializeUpdateResponse, SmartCardError>(
                         SmartCardError.InvalidData(
-                            $"SCP02 INITIALIZE UPDATE response too short: {response.Length} bytes, expected at least 28"
+                            $"SCP02 INITIALIZE UPDATE response must be 28 bytes, got {response.Length}"
                         )
                     );
                 }
@@ -613,13 +611,11 @@ public class InitializeUpdateResponse
 
             case 0x03: // SCP03
             {
-                // SCP03 S8 with a random card challenge is 29 bytes. A 3-byte sequence
-                // counter is appended only for pseudo-random challenge generation.
-                if (response.Length < 29)
+                if (response.Length is not (29 or 32))
                 {
                     return Result.Failure<InitializeUpdateResponse, SmartCardError>(
                         SmartCardError.InvalidData(
-                            $"SCP03 INITIALIZE UPDATE response too short: {response.Length} bytes, expected at least 29"
+                            $"SCP03 INITIALIZE UPDATE response must be 29 or 32 bytes, got {response.Length}"
                         )
                     );
                 }
@@ -629,6 +625,18 @@ public class InitializeUpdateResponse
                 // - Byte 1: SCP Version (already read at offset 11, should be 0x03)
                 // - Byte 2: Implementation parameter 'i' (at offset 12)
                 byte implementation = response[offset++];
+                bool usesPseudoRandomChallenge = (
+                    (ScpImplementation)implementation
+                ).UsesScp03PseudoRandomChallenge();
+                int expectedLength = usesPseudoRandomChallenge ? 32 : 29;
+                if (response.Length != expectedLength)
+                {
+                    return Result.Failure<InitializeUpdateResponse, SmartCardError>(
+                        SmartCardError.InvalidData(
+                            $"SCP03 implementation {implementation:X2} requires a {expectedLength}-byte INITIALIZE UPDATE response, got {response.Length}"
+                        )
+                    );
+                }
 
                 // Build the key information structure
                 byte[] keyInformation = new byte[3];
@@ -646,7 +654,7 @@ public class InitializeUpdateResponse
                 Array.Copy(response, offset, cardCryptogram, 0, 8);
                 offset += 8;
 
-                // Sequence counter (remaining bytes - should be 3 for pseudo-random challenge)
+                // The 3-byte sequence counter is present only with a pseudo-random challenge.
                 int remainingBytes = response.Length - offset;
                 if (remainingBytes > 0)
                 {

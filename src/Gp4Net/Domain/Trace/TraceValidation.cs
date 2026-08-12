@@ -848,7 +848,7 @@ public static class TraceValidation
     {
         // Parse response into InitializeUpdateResponse
         return InitializeUpdateResponse
-            .Parse(response)
+            .Parse(response[..^2])
             .Bind(iuResponse =>
                 // Build cryptogram data for SCP02
                 CryptoOperations
@@ -874,7 +874,7 @@ public static class TraceValidation
     {
         // Parse response into InitializeUpdateResponse
         return InitializeUpdateResponse
-            .Parse(response)
+            .Parse(response[..^2])
             .Bind(iuResponse =>
                 // Build cryptogram data for SCP03
                 CryptoOperations

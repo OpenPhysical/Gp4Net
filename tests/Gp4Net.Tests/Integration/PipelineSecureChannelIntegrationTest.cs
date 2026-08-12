@@ -1,77 +1,111 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using AwesomeAssertions;
+using CSharpFunctionalExtensions;
+using Gp4Net.Constants;
+using Gp4Net.Core;
+using Gp4Net.Cryptography;
+using Gp4Net.Domain;
+using Gp4Net.Domain.Commands;
+using Gp4Net.Domain.Keys;
+using Gp4Net.Pipeline;
+using Gp4Net.Transport;
+using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
+using static Gp4Net.Pipeline.CommandProcessing;
 
 namespace Gp4Net.Tests.Integration;
 
-/// <summary>
-/// Integration test demonstrating the fixed pipeline architecture.
-/// This test validates that encrypted trace responses get properly decrypted through the pipeline.
-/// </summary>
 [TestFixture]
 [Category("Integration")]
 [Category("Pipeline")]
 public class PipelineSecureChannelIntegrationTest
 {
-    /// <summary>
-    /// This test demonstrates that the pipeline now correctly processes encrypted responses.
-    /// Previously, the TraceBasedCardService bypassed the UnwrapSecureChannel processor.
-    /// Now, encrypted responses flow through the complete pipeline and get decrypted.
-    /// </summary>
+    private static readonly byte[] SEnc = Convert.FromHexString("00112233445566778899AABBCCDDEEFF");
+    private static readonly byte[] SMac = Convert.FromHexString("0102030405060708090A0B0C0D0E0F10");
+    private static readonly byte[] SRMac = Convert.FromHexString(
+        "102030405060708090A0B0C0D0E0F000"
+    );
+    private static readonly byte[] Chaining = Convert.FromHexString(
+        "00112233445566778899AABBCCDDEEFF"
+    );
+
     [Test]
-    public void Pipeline_Should_Decrypt_Encrypted_TraceResponse()
+    public async Task Pipeline_Should_Decrypt_And_Verify_Golden_Scp03_Response()
     {
-        // Arrange: Example encrypted response from GP Pro trace
-        // This is the encrypted response that was returned directly to tests (bypassing pipeline)
-        string encryptedTraceResponse =
-            "E3264F08A0000001510000009F700101C5039EFE80C407A0000001515350CC08A0000001510000009000";
-
-        // Expected decrypted response (what tests should actually verify against)
-        string expectedDecryptedResponse =
-            "4F08A0000001510000009F700101C5039EFE80C407A0000001515350CC08A000000151000000";
-
-        // This test demonstrates the architectural fix:
-        // 1. TraceBasedCardService no longer bypasses secure channel establishment
-        // 2. Responses flow through ExecuteTransport processor
-        // 3. ExecuteTransport applies secure channel unwrapping
-        // 4. Tests now verify against decrypted plaintext, not encrypted data
-
-        // Success criteria: Pipeline processes encrypted trace data correctly
-        Assert.That(
-            encryptedTraceResponse,
-            Is.Not.EqualTo(expectedDecryptedResponse),
-            "Encrypted and decrypted responses should be different - this validates the fix is needed"
+        SecureChannelState state = SecureChannelState
+            .Create(
+                new SessionKeys(SEnc, SMac, SRMac),
+                SecurityLevel.CDecryption | SecurityLevel.RMac | SecurityLevel.REncryption,
+                CryptoOperations.ScpVersion.Scp03,
+                Chaining,
+                (byte)ScpImplementation.Scp03I70
+            )
+            .Value with
+        {
+            EncryptionCounter = 1,
+        };
+        // Fixed SCP03 R-ENC + R-MAC vector for plaintext 0102039000 and the keys above.
+        byte[] goldenResponse = Convert.FromHexString(
+            "6DAF1A05635B84438939EDC1FE2E57EB9E0688B245337A859000"
         );
-
-        // The fix ensures trace-based testing actually tests the secure channel implementation
-        // instead of bypassing it completely.
-        Assert.Pass(
-            "Pipeline architecture fixed: Secure channel unwrapping now integrated into ExecuteTransport"
+        var channel = new FixedChannel();
+        var transport = new FixedResponseTransport(goldenResponse);
+        var environment = new CommandEnvironment(
+            channel,
+            transport,
+            Maybe<SecureChannelState>.From(state),
+            NullLogger.Instance,
+            CommandOptions.Default
         );
+        var command = SelectCommand.CreateForIssuerSecurityDomain().Value;
+
+        var result = await CommandProcessors.ExecuteTransport(command, environment);
+
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Data.Should().Equal(0x01, 0x02, 0x03);
+        _ = ((ushort)result.Value.StatusWord).Should().Be(0x9000);
+        _ = result.Value.Metadata.SecureChannelUnwrapped.Should().BeTrue();
+        _ = transport.TransmissionCount.Should().Be(1);
     }
 
-    /// <summary>
-    /// Validates that the TraceBasedCardService integration fix works correctly.
-    /// The service should now work with proper secure channel establishment instead of faking it.
-    /// </summary>
-    [Test]
-    public void TraceBasedCardService_Should_DetectSecureChannelFromTrace()
+    private sealed class FixedChannel : ICardChannel
     {
-        // Arrange: INITIALIZE UPDATE command (8050) and EXTERNAL AUTHENTICATE command (8482)
-        string initUpdateCommand = "8050";
-        string extAuthCommand = "8482";
+        public TransportProtocol Protocol => TransportProtocol.T1;
+        public bool IsOpen => true;
 
-        // Act: The fixed TraceBasedCardService should detect these commands in traces
-        bool hasSecureChannelCommands =
-            initUpdateCommand.StartsWith("8050") && extAuthCommand.StartsWith("8482");
+        public Task<Result<ChannelExchange, SmartCardError>> TransmitAsync(
+            byte[] command,
+            CancellationToken cancellationToken = default
+        ) =>
+            Task.FromResult(
+                Result.Success<ChannelExchange, SmartCardError>(new ChannelExchange([], this))
+            );
+    }
 
-        // Assert: Service correctly detects secure channel establishment
-        Assert.That(
-            hasSecureChannelCommands,
-            Is.True,
-            "TraceBasedCardService should detect INITIALIZE UPDATE and EXTERNAL AUTHENTICATE commands"
-        );
+    private sealed class FixedResponseTransport(byte[] response) : IApduTransport
+    {
+        public TransportProtocol Protocol => TransportProtocol.T1;
+        public int MaxCommandDataLength => 255;
+        public int MaxResponseDataLength => 256;
+        public bool SupportsExtendedLength => false;
+        public int TransmissionCount { get; private set; }
 
-        Assert.Pass(
-            "TraceBasedCardService integration fixed: No longer bypasses secure channel establishment"
-        );
+        public Task<Result<TransportExchange, SmartCardError>> TransmitAsync(
+            IApduCommand command,
+            ICardChannel channel,
+            CancellationToken cancellationToken = default
+        )
+        {
+            TransmissionCount++;
+            ushort statusWord = (ushort)(response[^2] << 8 | response[^1]);
+            var apduResponse = new ApduResponse(response[..^2], statusWord);
+            return Task.FromResult(
+                Result.Success<TransportExchange, SmartCardError>(
+                    new TransportExchange(apduResponse, channel)
+                )
+            );
+        }
     }
 }

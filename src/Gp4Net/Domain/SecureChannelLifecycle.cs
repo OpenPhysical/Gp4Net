@@ -56,19 +56,31 @@ public record InitializeUpdateData(
     /// </summary>
     public Result<InitializeUpdateData, SmartCardError> Validate()
     {
-        return HostChallenge.Length == 8
-            ? CardChallenge.Length == 6
-                ? CardCryptogram.Length == 8
-                    ? Result.Success<InitializeUpdateData, SmartCardError>(this)
-                    : Result.Failure<InitializeUpdateData, SmartCardError>(
-                        new InvalidLengthError("CardCryptogram", 8, CardCryptogram.Length)
-                    )
-                : Result.Failure<InitializeUpdateData, SmartCardError>(
-                    new InvalidLengthError("CardChallenge", 6, CardChallenge.Length)
-                )
-            : Result.Failure<InitializeUpdateData, SmartCardError>(
-                new InvalidLengthError("HostChallenge", 8, HostChallenge.Length)
+        if (HostChallenge.Length != 8)
+            return new InvalidLengthError("HostChallenge", 8, HostChallenge.Length);
+
+        int expectedCardChallengeLength = ProtocolVersion switch
+        {
+            ScpVersion.Scp02 => 6,
+            ScpVersion.Scp03 => 8,
+            _ => 0,
+        };
+
+        if (expectedCardChallengeLength == 0)
+            return SmartCardError.InvalidArgument(
+                $"Unsupported secure channel protocol: {ProtocolVersion}"
             );
+
+        if (CardChallenge.Length != expectedCardChallengeLength)
+            return new InvalidLengthError(
+                "CardChallenge",
+                expectedCardChallengeLength,
+                CardChallenge.Length
+            );
+
+        return CardCryptogram.Length == 8
+            ? Result.Success<InitializeUpdateData, SmartCardError>(this)
+            : new InvalidLengthError("CardCryptogram", 8, CardCryptogram.Length);
     }
 }
 
@@ -85,16 +97,25 @@ public record AuthenticatedState(
     /// <summary>
     /// Validates the authenticated state.
     /// </summary>
-    public Result<AuthenticatedState, SmartCardError> Validate()
+    public Result<AuthenticatedState, SmartCardError> Validate(ScpVersion protocolVersion)
     {
-        return Keys != null
-            ? InitialMacChaining.Length == 8
-                ? Result.Success<AuthenticatedState, SmartCardError>(this)
-                : Result.Failure<AuthenticatedState, SmartCardError>(
-                    new InvalidLengthError("InitialMacChaining", 8, InitialMacChaining.Length)
-                )
-            : Result.Failure<AuthenticatedState, SmartCardError>(
-                new NullParameterError(nameof(Keys))
+        int expectedChainingLength = protocolVersion switch
+        {
+            ScpVersion.Scp02 => 8,
+            ScpVersion.Scp03 => 16,
+            _ => 0,
+        };
+        if (expectedChainingLength == 0)
+            return SmartCardError.InvalidArgument(
+                $"Unsupported secure channel protocol: {protocolVersion}"
+            );
+
+        return InitialMacChaining.Length == expectedChainingLength
+            ? Result.Success<AuthenticatedState, SmartCardError>(this)
+            : new InvalidLengthError(
+                "InitialMacChaining",
+                expectedChainingLength,
+                InitialMacChaining.Length
             );
     }
 }
@@ -198,8 +219,9 @@ public static class SecureChannelLifecycleTransitions
 
         var authState = new AuthenticatedState(keys, level, externalAuthMac, implementation);
 
-        return authState
-            .Validate()
+        return current
+            .InitData.ToResult((SmartCardError)new MissingDataError("InitializationData"))
+            .Bind(initData => authState.Validate(initData.ProtocolVersion))
             .Map(_ =>
                 current with
                 {

@@ -1,6 +1,8 @@
 using AwesomeAssertions;
 using Gp4Net.Constants;
+using Gp4Net.Cryptography;
 using Gp4Net.Domain;
+using Gp4Net.Domain.Keys;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Compliance;
@@ -82,70 +84,84 @@ public class Scp02ProtocolRulesTests
             });
     }
 
-    /// <summary>
-    /// GP SCP02 Section E.1.6: Protocol Rule - Session Termination Conditions
-    /// Tests conditions that terminate secure channel sessions per specification.
-    /// </summary>
     [Test]
-    public void Scp02_Should_Terminate_Session_On_Specified_Conditions()
+    [TestCase(CryptoOperations.ScpVersion.Scp02, 6)]
+    [TestCase(CryptoOperations.ScpVersion.Scp03, 8)]
+    public void SecureChannelLifecycle_Should_Initiate_With_Protocol_Challenge_Length(
+        CryptoOperations.ScpVersion protocol,
+        int cardChallengeLength
+    )
     {
-        // Arrange - Test termination conditions per GP Section E.1.6
-        var terminationConditions = new[]
-        {
-            new { Condition = "New INITIALIZE UPDATE command", ShouldTerminate = true },
-            new { Condition = "Application selection", ShouldTerminate = true },
-            new { Condition = "Logical channel termination", ShouldTerminate = true },
-            new { Condition = "Card session termination", ShouldTerminate = true },
-            new { Condition = "Explicit API termination", ShouldTerminate = true },
-            new { Condition = "Valid command processing", ShouldTerminate = false },
-            new { Condition = "R-MAC session begin", ShouldTerminate = false },
-        };
+        var initialization = new InitializeUpdateData(
+            new byte[8],
+            new byte[cardChallengeLength],
+            1,
+            new byte[8],
+            protocol
+        );
 
-        // Act & Assert
-        _ = terminationConditions
-            .Should()
-            .AllSatisfy(testCase =>
-            {
-                bool shouldTerminate = ShouldTerminateSecureChannelSession(testCase.Condition);
-                _ = shouldTerminate
-                    .Should()
-                    .Be(
-                        testCase.ShouldTerminate,
-                        $"GP Section E.1.6: {testCase.Condition} should {(testCase.ShouldTerminate ? "" : "not ")}terminate session"
-                    );
-            });
+        var result = SecureChannelLifecycle.NotInitiated.InitiateChannel(initialization);
+
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Phase.Should().Be(SecureChannelPhase.Initiated);
+        _ = result.Value.InitData.Value.Should().Be(initialization);
     }
 
-    /// <summary>
-    /// GP SCP02 Section E.1.6: Current Security Level Management
-    /// Tests that Current Security Level is set to NO_SECURITY_LEVEL when appropriate.
-    /// </summary>
     [Test]
-    public void Scp02_Should_Reset_Security_Level_To_No_Security_On_Session_Events()
+    [TestCase(CryptoOperations.ScpVersion.Scp02, 8)]
+    [TestCase(CryptoOperations.ScpVersion.Scp03, 6)]
+    public void SecureChannelLifecycle_Should_Reject_Wrong_Protocol_Challenge_Length(
+        CryptoOperations.ScpVersion protocol,
+        int cardChallengeLength
+    )
     {
-        // Arrange - Events that reset security level per GP Section E.1.6
-        string[] resetEvents =
-        [
-            "Session termination",
-            "Session abortion",
-            "New session initiation",
-            "Card reset",
-            "Power off",
-        ];
+        var initialization = new InitializeUpdateData(
+            new byte[8],
+            new byte[cardChallengeLength],
+            1,
+            new byte[8],
+            protocol
+        );
 
-        // Act & Assert
-        _ = resetEvents
-            .Should()
-            .AllSatisfy(eventType =>
-            {
-                var securityLevelAfterEvent = GetSecurityLevelAfterEvent(eventType);
-                _ = securityLevelAfterEvent
-                    .Should()
-                    .Be(
-                        SecurityLevel.None,
-                        $"GP Section E.1.6: {eventType} should reset Current Security Level to NO_SECURITY_LEVEL"
-                    );
-            });
+        var result = SecureChannelLifecycle.NotInitiated.InitiateChannel(initialization);
+
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("CardChallenge");
+    }
+
+    [Test]
+    public void SecureChannelLifecycle_Should_Authenticate_Terminate_And_Abort()
+    {
+        var initialization = new InitializeUpdateData(
+            new byte[8],
+            new byte[8],
+            1,
+            new byte[8],
+            CryptoOperations.ScpVersion.Scp03
+        );
+        var initiated = SecureChannelLifecycle.NotInitiated.InitiateChannel(initialization).Value;
+        var keys = new SessionKeys(new byte[16], new byte[16], new byte[16]);
+
+        var authenticated = initiated.AuthenticateChannel(
+            keys,
+            SecurityLevel.CMac,
+            new byte[16],
+            ScpImplementation.Scp03I70
+        );
+
+        _ = authenticated.IsSuccess.Should().BeTrue();
+        _ = authenticated.Value.IsAuthenticated.Should().BeTrue();
+        _ = authenticated.Value.CurrentSecurityLevel.Value.Should().Be(SecurityLevel.CMac);
+        _ = authenticated.Value.ToSecureChannelState().IsSuccess.Should().BeTrue();
+
+        var terminated = authenticated.Value.TerminateChannel("card session ended");
+        _ = terminated.Phase.Should().Be(SecureChannelPhase.Terminated);
+        _ = terminated.CurrentSecurityLevel.HasValue.Should().BeFalse();
+        _ = terminated.TerminationInfo.Value.Reason.Should().Be("card session ended");
+
+        var aborted = authenticated.Value.AbortChannel("response MAC failed", 0x6982);
+        _ = aborted.Phase.Should().Be(SecureChannelPhase.Aborted);
+        _ = aborted.TerminationInfo.Value.StatusWord.Value.Should().Be(0x6982);
     }
 
     /// <summary>
@@ -262,36 +278,6 @@ public class Scp02ProtocolRulesTests
     {
         // GP Section E.1.6: All secure messaging requires authentication
         return level != SecurityLevel.None;
-    }
-
-    private static bool ShouldTerminateSecureChannelSession(string condition)
-    {
-        // GP Section E.1.6: Session termination conditions
-        return condition switch
-        {
-            "New INITIALIZE UPDATE command" => true,
-            "Application selection" => true,
-            "Logical channel termination" => true,
-            "Card session termination" => true,
-            "Explicit API termination" => true,
-            "Valid command processing" => false,
-            "R-MAC session begin" => false,
-            _ => false,
-        };
-    }
-
-    private static SecurityLevel GetSecurityLevelAfterEvent(string eventType)
-    {
-        // GP Section E.1.6: Events that reset Current Security Level
-        return eventType switch
-        {
-            "Session termination" => SecurityLevel.None,
-            "Session abortion" => SecurityLevel.None,
-            "New session initiation" => SecurityLevel.None,
-            "Card reset" => SecurityLevel.None,
-            "Power off" => SecurityLevel.None,
-            _ => SecurityLevel.CMac, // Assume some security for other events
-        };
     }
 
     private static void VerifyImplementationBitmapConsistency(ScpImplementation implementation)

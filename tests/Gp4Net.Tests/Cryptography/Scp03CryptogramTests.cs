@@ -82,7 +82,7 @@ public class Scp03CryptogramTests
         // - 3 bytes sequence counter (optional for SCP03)
 
         var initUpdateResponse = Convert.FromHexString(
-            "03700000000000000000010370BE906A81C79CAF176D073D7EF2F518F300004F9000"
+            "03700000000000000000010370BE906A81C79CAF176D073D7EF2F518F300004F"
         );
 
         var parseResult = InitializeUpdateResponse.Parse(initUpdateResponse);

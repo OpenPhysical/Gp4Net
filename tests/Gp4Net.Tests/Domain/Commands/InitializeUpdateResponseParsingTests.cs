@@ -350,7 +350,7 @@ public class InitializeUpdateResponseParsingTests
     }
 
     [Test]
-    public void Parse_WithExtraTrailingBytes_ShouldIgnoreExtraData()
+    public void Parse_WithExtraTrailingBytes_ShouldRejectResponse()
     {
         // Arrange - Valid 28-byte response with 4 extra bytes
         byte[] response = new byte[32];
@@ -369,7 +369,7 @@ public class InitializeUpdateResponseParsingTests
             8
         ); // Card cryptogram
 
-        // Extra trailing bytes (should be ignored for SCP02)
+        // Extra trailing bytes are outside the SCP02 Table E-8 response.
         response[28] = 0xAA;
         response[29] = 0xBB;
         response[30] = 0xCC;
@@ -381,20 +381,8 @@ public class InitializeUpdateResponseParsingTests
         );
 
         // Assert
-        _ = result.IsSuccess.Should().BeTrue("Parser should handle extra trailing bytes");
-
-        var parsed = result.Value;
-        _ = parsed.KeyVersion.Should().Be(0x01);
-        _ = parsed.ScpId.Should().Be(0x02);
-        _ = parsed.SequenceCounter.Should().Equal(0x00, 0x01);
-        _ = parsed.CardChallenge.Length.Should().Be(6, "SCP02 card challenge should be 6 bytes");
-        _ = parsed.CardCryptogram.Length.Should().Be(8);
-
-        TestContext.Out.WriteLine("✓ Extra trailing bytes handled correctly");
-        TestContext.Out.WriteLine($"Response length: {response.Length} bytes (28 valid + 4 extra)");
-        TestContext.Out.WriteLine(
-            $"Parsed card challenge: {Convert.ToHexString(parsed.CardChallenge)}"
-        );
+        _ = result.IsFailure.Should().BeTrue("trailing response data must not be ignored");
+        _ = result.Error.Message.Should().Contain("must be 28 bytes");
     }
 
     [Test]
@@ -405,10 +393,10 @@ public class InitializeUpdateResponseParsingTests
         [
             // (description, responseLength, expectedSuccess)
             ("Exactly 28 bytes (minimum SCP02)", 28, true),
-            ("29 bytes (SCP02 + 1)", 29, true),
-            ("30 bytes (SCP02 + 2)", 30, true),
+            ("29 bytes (SCP02 + 1)", 29, false),
+            ("30 bytes (SCP02 + 2)", 30, false),
             ("32 bytes (typical SCP03)", 32, true),
-            ("35 bytes (SCP03 + extra)", 35, true),
+            ("35 bytes (SCP03 + extra)", 35, false),
         ];
 
         foreach ((string description, int responseLength, bool expectedSuccess) in testCases)

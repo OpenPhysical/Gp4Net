@@ -183,12 +183,7 @@ public class SpecificationComplianceValidationTests
     [Test]
     public void InitializeUpdateResponse_InvalidLengths_ReturnsError()
     {
-        // Arrange: Test lengths outside the GP spec minimum
-
-        // Below minimum (27 bytes)
         byte[] tooShortResponse = new byte[27];
-
-        // Act & Assert: Only lengths below minimum should be rejected
         Result<InitializeUpdateResponse, SmartCardError> shortResult =
             InitializeUpdateResponse.Parse(tooShortResponse);
         _ = shortResult
@@ -198,17 +193,31 @@ public class SpecificationComplianceValidationTests
             .Error.Message.Should()
             .Contain("INITIALIZE UPDATE response too short: 27 bytes, expected at least 28");
 
-        // Test that larger responses are now accepted (real-world traces show up to 35+ bytes)
-        byte[] largeResponse = new byte[35];
-        // Fill with minimal valid structure
-        largeResponse[10] = 0x01; // Key version
-        largeResponse[11] = 0x03; // SCP ID
+        byte[] scp02WithTrailingData = new byte[29];
+        scp02WithTrailingData[10] = 0x01;
+        scp02WithTrailingData[11] = 0x02;
+        _ = InitializeUpdateResponse
+            .Parse(scp02WithTrailingData)
+            .IsFailure.Should()
+            .BeTrue("SCP02 Table E-8 defines an exact 28-byte response");
 
-        Result<InitializeUpdateResponse, SmartCardError> largeResult =
-            InitializeUpdateResponse.Parse(largeResponse);
-        _ = largeResult
-            .IsSuccess.Should()
-            .BeTrue("35-byte response should be valid (real-world trace data)");
+        byte[] scp03RandomWithTrailingData = new byte[30];
+        scp03RandomWithTrailingData[10] = 0x01;
+        scp03RandomWithTrailingData[11] = 0x03;
+        scp03RandomWithTrailingData[12] = 0x60;
+        _ = InitializeUpdateResponse
+            .Parse(scp03RandomWithTrailingData)
+            .IsFailure.Should()
+            .BeTrue("SCP03 random-challenge responses are exactly 29 bytes");
+
+        byte[] scp03PseudoRandomWithoutCounter = new byte[29];
+        scp03PseudoRandomWithoutCounter[10] = 0x01;
+        scp03PseudoRandomWithoutCounter[11] = 0x03;
+        scp03PseudoRandomWithoutCounter[12] = 0x70;
+        _ = InitializeUpdateResponse
+            .Parse(scp03PseudoRandomWithoutCounter)
+            .IsFailure.Should()
+            .BeTrue("SCP03 pseudo-random challenges require the 3-byte sequence counter");
     }
 
     /// <summary>GP Card Specification v2.3.1, Table 11-36.</summary>
