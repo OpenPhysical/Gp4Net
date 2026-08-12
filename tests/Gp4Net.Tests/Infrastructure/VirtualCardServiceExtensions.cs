@@ -17,7 +17,7 @@ using JetBrains.Annotations;
 namespace Gp4Net.Tests.Infrastructure;
 
 /// <summary>
-/// Extension methods for VirtualCardService to support legacy test methods.
+/// Extension methods for VirtualCardOperations to support legacy test methods.
 /// Provides compatibility layer for existing test infrastructure.
 /// </summary>
 [PublicAPI]
@@ -29,7 +29,7 @@ public static class VirtualCardServiceExtensions
     /// </summary>
     /// <param name="service">The virtual card service to configure.</param>
     /// <returns>The configured service for method chaining.</returns>
-    public static VirtualCardService SetupTestEnvironment(this VirtualCardService service)
+    public static VirtualCardOperations SetupTestEnvironment(this VirtualCardOperations service)
     {
         var manager = new VirtualReaderManagerBuilder()
             .WithP71Reader("Virtual P71 Reader 00 00")
@@ -37,7 +37,7 @@ public static class VirtualCardServiceExtensions
             .Value.WithP71Reader("Virtual Debug Reader 02 00")
             .Value.Build();
 
-        return new VirtualCardService(manager, Maybe<VirtualCardReader>.None, false);
+        return new VirtualCardOperations(manager, Maybe<VirtualCardReader>.None, false);
     }
 
     /// <summary>
@@ -46,7 +46,7 @@ public static class VirtualCardServiceExtensions
     /// </summary>
     /// <param name="service">The virtual card service.</param>
     /// <returns>Collection of available reader names.</returns>
-    public static IReadOnlyList<string> GetReadersLegacy(this VirtualCardService service)
+    public static IReadOnlyList<string> GetReadersLegacy(this VirtualCardOperations service)
     {
         return service.GetReaderManager().GetReaderNames();
     }
@@ -59,7 +59,7 @@ public static class VirtualCardServiceExtensions
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>Task containing result with collection of available reader names.</returns>
     public static Task<Result<string[], SmartCardError>> GetReadersAsync(
-        this VirtualCardService service,
+        this VirtualCardOperations service,
         CancellationToken cancellationToken = default
     )
     {
@@ -78,7 +78,7 @@ public static class VirtualCardServiceExtensions
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>Task containing response bytes including status word.</returns>
     public static Task<byte[]> TransmitAsync(
-        this VirtualCardService service,
+        this VirtualCardOperations service,
         byte[] command,
         CancellationToken cancellationToken = default
     )
@@ -131,11 +131,11 @@ public static class VirtualCardServiceExtensions
 }
 
 /// <summary>
-/// Test implementation of IKeysetResolver for unit testing.
+/// Test implementation of  for unit testing.
 /// Provides minimal implementation that returns test keys for all methods.
 /// </summary>
 [PublicAPI]
-public class TestKeysetResolver : IKeysetResolver
+public class TestKeysetResolver
 {
     private readonly IReadOnlyDictionary<string, IKeySet> _keysets;
 
@@ -309,14 +309,14 @@ public static class TestContextHelper
     /// Creates an empty test context for basic test scenarios.
     /// </summary>
     /// <returns>An empty immutable pipeline context.</returns>
-    public static IPipelineContext Empty() => ImmutablePipelineContext.Empty;
+    public static ImmutablePipelineContext Empty() => ImmutablePipelineContext.Empty;
 
     /// <summary>
     /// Creates a test context with a specific keyset.
     /// </summary>
     /// <param name="keyset">The keyset to include in the context.</param>
     /// <returns>Pipeline context containing the keyset.</returns>
-    public static IPipelineContext WithKeyset(KeySet keyset)
+    public static ImmutablePipelineContext WithKeyset(KeySet keyset)
     {
         return ImmutablePipelineContext.Empty.With("Keyset", keyset);
     }
@@ -326,7 +326,7 @@ public static class TestContextHelper
     /// </summary>
     /// <param name="channelState">The secure channel state.</param>
     /// <returns>Pipeline context containing the channel state.</returns>
-    public static IPipelineContext WithSecureChannel(SecureChannelState channelState)
+    public static ImmutablePipelineContext WithSecureChannel(SecureChannelState channelState)
     {
         return ImmutablePipelineContext.Empty.With("SecureChannelState", channelState);
     }
@@ -337,7 +337,7 @@ public static class TestContextHelper
     /// <param name="keyset">The keyset to include.</param>
     /// <param name="channelState">The secure channel state.</param>
     /// <returns>Fully configured pipeline context for secure channel tests.</returns>
-    public static IPipelineContext WithKeysetAndChannel(
+    public static ImmutablePipelineContext WithKeysetAndChannel(
         KeySet keyset,
         SecureChannelState channelState
     )

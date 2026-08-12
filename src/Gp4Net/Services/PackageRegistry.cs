@@ -15,15 +15,15 @@ namespace Gp4Net.Services;
 /// Service for resolving Java Card package AIDs to human-readable names and versions.
 /// </summary>
 [PublicAPI]
-public class PackageRegistry
+public class PackageCatalog
 {
     private readonly Dictionary<string, PackageInfo> _packages;
     private readonly Dictionary<string, PackageInfo> _aidLookup;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="PackageRegistry"/> class.
+    /// Initializes a new instance of the <see cref="PackageCatalog"/> class.
     /// </summary>
-    public PackageRegistry()
+    public PackageCatalog()
     {
         var result = LoadPackageDatabase();
 

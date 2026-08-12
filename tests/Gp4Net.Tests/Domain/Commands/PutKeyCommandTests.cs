@@ -11,7 +11,7 @@ using Gp4Net.Extensions;
 using Gp4Net.Services.GlobalPlatform;
 using Gp4Net.Transport;
 using NUnit.Framework;
-using static Gp4Net.Cryptography.CryptoService;
+using static Gp4Net.Cryptography.CryptoOperations;
 
 namespace Gp4Net.Tests.Domain.Commands;
 

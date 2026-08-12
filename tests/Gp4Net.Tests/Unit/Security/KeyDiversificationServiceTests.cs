@@ -24,17 +24,13 @@ public class KeyDiversificationServiceTests
         Assert.That(baseKeyResult.IsSuccess, Is.True);
         var baseKeySet = baseKeyResult.Value;
 
-        var specResult = KeyDiversificationService.CreateSpec("kdf3");
+        var specResult = KeyDiversification.CreateSpec("kdf3");
         Assert.That(specResult.IsSuccess, Is.True);
         var spec = specResult.Value;
 
         byte[] kdd = Enumerable.Range(0, 10).Select(i => (byte)i).ToArray();
 
-        var diversifiedResult = KeyDiversificationService.DiversifyScp03KeySet(
-            baseKeySet,
-            spec,
-            kdd
-        );
+        var diversifiedResult = KeyDiversification.DiversifyScp03KeySet(baseKeySet, spec, kdd);
         Assert.That(
             diversifiedResult.IsSuccess,
             Is.True,
@@ -54,7 +50,7 @@ public class KeyDiversificationServiceTests
 
         foreach (var alias in aliases)
         {
-            var result = KeyDiversificationService.CreateSpec(alias);
+            var result = KeyDiversification.CreateSpec(alias);
             Assert.That(
                 result.IsSuccess,
                 Is.True,
@@ -76,7 +72,7 @@ public class KeyDiversificationServiceTests
         var input = Enumerable.Repeat((byte)0x01, 16).ToArray();
         var iv = new byte[16];
 
-        var encryptResult = CryptoService.Cipher.EncryptAesCbc(key, iv, input);
+        var encryptResult = CryptoOperations.Cipher.EncryptAesCbc(key, iv, input);
 
         Assert.That(
             encryptResult.IsSuccess,

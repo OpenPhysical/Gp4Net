@@ -87,7 +87,7 @@ public static class Scp03CommandProcessors
         CardState state,
         CardConfiguration config,
         IRngContext rngContext,
-        LoggingService logging
+        CardLogging logging
     )
     {
         logging.LogDebug("Processing SCP03 EXTERNAL AUTHENTICATE command");
@@ -264,7 +264,7 @@ public static class Scp03CommandProcessors
                 .Bind(sequenceCounter =>
                 {
                     byte[] context = sequenceCounter.Concat(config.IsdAid).ToArray();
-                    return CryptoService
+                    return CryptoOperations
                         .KeyDerivation.DeriveScp03Data(scp03Keys.EncKey, 0x02, context, 64)
                         .Map(challenge => new Scp03ChallengeData(
                             request,
@@ -299,10 +299,10 @@ public static class Scp03CommandProcessors
                 data.CardChallenge,
                 Maybe<ScpImplementation>.From(state.ScpImplementation)
             )
-            .Bind(context => CryptoService.KeyDerivation.DeriveSessionKeys(context))
+            .Bind(context => CryptoOperations.KeyDerivation.DeriveSessionKeys(context))
             .Bind(sessionKeys =>
                 // Calculate cryptogram using SESSION S-MAC key (not static MAC key)
-                CryptoService
+                CryptoOperations
                     .Cryptogram.CalculateScp03CardCryptogram(
                         sessionKeys.SMac,
                         data.Request.HostChallenge,
@@ -637,11 +637,11 @@ public static class Scp03CommandProcessors
                                         Maybe<ScpImplementation>.From(state.ScpImplementation)
                                     )
                                     .Bind(context =>
-                                        CryptoService.KeyDerivation.DeriveSessionKeys(context)
+                                        CryptoOperations.KeyDerivation.DeriveSessionKeys(context)
                                     )
                                     .Bind(sessionKeys =>
                                         // Calculate expected cryptogram using SESSION S-MAC key
-                                        CryptoService
+                                        CryptoOperations
                                             .Cryptogram.CalculateScp03HostCryptogram(
                                                 sessionKeys.SMac,
                                                 hostChallenge,
@@ -650,7 +650,7 @@ public static class Scp03CommandProcessors
                                             .Bind(expectedCryptogram =>
                                             {
                                                 if (
-                                                    !CryptoService.Utils.CompareBytes(
+                                                    !CryptoOperations.Utils.CompareBytes(
                                                         request.HostCryptogram,
                                                         expectedCryptogram
                                                     )
@@ -745,7 +745,7 @@ public static class Scp03CommandProcessors
                                         state.ScpImplementation
                                     )
                                     .Bind(context =>
-                                        CryptoService.KeyDerivation.DeriveSessionKeys(context)
+                                        CryptoOperations.KeyDerivation.DeriveSessionKeys(context)
                                     )
                                     .Tap(keys =>
                                         logger.Match(
@@ -790,7 +790,7 @@ public static class Scp03CommandProcessors
         var secureChannelStateResult = SecureChannelState.Create(
             sessionKeys: sessionKeys,
             securityLevel: securityLevel,
-            protocolVersion: (CryptoService.ScpVersion)
+            protocolVersion: (CryptoOperations.ScpVersion)
                 Gp4Net.Constants.Constants.GlobalPlatform.Protocols.SCP03,
             initialMacChainingValue: fullMac,
             implementationParameter: (byte)state.ScpImplementation
@@ -858,7 +858,7 @@ public static class Scp03CommandProcessors
             .. request.HostCryptogram,
         ];
 
-        return CryptoService
+        return CryptoOperations
             .ScpOperations.Scp03.CalculateCommandMac(
                 macInput,
                 sessionKeys.SMac,

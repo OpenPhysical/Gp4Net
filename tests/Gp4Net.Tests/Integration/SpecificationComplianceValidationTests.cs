@@ -29,7 +29,7 @@ public class SpecificationComplianceValidationTests
 
         // Invalid key length
         byte[] invalidKey = new byte[15];
-        Result<byte[], SmartCardError> result1 = CryptoService.Keys.ComputeDeleteToken(
+        Result<byte[], SmartCardError> result1 = CryptoOperations.Keys.ComputeDeleteToken(
             invalidKey,
             0x00,
             0x80,
@@ -46,7 +46,7 @@ public class SpecificationComplianceValidationTests
 
         // Empty AID
         byte[] emptyAid = [];
-        Result<byte[], SmartCardError> result2 = CryptoService.Keys.ComputeDeleteToken(
+        Result<byte[], SmartCardError> result2 = CryptoOperations.Keys.ComputeDeleteToken(
             validKey,
             0x00,
             0x80,
@@ -61,7 +61,7 @@ public class SpecificationComplianceValidationTests
 
         // AID too short
         byte[] shortAid = new byte[4]; // Must be 5-16 bytes
-        Result<byte[], SmartCardError> result3 = CryptoService.Keys.ComputeDeleteToken(
+        Result<byte[], SmartCardError> result3 = CryptoOperations.Keys.ComputeDeleteToken(
             validKey,
             0x00,
             0x80,
@@ -75,7 +75,7 @@ public class SpecificationComplianceValidationTests
         _ = result3.Error.Message.Should().Contain("AID length must be 5-16 bytes");
 
         // Valid case
-        Result<byte[], SmartCardError> result4 = CryptoService.Keys.ComputeDeleteToken(
+        Result<byte[], SmartCardError> result4 = CryptoOperations.Keys.ComputeDeleteToken(
             validKey,
             0x00,
             0x80,

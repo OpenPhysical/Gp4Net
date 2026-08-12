@@ -43,7 +43,7 @@ public static class CardProfileLoader
         Maybe<string>
             .From(jsonPath)
             .Where(path => !string.IsNullOrWhiteSpace(path))
-            .ToResult(ErrorFactory.EmptyArgument("JSON path"))
+            .ToResult(Errors.EmptyArgument("JSON path"))
             .Ensure(
                 File.Exists,
                 SmartCardError.InvalidArgument($"Profile file not found: {jsonPath}")
@@ -77,7 +77,7 @@ public static class CardProfileLoader
         Maybe<string>
             .From(json)
             .Where(content => !string.IsNullOrWhiteSpace(content))
-            .ToResult(ErrorFactory.EmptyArgument("JSON content"))
+            .ToResult(Errors.EmptyArgument("JSON content"))
             .Bind(ParseCardConfiguration);
 
     private static Result<CardConfiguration, SmartCardError> ParseCardConfiguration(string json)
@@ -324,7 +324,7 @@ public static class CardProfileLoader
         Maybe<string>
             .From(hex)
             .Where(h => !string.IsNullOrWhiteSpace(h))
-            .ToResult(ErrorFactory.EmptyArgument(fieldName))
+            .ToResult(Errors.EmptyArgument(fieldName))
             .Map(h => h.Replace(" ", "").Replace("-", ""))
             .Ensure(
                 cleaned => cleaned.Length % 2 == 0,

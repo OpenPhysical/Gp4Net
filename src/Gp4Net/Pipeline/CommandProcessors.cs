@@ -113,9 +113,9 @@ public static class CommandProcessors
 
         var secureChannelState = environment.SecureChannel.Value;
 
-        // Apply secure channel wrapping using ScpService with proper functional handling
+        // Apply secure channel wrapping using ScpOperations with proper functional handling
         environment.Logger.LogDebug(
-            "Applying command security using ScpService for protocol {Protocol:X2}",
+            "Applying command security using ScpOperations for protocol {Protocol:X2}",
             (byte)secureChannelState.ProtocolVersion
         );
 
@@ -123,7 +123,7 @@ public static class CommandProcessors
             Result
                 .Success<byte[], SmartCardError>(command.ToBytes())
                 .Bind(commandBytes =>
-                    ScpService
+                    ScpOperations
                         .Security.ApplyCommandSecurity(
                             new WSCT.ISO7816.CommandAPDU(commandBytes),
                             secureChannelState
@@ -150,7 +150,7 @@ public static class CommandProcessors
                             else if (environment.Options.DebugLogging)
                             {
                                 environment.Logger.LogDebug(
-                                    "ScpService returned {ByteCount} wrapped bytes: {WrappedBytes}",
+                                    "ScpOperations returned {ByteCount} wrapped bytes: {WrappedBytes}",
                                     wrappedBytes.Length,
                                     Convert.ToHexString(wrappedBytes)
                                 );
@@ -284,11 +284,13 @@ public static class CommandProcessors
                     response =>
                     {
                         stopwatch.Stop();
+                        var apduResponse = response.Response;
+                        var updatedEnvironment = environment with { Channel = response.Channel, };
 
                         // Combine response bytes for metadata
                         byte[] responseBytes = CombineResponseBytes(
-                            response.Data,
-                            response.StatusWord
+                            apduResponse.Data,
+                            apduResponse.StatusWord
                         );
 
                         // Log response details
@@ -297,12 +299,12 @@ public static class CommandProcessors
                             environment.Logger.LogInformation(
                                 "[DEBUG] Wire-level Response: {ResponseHex} (SW={StatusWord:X4})",
                                 Convert.ToHexString(responseBytes),
-                                response.StatusWord
+                                apduResponse.StatusWord
                             );
                             LogResponseStructure(
                                 environment.Logger,
-                                response.Data,
-                                response.StatusWord,
+                                apduResponse.Data,
+                                apduResponse.StatusWord,
                                 "Wire-level Response"
                             );
                         }
@@ -310,8 +312,8 @@ public static class CommandProcessors
                         {
                             environment.Logger.LogInformation(
                                 "[VERBOSE] Response: {DataLength} bytes + SW={StatusWord:X4}",
-                                response.Data.Length,
-                                response.StatusWord
+                                apduResponse.Data.Length,
+                                apduResponse.StatusWord
                             );
                         }
 
@@ -322,9 +324,9 @@ public static class CommandProcessors
                         );
 
                         var transportResult = CommandResult.Success(
-                            response.Data,
-                            response.StatusWord,
-                            environment,
+                            apduResponse.Data,
+                            apduResponse.StatusWord,
+                            updatedEnvironment,
                             metadata
                         );
 
@@ -396,7 +398,7 @@ public static class CommandProcessors
 
             byte[] responseBytes = CombineResponseBytes(result.Data, result.StatusWord);
             var securedResponse = new WSCT.ISO7816.ResponseAPDU(responseBytes);
-            return ScpService
+            return ScpOperations
                 .Security.RemoveResponseSecurity(
                     securedResponse,
                     result.UpdatedEnvironment.SecureChannel.Value

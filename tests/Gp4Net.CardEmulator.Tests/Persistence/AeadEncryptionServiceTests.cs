@@ -9,7 +9,7 @@ using NUnit.Framework;
 namespace Gp4Net.CardEmulator.Tests.Persistence;
 
 /// <summary>
-/// Tests for AeadEncryptionService functionality.
+/// Tests for CardStateEncryption functionality.
 /// Verifies AES-256-GCM encryption/decryption with UUID binding and security properties.
 /// </summary>
 [TestFixture]
@@ -18,10 +18,10 @@ public class AeadEncryptionServiceTests
     // @TODO THESE NEED TO ALL BE IMMUTABLE, PREFERABLY RECORD.
 
     /// <summary>
-    /// A private instance of the <see cref="AeadEncryptionService"/> class used for testing encryption and decryption processes
+    /// A private instance of the <see cref="CardStateEncryption"/> class used for testing encryption and decryption processes
     /// with AEAD (Authenticated Encryption with Associated Data).
     /// </summary>
-    private AeadEncryptionService _service;
+    private CardStateEncryption _service;
 
     /// <summary>
     /// Represents a valid 32-byte AES-256 encryption key used for testing purposes
@@ -45,14 +45,14 @@ public class AeadEncryptionServiceTests
 
     /// <summary>
     /// Represents a valid unique identifier (UUID) associated with a card.
-    /// Used in encryption and decryption operations as part of the AeadEncryptionService test suite.
+    /// Used in encryption and decryption operations as part of the CardStateEncryption test suite.
     /// </summary>
     private CardUuid _validUuid;
 
     [SetUp]
     public void SetUp()
     {
-        _service = new AeadEncryptionService();
+        _service = new CardStateEncryption();
 
         // Generate valid 32-byte AES-256 key
         _validKey = [.. Enumerable.Range(0, 32).Select(i => (byte)(0x42 + i % 16))];

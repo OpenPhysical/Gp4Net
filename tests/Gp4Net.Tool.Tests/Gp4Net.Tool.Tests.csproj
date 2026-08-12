@@ -24,7 +24,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Gp4Net\Gp4Net.csproj" />
     <ProjectReference Include="..\..\src\Gp4Net.Tool\Gp4Net.Tool.csproj" />
-    <ProjectReference Include="..\Gp4Net.Tests.Shared\Gp4Net.Tests.Shared.csproj" />
   </ItemGroup>
   <PropertyGroup>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>

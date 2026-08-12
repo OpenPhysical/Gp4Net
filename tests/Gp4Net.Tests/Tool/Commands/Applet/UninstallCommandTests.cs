@@ -27,19 +27,19 @@ namespace Gp4Net.Tests.Tool.Commands.Applet;
 public sealed class UninstallCommandTests
 {
     private TestCliContext _testContext;
-    private ISmartCardService _smartCardService;
+    private ICardSessionCommands _smartCardService;
     private UninstallCommand _command;
     private string _testCapFilePath;
 
     [SetUp]
     public void Setup()
     {
-        var virtualCardService = new VirtualCardService();
+        var virtualCardService = new VirtualCardOperations();
         virtualCardService.SetupTestEnvironment();
         _smartCardService = Create(virtualCardService).Value;
 
-        var displayService = new DisplayService();
-        var keysetResolver = new KeysetResolver();
+        var displayService = new ConsoleDisplay();
+        var keysetResolver = new KeysetResolution();
         var logger = NullLogger<CliContext>.Instance;
 
         _testContext = new TestCliContext(
@@ -153,15 +153,15 @@ public sealed class UninstallCommandTests
         _ = cardService.ExecuteCount.Should().Be(2);
     }
 
-    private static TestCliContext CreateContext(ISmartCardService cardService)
+    private static TestCliContext CreateContext(ICardSessionCommands cardService)
     {
-        var displayService = new DisplayService();
-        var keysetResolver = new KeysetResolver();
+        var displayService = new ConsoleDisplay();
+        var keysetResolver = new KeysetResolution();
         var logger = NullLogger<CliContext>.Instance;
         return new TestCliContext(displayService, cardService, keysetResolver, logger);
     }
 
-    private sealed class QueuedStatusCardService : ISmartCardService
+    private sealed class QueuedStatusCardService : ICardSessionCommands
     {
         private readonly Queue<StatusWord> _statusWords;
 
@@ -172,7 +172,7 @@ public sealed class UninstallCommandTests
 
         public int ExecuteCount { get; private set; }
 
-        public IPipelineContext Context => ImmutablePipelineContext.Empty;
+        public ImmutablePipelineContext Context => ImmutablePipelineContext.Empty;
 
         public Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
             CommandAPDU command,
@@ -201,11 +201,14 @@ public sealed class UninstallCommandTests
             CancellationToken cancellationToken = default
         ) => ExecuteCommandAsync(command, options.UseSecureChannel, cancellationToken);
 
-        public Result<ISmartCardService, SmartCardError> WithContext(IPipelineContext context) =>
-            Result.Success<ISmartCardService, SmartCardError>(this);
+        public Result<ICardSessionCommands, SmartCardError> WithContext(
+            ImmutablePipelineContext context
+        ) => Result.Success<ICardSessionCommands, SmartCardError>(this);
 
-        public Result<ISmartCardService, SmartCardError> WithContextValue<T>(string key, T value) =>
-            Result.Success<ISmartCardService, SmartCardError>(this);
+        public Result<ICardSessionCommands, SmartCardError> WithContextValue<T>(
+            string key,
+            T value
+        ) => Result.Success<ICardSessionCommands, SmartCardError>(this);
 
         public Task<Result<bool, SmartCardError>> IsConnectedAsync(
             CancellationToken cancellationToken = default

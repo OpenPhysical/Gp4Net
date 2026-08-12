@@ -16,6 +16,7 @@ using Gp4Net.Domain.Commands;
 using Gp4Net.Pipeline;
 using JetBrains.Annotations;
 using WSCT.ISO7816;
+using DomainCardCapabilities = Gp4Net.Domain.CardInfo.CardCapabilities;
 
 namespace Gp4Net.Services.GlobalPlatform;
 
@@ -84,8 +85,8 @@ public static class CardInformationGatherer
                 _ => Maybe<CardDataInfo>.None
             ),
             Capabilities = capabilitiesTask.Result.Match(
-                success => Maybe<CardCapabilities>.From(success),
-                _ => Maybe<CardCapabilities>.None
+                success => Maybe<DomainCardCapabilities>.From(success),
+                _ => Maybe<DomainCardCapabilities>.None
             ),
             KeyInfo = keyInfoTask.Result.Match(
                 success => Maybe<KeyInformationTemplate>.From(success),
@@ -103,8 +104,8 @@ public static class CardInformationGatherer
             // Derive additional information from gathered data
             ScpInfo = DeriveScpInformation(
                 capabilitiesTask.Result.Match(
-                    success => Maybe<CardCapabilities>.From(success),
-                    _ => Maybe<CardCapabilities>.None
+                    success => Maybe<DomainCardCapabilities>.From(success),
+                    _ => Maybe<DomainCardCapabilities>.None
                 ),
                 diversificationDataTask.Result.Match(
                     success => Maybe<byte[]>.From(success),
@@ -209,7 +210,9 @@ public static class CardInformationGatherer
     /// Contains SCP support, privileges, and algorithm information.
     /// Reference: GlobalPlatform Card Specification v2.3.1 Section E.2.1.1
     /// </summary>
-    private static async Task<Result<CardCapabilities, SmartCardError>> GetCardCapabilitiesAsync(
+    private static async Task<
+        Result<DomainCardCapabilities, SmartCardError>
+    > GetCardCapabilitiesAsync(
         Func<
             CommandAPDU,
             CancellationToken,
@@ -352,7 +355,7 @@ public static class CardInformationGatherer
     /// Provides comprehensive SCP protocol and implementation option details.
     /// </summary>
     private static Maybe<ScpInformation> DeriveScpInformation(
-        Maybe<CardCapabilities> capabilities,
+        Maybe<DomainCardCapabilities> capabilities,
         Maybe<byte[]> diversificationData
     )
     {

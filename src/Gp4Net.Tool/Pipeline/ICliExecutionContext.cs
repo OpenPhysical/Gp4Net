@@ -9,24 +9,24 @@ namespace Gp4Net.Tool.Pipeline;
 
 /// <summary>
 /// Provides context and services for CLI command execution.
-/// This is separate from the core pipeline's IPipelineContext.
+/// This is separate from the core pipeline's ImmutablePipelineContext.
 /// </summary>
 public interface ICliExecutionContext
 {
     /// <summary>
     /// Gets the display service for console output.
     /// </summary>
-    IDisplayService Display { get; }
+    IDisplay Display { get; }
 
     /// <summary>
     /// Gets the smart card service for functional card operations.
     /// </summary>
-    ISmartCardService CardService { get; }
+    ICardSessionCommands CardService { get; }
 
     /// <summary>
     /// Gets the keyset resolver for resolving keysets by name or parameters.
     /// </summary>
-    IKeysetResolver KeysetResolver { get; }
+    KeysetResolution KeysetResolution { get; }
 
     /// <summary>
     /// Gets a pure function for establishing secure channels from user requests.

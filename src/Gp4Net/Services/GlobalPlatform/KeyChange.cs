@@ -12,7 +12,7 @@ using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Modes;
 using Org.BouncyCastle.Crypto.Parameters;
-using static Gp4Net.Cryptography.CryptoService;
+using static Gp4Net.Cryptography.CryptoOperations;
 
 namespace Gp4Net.Services.GlobalPlatform;
 
@@ -60,27 +60,29 @@ public static class KeyChange
     }
 
     public static async Task<Result<PutKeyResponse, SmartCardError>> ExecuteAsync(
-        ISmartCardService cardService,
+        Func<
+            WSCT.ISO7816.CommandAPDU,
+            bool,
+            CancellationToken,
+            Task<Result<Gp4Net.Pipeline.CommandResponse, SmartCardError>>
+        > execute,
+        SecureChannelState secureChannel,
         IKeySet newKeys,
         byte replacedKeyVersion,
         byte? firstKeyIdentifier = null,
         CancellationToken cancellationToken = default
     )
     {
-        var channel = cardService.Context.Get<SecureChannelState>("SecureChannelSession");
-        var commandResult = channel
-            .ToResult(
-                SmartCardError.AuthenticationFailed("An authenticated secure channel is required.")
-            )
-            .Bind(state => CreateCommand(newKeys, state, replacedKeyVersion, firstKeyIdentifier));
+        var commandResult = CreateCommand(
+            newKeys,
+            secureChannel,
+            replacedKeyVersion,
+            firstKeyIdentifier
+        );
         if (commandResult.IsFailure)
             return commandResult.Error;
 
-        var response = await cardService.ExecuteCommandAsync(
-            commandResult.Value.ToApdu(),
-            true,
-            cancellationToken
-        );
+        var response = await execute(commandResult.Value.ToApdu(), true, cancellationToken);
         return response
             .Bind(Responses.ParsePutKeyResponse)
             .Bind(parsed => VerifyResponse(parsed, newKeys));

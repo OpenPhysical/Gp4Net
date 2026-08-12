@@ -15,7 +15,7 @@ public sealed record ConstantPoolComponentAnalysis(
 {
     public static Result<ConstantPoolComponentAnalysis, SmartCardError> Parse(
         CapFileStructure capFile,
-        PackageRegistry packageRegistry
+        PackageCatalog packageRegistry
     )
     {
         var constantPoolComponent = capFile.Components.FirstOrDefault(c =>

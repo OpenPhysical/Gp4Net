@@ -299,7 +299,7 @@ public sealed class ValidateCliCommandTests
             )
         );
 
-        var result = ConstantPoolComponentAnalysis.Parse(capFile, new PackageRegistry());
+        var result = ConstantPoolComponentAnalysis.Parse(capFile, new PackageCatalog());
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.Entries.Should().HaveCount(2);
@@ -353,9 +353,7 @@ public sealed class ValidateCliCommandTests
                 ]
             )
         );
-        var constantPool = ConstantPoolComponentAnalysis
-            .Parse(capFile, new PackageRegistry())
-            .Value;
+        var constantPool = ConstantPoolComponentAnalysis.Parse(capFile, new PackageCatalog()).Value;
 
         var result = ReferenceLocationComponentAnalysis.Parse(capFile, constantPool);
 

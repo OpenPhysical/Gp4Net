@@ -23,7 +23,7 @@ public class SimpleScp02Test
         var cryptogramData = hostChallenge.Concat(sequenceCounter).Concat(cardChallenge).ToArray();
 
         // Calculate cryptogram - now expects unpadded data, padding handled internally
-        var result = CryptoService.Cryptogram.CalculateScp02Cryptogram(sEncKey, cryptogramData);
+        var result = CryptoOperations.Cryptogram.CalculateScp02Cryptogram(sEncKey, cryptogramData);
 
         result.Match(
             calculatedCryptogram =>

@@ -21,21 +21,21 @@ public class CommandMacDataTests
         var masterKey = Convert.FromHexString("404142434445464748494A4B4C4D4E4F");
         var sequenceCounter = Convert.FromHexString("0013");
 
-        var encKey = CryptoService
+        var encKey = CryptoOperations
             .KeyDerivation.DeriveScp02SessionKey(
                 masterKey,
                 sequenceCounter,
                 Gp4Net.Constants.Constants.Scp.Scp02.KeyDerivationConstants.SEnc
             )
             .Value;
-        var macKey = CryptoService
+        var macKey = CryptoOperations
             .KeyDerivation.DeriveScp02SessionKey(
                 masterKey,
                 sequenceCounter,
                 Gp4Net.Constants.Constants.Scp.Scp02.KeyDerivationConstants.SMac
             )
             .Value;
-        var rmacKey = CryptoService
+        var rmacKey = CryptoOperations
             .KeyDerivation.DeriveScp02SessionKey(
                 masterKey,
                 sequenceCounter,
@@ -45,7 +45,13 @@ public class CommandMacDataTests
 
         var sessionKeys = SessionKeys.Create(encKey, macKey, rmacKey).Value;
         var state = SecureChannelState
-            .Create(sessionKeys, level, CryptoService.ScpVersion.Scp02, new byte[8], implementation)
+            .Create(
+                sessionKeys,
+                level,
+                CryptoOperations.ScpVersion.Scp02,
+                new byte[8],
+                implementation
+            )
             .Value;
         return state;
     }
@@ -98,10 +104,10 @@ public class CommandMacDataTests
         );
 
         var chainingIcv = Convert.FromHexString("D0C159C17E6D3F9A");
-        var encryptedIcv = CryptoService
+        var encryptedIcv = CryptoOperations
             .Mac.EncryptScp02Icv(chainingIcv, state.SessionKeys.SMac)
             .Value;
-        var expectedMac = CryptoService
+        var expectedMac = CryptoOperations
             .Mac.CalculateScp02CommandMac(
                 state.SessionKeys.SMac,
                 result.Value.CalculationBytes.ToArray(),
@@ -119,11 +125,15 @@ public class CommandMacDataTests
         var command = new CommandAPDU(commandBytes);
         var state = CreateScp02State(SecurityLevel.CDecryption, implementation: 0x10);
         var macChaining = MacChainingState
-            .Create(Convert.FromHexString("D0C159C17E6D3F9A"), CryptoService.ScpVersion.Scp02, 0x00)
+            .Create(
+                Convert.FromHexString("D0C159C17E6D3F9A"),
+                CryptoOperations.ScpVersion.Scp02,
+                0x00
+            )
             .Value;
         var seededState = state with { MacChaining = macChaining };
 
-        var result = ScpService.Security.RemoveCommandSecurity(command, seededState);
+        var result = ScpOperations.Security.RemoveCommandSecurity(command, seededState);
 
         if (result.IsFailure)
         {
@@ -141,12 +151,16 @@ public class CommandMacDataTests
         var command = new CommandAPDU(Convert.FromHexString("80CA9F7F00"));
         var state = CreateScp02State(SecurityLevel.CMac, implementation: 0x00);
         var chaining = MacChainingState
-            .Create(Convert.FromHexString("D0C159C17E6D3F9A"), CryptoService.ScpVersion.Scp02, 0x00)
+            .Create(
+                Convert.FromHexString("D0C159C17E6D3F9A"),
+                CryptoOperations.ScpVersion.Scp02,
+                0x00
+            )
             .Value;
         var seededState = state with { MacChaining = chaining };
 
-        var secured = ScpService.Security.ApplyCommandSecurity(command, seededState).Value;
-        var removed = ScpService.Security.RemoveCommandSecurity(
+        var secured = ScpOperations.Security.ApplyCommandSecurity(command, seededState).Value;
+        var removed = ScpOperations.Security.RemoveCommandSecurity(
             secured.securedCommand,
             seededState
         );
@@ -165,11 +179,13 @@ public class CommandMacDataTests
         // security status not satisfied and does not expose the expected MAC.
         var command = new CommandAPDU(Convert.FromHexString("80CA9F7F00"));
         var state = CreateScp02State(SecurityLevel.CMac);
-        var secured = ScpService.Security.ApplyCommandSecurity(command, state).Value.securedCommand;
+        var secured = ScpOperations
+            .Security.ApplyCommandSecurity(command, state)
+            .Value.securedCommand;
         byte[] tampered = secured.BinaryCommand.ToArray();
         tampered[^2] ^= 0x01;
 
-        var result = ScpService.Security.RemoveCommandSecurity(new CommandAPDU(tampered), state);
+        var result = ScpOperations.Security.RemoveCommandSecurity(new CommandAPDU(tampered), state);
 
         Assert.That(result.IsFailure, Is.True);
         Assert.That(result.Error.Message, Does.Not.Contain("expected"));

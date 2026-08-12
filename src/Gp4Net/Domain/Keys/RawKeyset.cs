@@ -73,12 +73,14 @@ public sealed record RawKeyset(
     /// <summary>
     /// Converts to appropriate typed keyset based on negotiated SCP version.
     /// </summary>
-    public Result<IKeySet, SmartCardError> ToTypedKeyset(CryptoService.ScpVersion negotiatedVersion)
+    public Result<IKeySet, SmartCardError> ToTypedKeyset(
+        CryptoOperations.ScpVersion negotiatedVersion
+    )
     {
         return negotiatedVersion switch
         {
-            CryptoService.ScpVersion.Scp02 => ToScp02KeySet().Map(ks => (IKeySet)ks),
-            CryptoService.ScpVersion.Scp03 => ToScp03KeySet().Map(ks => (IKeySet)ks),
+            CryptoOperations.ScpVersion.Scp02 => ToScp02KeySet().Map(ks => (IKeySet)ks),
+            CryptoOperations.ScpVersion.Scp03 => ToScp03KeySet().Map(ks => (IKeySet)ks),
             _
                 => Result.Failure<IKeySet, SmartCardError>(
                     SmartCardError.InvalidArgument($"Unsupported SCP version: {negotiatedVersion}")

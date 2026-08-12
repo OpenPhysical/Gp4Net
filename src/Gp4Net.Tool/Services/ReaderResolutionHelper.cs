@@ -25,11 +25,11 @@ public static class ReaderResolutionHelper
     /// <param name="displayService">Service for displaying progress/errors.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Connected smart card service or error.</returns>
-    public static async Task<Result<ISmartCardService, SmartCardError>> ResolveAndConnectAsync(
+    public static async Task<Result<ICardSessionCommands, SmartCardError>> ResolveAndConnectAsync(
         Maybe<string> explicitReader,
-        ISmartCardServiceFactory serviceFactory,
-        IReaderResolutionService resolutionService,
-        IDisplayService displayService,
+        CardSessionConnections serviceFactory,
+        ReaderSelectionOperations resolutionService,
+        IDisplay displayService,
         CancellationToken cancellationToken = default
     )
     {
@@ -61,10 +61,7 @@ public static class ReaderResolutionHelper
     /// </summary>
     /// <param name="resolution">The resolved reader information.</param>
     /// <param name="displayService">Service for displaying information.</param>
-    public static void DisplayResolutionInfo(
-        ReaderResolution resolution,
-        IDisplayService displayService
-    )
+    public static void DisplayResolutionInfo(ReaderResolution resolution, IDisplay displayService)
     {
         var message = resolution.Method switch
         {
@@ -128,7 +125,7 @@ public static class ReaderResolutionHelper
     /// <returns>Resolved reader name or error.</returns>
     public static async Task<Result<string, SmartCardError>> ResolveReaderNameAsync(
         string readerName,
-        IReaderResolutionService resolutionService,
+        ReaderSelectionOperations resolutionService,
         CancellationToken cancellationToken = default
     )
     {

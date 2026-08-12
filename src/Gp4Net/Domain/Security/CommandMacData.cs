@@ -6,7 +6,7 @@ using Gp4Net.Cryptography;
 using Gp4Net.Domain.Keys;
 using JetBrains.Annotations;
 using WSCT.ISO7816;
-using static Gp4Net.Cryptography.CryptoService;
+using static Gp4Net.Cryptography.CryptoOperations;
 
 namespace Gp4Net.Domain.Security;
 
@@ -225,7 +225,7 @@ public sealed record CommandMacData
     {
         var commandWithoutMac = BuildCommandWithoutMac(originalCommand, dataWithoutMac, macSize);
 
-        return CryptoService
+        return CryptoOperations
             .ScpOperations.Scp02.RemoveCommandEncryption(
                 commandWithoutMac,
                 session.SessionKeys.SEnc
@@ -242,7 +242,7 @@ public sealed record CommandMacData
     {
         var commandWithoutMac = BuildCommandWithoutMac(originalCommand, dataWithoutMac, macSize);
 
-        return CryptoService
+        return CryptoOperations
             .ScpOperations.Scp03.RemoveCommandEncryption(
                 commandWithoutMac,
                 session.SessionKeys.SEnc,

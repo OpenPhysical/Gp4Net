@@ -41,11 +41,21 @@ public interface IApduTransport
     /// <param name="channel">The card channel to use.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The complete response including all chained data.</returns>
-    Task<Result<ApduResponse, SmartCardError>> TransmitAsync(
+    Task<Result<TransportExchange, SmartCardError>> TransmitAsync(
         IApduCommand command,
         ICardChannel channel,
         CancellationToken cancellationToken = default
     );
+}
+
+/// <summary>
+/// A protocol response paired with the channel state produced while receiving it.
+/// </summary>
+public sealed record TransportExchange(ApduResponse Response, ICardChannel Channel)
+{
+    public byte[] Data => Response.Data;
+    public ushort StatusWord => Response.StatusWord;
+    public bool IsSuccessful => Response.IsSuccessful;
 }
 
 /// <summary>

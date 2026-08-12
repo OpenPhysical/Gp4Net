@@ -1,6 +1,4 @@
-using System;
-using System.Reflection;
-using Gp4Net.Tool.Pipeline;
+using Gp4Net.Tool.Infrastructure;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Tool.Pipeline;
@@ -10,7 +8,7 @@ public class CommandDerivationTests
     [Test]
     public void Should_Derive_Command_Name_From_Valid_Input()
     {
-        var result = DeriveCommandNameViaReflection("ListReadersCommand");
+        var result = CommandCatalog.DeriveCommandName("ListReadersCommand");
 
         Assert.That(result, Is.EqualTo("list-readers"));
     }
@@ -18,7 +16,7 @@ public class CommandDerivationTests
     [Test]
     public void Should_Handle_Single_Word_Command()
     {
-        var result = DeriveCommandNameViaReflection("InfoCommand");
+        var result = CommandCatalog.DeriveCommandName("InfoCommand");
 
         Assert.That(result, Is.EqualTo("info"));
     }
@@ -26,7 +24,7 @@ public class CommandDerivationTests
     [Test]
     public void Should_Handle_Multi_Word_Command()
     {
-        var result = DeriveCommandNameViaReflection("TestSecureChannelCommand");
+        var result = CommandCatalog.DeriveCommandName("TestSecureChannelCommand");
 
         Assert.That(result, Is.EqualTo("test-secure-channel"));
     }
@@ -34,7 +32,7 @@ public class CommandDerivationTests
     [Test]
     public void Should_Handle_Command_Without_Suffix()
     {
-        var result = DeriveCommandNameViaReflection("SimpleTest");
+        var result = CommandCatalog.DeriveCommandName("SimpleTest");
 
         Assert.That(result, Is.EqualTo("simple-test"));
     }
@@ -42,7 +40,7 @@ public class CommandDerivationTests
     [Test]
     public void Should_Handle_Single_Character_Name()
     {
-        var result = DeriveCommandNameViaReflection("ACommand");
+        var result = CommandCatalog.DeriveCommandName("ACommand");
 
         Assert.That(result, Is.EqualTo("a"));
     }
@@ -50,7 +48,7 @@ public class CommandDerivationTests
     [Test]
     public void Should_Handle_All_Caps_Acronym()
     {
-        var result = DeriveCommandNameViaReflection("HTTPSProxyCommand");
+        var result = CommandCatalog.DeriveCommandName("HTTPSProxyCommand");
 
         Assert.That(result, Is.EqualTo("h-t-t-p-s-proxy"));
     }
@@ -58,7 +56,7 @@ public class CommandDerivationTests
     [Test]
     public void Should_Handle_Empty_After_Suffix_Removal()
     {
-        var result = DeriveCommandNameViaReflection("Command");
+        var result = CommandCatalog.DeriveCommandName("Command");
 
         Assert.That(result, Is.EqualTo(""));
     }
@@ -66,7 +64,7 @@ public class CommandDerivationTests
     [Test]
     public void Should_Handle_Consecutive_Uppercase()
     {
-        var result = DeriveCommandNameViaReflection("XMLParserCommand");
+        var result = CommandCatalog.DeriveCommandName("XMLParserCommand");
 
         Assert.That(result, Is.EqualTo("x-m-l-parser"));
     }
@@ -74,7 +72,7 @@ public class CommandDerivationTests
     [Test]
     public void Should_Handle_Numeric_Characters()
     {
-        var result = DeriveCommandNameViaReflection("Scp02AuthCommand");
+        var result = CommandCatalog.DeriveCommandName("Scp02AuthCommand");
 
         Assert.That(result, Is.EqualTo("scp02-auth"));
     }
@@ -82,24 +80,8 @@ public class CommandDerivationTests
     [Test]
     public void Should_Handle_Lowercase_Start()
     {
-        var result = DeriveCommandNameViaReflection("testCommand");
+        var result = CommandCatalog.DeriveCommandName("testCommand");
 
         Assert.That(result, Is.EqualTo("test"));
-    }
-
-    private static string DeriveCommandNameViaReflection(string className)
-    {
-        var method = typeof(CommandRegistrationService).GetMethod(
-            "DeriveCommandName",
-            BindingFlags.NonPublic | BindingFlags.Static
-        );
-
-        if (method == null)
-        {
-            throw new InvalidOperationException("DeriveCommandName method not found");
-        }
-
-        var result = method.Invoke(null, new object[] { className });
-        return result?.ToString() ?? string.Empty;
     }
 }

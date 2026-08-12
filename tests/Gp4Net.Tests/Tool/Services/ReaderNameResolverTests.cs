@@ -19,14 +19,14 @@ using WSCT.ISO7816;
 namespace Gp4Net.Tests.Tool.Services;
 
 /// <summary>
-/// Tests for the functional ReaderNameResolver static service.
+/// Tests for the functional ReaderSelection static service.
 /// Validates auto-detection, exact matching, partial matching, and error handling.
 /// </summary>
 [TestFixture]
 public class ReaderNameResolverTests
 {
-    private ISmartCardService _cardService;
-    private VirtualCardService _virtualCardService;
+    private ICardSessionCommands _cardService;
+    private VirtualCardOperations _virtualCardService;
 
     [SetUp]
     public void Setup()
@@ -37,9 +37,13 @@ public class ReaderNameResolverTests
             .Value.WithP71Reader("Virtual Debug Reader 02 00")
             .Value.Build();
 
-        _virtualCardService = new VirtualCardService(manager, Maybe<VirtualCardReader>.None, false);
+        _virtualCardService = new VirtualCardOperations(
+            manager,
+            Maybe<VirtualCardReader>.None,
+            false
+        );
 
-        // Use a wrapper that implements ISmartCardService
+        // Use a wrapper that implements ICardSessionCommands
         _cardService = new VirtualSmartCardServiceWrapper(_virtualCardService);
     }
 
@@ -57,7 +61,7 @@ public class ReaderNameResolverTests
         var autoInput = Maybe<string>.From("auto");
 
         // Act
-        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
+        Result<string, SmartCardError> result = await ReaderSelection.ResolveAsync(
             autoInput,
             _cardService
         );
@@ -81,7 +85,7 @@ public class ReaderNameResolverTests
         var emptyInput = Maybe<string>.None;
 
         // Act
-        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
+        Result<string, SmartCardError> result = await ReaderSelection.ResolveAsync(
             emptyInput,
             _cardService
         );
@@ -111,7 +115,7 @@ public class ReaderNameResolverTests
             var input = Maybe<string>.From(exactReaderName);
 
             // Act
-            var result = await ReaderNameResolver.ResolveAsync(input, _cardService);
+            var result = await ReaderSelection.ResolveAsync(input, _cardService);
 
             // Assert
             result.Should().BeSuccess();
@@ -147,7 +151,7 @@ public class ReaderNameResolverTests
             var lowerCaseInput = Maybe<string>.From(exactReaderName.ToLowerInvariant());
 
             // Act
-            var result = await ReaderNameResolver.ResolveAsync(lowerCaseInput, _cardService);
+            var result = await ReaderSelection.ResolveAsync(lowerCaseInput, _cardService);
 
             // Assert
             result.Should().BeSuccess();
@@ -173,7 +177,7 @@ public class ReaderNameResolverTests
         var partialInput = Maybe<string>.From("P71");
 
         // Act
-        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
+        Result<string, SmartCardError> result = await ReaderSelection.ResolveAsync(
             partialInput,
             _cardService
         );
@@ -193,7 +197,7 @@ public class ReaderNameResolverTests
         var partialInput = Maybe<string>.From("test");
 
         // Act
-        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
+        Result<string, SmartCardError> result = await ReaderSelection.ResolveAsync(
             partialInput,
             _cardService
         );
@@ -213,7 +217,7 @@ public class ReaderNameResolverTests
         var nonExistentInput = Maybe<string>.From("NonExistentReader123");
 
         // Act
-        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
+        Result<string, SmartCardError> result = await ReaderSelection.ResolveAsync(
             nonExistentInput,
             _cardService
         );
@@ -238,7 +242,7 @@ public class ReaderNameResolverTests
         var input = Maybe<string>.From("auto");
 
         // Act
-        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
+        Result<string, SmartCardError> result = await ReaderSelection.ResolveAsync(
             input,
             failingCardService
         );
@@ -258,7 +262,7 @@ public class ReaderNameResolverTests
         var detectInput = Maybe<string>.From("detect");
 
         // Act
-        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
+        Result<string, SmartCardError> result = await ReaderSelection.ResolveAsync(
             detectInput,
             _cardService
         );
@@ -278,7 +282,7 @@ public class ReaderNameResolverTests
         var firstInput = Maybe<string>.From("first");
 
         // Act
-        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
+        Result<string, SmartCardError> result = await ReaderSelection.ResolveAsync(
             firstInput,
             _cardService
         );
@@ -301,7 +305,7 @@ public class ReaderNameResolverTests
         var autoInput = Maybe<string>.From("auto");
 
         // Act
-        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
+        Result<string, SmartCardError> result = await ReaderSelection.ResolveAsync(
             autoInput,
             _cardService
         );
@@ -317,16 +321,16 @@ public class ReaderNameResolverTests
 }
 
 /// <summary>
-/// Wrapper that implements ISmartCardService using VirtualCardService.
+/// Wrapper that implements ICardSessionCommands using VirtualCardOperations.
 /// Provides reader enumeration from virtual reader manager.
 /// </summary>
-internal sealed class VirtualSmartCardServiceWrapper : ISmartCardService
+internal sealed class VirtualSmartCardServiceWrapper : ICardSessionCommands
 {
-    private readonly VirtualCardService _virtualCardService;
+    private readonly VirtualCardOperations _virtualCardService;
 
-    public IPipelineContext Context { get; } = new SimplePipelineContext();
+    public ImmutablePipelineContext Context { get; } = ImmutablePipelineContext.Empty;
 
-    public VirtualSmartCardServiceWrapper(VirtualCardService virtualCardService)
+    public VirtualSmartCardServiceWrapper(VirtualCardOperations virtualCardService)
     {
         _virtualCardService = virtualCardService;
     }
@@ -369,14 +373,16 @@ internal sealed class VirtualSmartCardServiceWrapper : ISmartCardService
         );
     }
 
-    public Result<ISmartCardService, SmartCardError> WithContext(IPipelineContext context)
+    public Result<ICardSessionCommands, SmartCardError> WithContext(
+        ImmutablePipelineContext context
+    )
     {
-        return Result.Success<ISmartCardService, SmartCardError>(this);
+        return Result.Success<ICardSessionCommands, SmartCardError>(this);
     }
 
-    public Result<ISmartCardService, SmartCardError> WithContextValue<T>(string key, T value)
+    public Result<ICardSessionCommands, SmartCardError> WithContextValue<T>(string key, T value)
     {
-        return Result.Success<ISmartCardService, SmartCardError>(this);
+        return Result.Success<ICardSessionCommands, SmartCardError>(this);
     }
 
     public Task<Result<bool, SmartCardError>> IsConnectedAsync(
@@ -442,11 +448,11 @@ internal sealed class VirtualSmartCardServiceWrapper : ISmartCardService
 }
 
 /// <summary>
-/// Test implementation of ISmartCardService that always returns errors.
+/// Test implementation of ICardSessionCommands that always returns errors.
 /// </summary>
-internal sealed class DisconnectedSmartCardService : ISmartCardService
+internal sealed class DisconnectedSmartCardService : ICardSessionCommands
 {
-    public IPipelineContext Context { get; } = new SimplePipelineContext();
+    public ImmutablePipelineContext Context { get; } = ImmutablePipelineContext.Empty;
 
     public Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
         CommandAPDU command,
@@ -486,16 +492,18 @@ internal sealed class DisconnectedSmartCardService : ISmartCardService
         );
     }
 
-    public Result<ISmartCardService, SmartCardError> WithContext(IPipelineContext context)
+    public Result<ICardSessionCommands, SmartCardError> WithContext(
+        ImmutablePipelineContext context
+    )
     {
-        return Result.Failure<ISmartCardService, SmartCardError>(
+        return Result.Failure<ICardSessionCommands, SmartCardError>(
             SmartCardError.CommunicationError("Cannot update context in disconnected service")
         );
     }
 
-    public Result<ISmartCardService, SmartCardError> WithContextValue<T>(string key, T value)
+    public Result<ICardSessionCommands, SmartCardError> WithContextValue<T>(string key, T value)
     {
-        return Result.Failure<ISmartCardService, SmartCardError>(
+        return Result.Failure<ICardSessionCommands, SmartCardError>(
             SmartCardError.CommunicationError("Cannot update context in disconnected service")
         );
     }
@@ -560,42 +568,4 @@ internal sealed class DisconnectedSmartCardService : ISmartCardService
     }
 
     public void Dispose() { }
-}
-
-/// <summary>
-/// Simple implementation of IPipelineContext for testing.
-/// </summary>
-internal sealed class SimplePipelineContext : IPipelineContext
-{
-    private readonly ImmutableDictionary<string, object> _values = ImmutableDictionary<
-        string,
-        object
-    >.Empty;
-
-    public Maybe<T> Get<T>(string key)
-    {
-        return Maybe<T>.None;
-    }
-
-    public IPipelineContext With<T>(string key, T value)
-    {
-        return this;
-    }
-
-    public IPipelineContext Without(string key)
-    {
-        return this;
-    }
-
-    public ImmutableArray<string> Keys => ImmutableArray<string>.Empty;
-
-    public IPipelineContext WithMany(ImmutableDictionary<string, object> values)
-    {
-        return this;
-    }
-
-    public ImmutableDictionary<string, object> ToImmutableDictionary()
-    {
-        return _values;
-    }
 }

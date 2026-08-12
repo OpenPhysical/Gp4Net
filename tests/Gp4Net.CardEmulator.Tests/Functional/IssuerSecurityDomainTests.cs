@@ -6,7 +6,7 @@ using Gp4Net.Core;
 using Gp4Net.Domain;
 using NUnit.Framework;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
-using static Gp4Net.Cryptography.CryptoService;
+using static Gp4Net.Cryptography.CryptoOperations;
 
 namespace Gp4Net.CardEmulator.Tests.Functional;
 

@@ -32,18 +32,18 @@ namespace Gp4Net.Tool.Commands.Card;
 [CliCommand("test-sc", "Test secure channel establishment with GP test keys", "card")]
 public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Settings>
 {
-    private readonly IDisplayService _displayService;
-    private readonly IKeysetResolver _keysetResolver;
-    private readonly IApduTransportFactory _transportFactory;
+    private readonly IDisplay _displayService;
+    private readonly KeysetResolution _keysetResolver;
+    private readonly ApduTransports _transportFactory;
     private readonly ILogger<TestSecureChannelCommand> _logger;
 
     /// <summary>
     /// Initializes a new instance of the TestSecureChannelCommand class.
     /// </summary>
     public TestSecureChannelCommand(
-        IDisplayService displayService,
-        IKeysetResolver keysetResolver,
-        IApduTransportFactory transportFactory,
+        IDisplay displayService,
+        KeysetResolution keysetResolver,
+        ApduTransports transportFactory,
         ILogger<TestSecureChannelCommand> logger
     )
     {
@@ -103,7 +103,7 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
 
         if (
             !string.IsNullOrWhiteSpace(settings.ReaderName)
-            && ReaderEnumerationService.IsVirtualReader(settings.ReaderName)
+            && ReaderEnumeration.IsVirtualReader(settings.ReaderName)
         )
         {
             _displayService.Info($"Using virtual reader: {settings.ReaderName}");
@@ -113,8 +113,8 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
         return Result
             .Try(() =>
             {
-                // Use ReaderEnumerationService instead of direct WSCT
-                var readersResult = ReaderEnumerationService
+                // Use ReaderEnumeration instead of direct WSCT
+                var readersResult = ReaderEnumeration
                     .EnumeratePhysicalReadersAsync()
                     .GetAwaiter()
                     .GetResult();
@@ -163,14 +163,14 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
             .Bind(result => result);
     }
 
-    private async Task<Result<ISmartCardService, SmartCardError>> ConnectSmartCardService(
+    private async Task<Result<ICardSessionCommands, SmartCardError>> ConnectSmartCardService(
         string readerName
     )
     {
         _displayService.Info($"Connecting to reader: {readerName}");
-        var result = await PhysicalCardConnectionService.CreateServiceAsync(
+        var result = await PhysicalCardConnections.CreateServiceAsync(
             readerName,
-            NullLogger<SmartCardService>.Instance,
+            NullLogger<CardSessionCommands>.Instance,
             CancellationToken.None
         );
 
@@ -183,7 +183,7 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
     }
 
     private async Task<Result<bool, SmartCardError>> TestSecureChannelEstablishment(
-        ISmartCardService smartCardService,
+        ICardSessionCommands smartCardService,
         Settings settings
     )
     {
@@ -221,7 +221,7 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
     /// Executes the secure channel test with the resolved keyset.
     /// </summary>
     private async Task<Result<bool, SmartCardError>> ExecuteTestWithKeySet(
-        ISmartCardService smartCardService,
+        ICardSessionCommands smartCardService,
         RawKeyset rawKeyset,
         Settings settings
     )
@@ -230,9 +230,9 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
 
         var sw = Stopwatch.StartNew();
 
-        // Establish secure channel using static ScpService
-        var secureChannelResult = await ScpService.Establishment.EstablishAsync(
-            smartCardService,
+        // Establish secure channel using static ScpOperations
+        var secureChannelResult = await ScpOperations.Establishment.EstablishAsync(
+            smartCardService.SendCommandAsync,
             rawKeyset,
             securityLevel,
             settings.ToSecureChannelRequest().ExplicitKeyVersion,
@@ -246,7 +246,7 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
             {
                 if (
                     settings.UseScp03
-                    && secureChannelSession.ScpOption.Protocol != CryptoService.ScpVersion.Scp03
+                    && secureChannelSession.ScpOption.Protocol != CryptoOperations.ScpVersion.Scp03
                 )
                 {
                     return Result.Failure<bool, SmartCardError>(
@@ -275,8 +275,8 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
     }
 
     private async Task<Result<bool, SmartCardError>> TestSecureMessaging(
-        ISmartCardService smartCardService,
-        ScpService.Types.SecureChannelSession secureChannelSession
+        ICardSessionCommands smartCardService,
+        ScpOperations.Types.SecureChannelSession secureChannelSession
     )
     {
         _displayService.Info("Testing secure messaging...");
@@ -315,7 +315,7 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
         );
     }
 
-    private void DisplayVectors(ScpService.Types.SecureChannelSession secureChannelSession)
+    private void DisplayVectors(ScpOperations.Types.SecureChannelSession secureChannelSession)
     {
         var vectors = secureChannelSession.Vectors;
         if (vectors is null)
@@ -363,7 +363,7 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
 
         if (firstStatusCommand.IsSuccess)
         {
-            var secured = ScpService.Security.ApplyCommandSecurity(
+            var secured = ScpOperations.Security.ApplyCommandSecurity(
                 firstStatusCommand.Value,
                 secureChannelSession.State
             );

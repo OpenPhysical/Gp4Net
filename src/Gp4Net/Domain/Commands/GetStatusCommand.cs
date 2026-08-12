@@ -396,13 +396,13 @@ public class GetStatusResponse
     }
 
     /// <summary>
-    /// Parses a GET STATUS response using TlvService.GlobalPlatformParsers.
+    /// Parses a GET STATUS response using TlvCodec.GlobalPlatformParsers.
     /// </summary>
     /// <param name="response">The response data (excluding status word).</param>
     /// <returns>A Result containing either the parsed response or an error.</returns>
     public static Result<GetStatusResponse, SmartCardError> Parse(byte[] response)
     {
-        return TlvService
+        return TlvCodec
             .GlobalPlatformParsers.ParseGetStatusResponse(response)
             .Map(entries => new GetStatusResponse(entries.ToList()));
     }

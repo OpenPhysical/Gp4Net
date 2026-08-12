@@ -466,9 +466,7 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
                     else
                     {
                         failureCount++;
-                        string errorMessage = ErrorTranslationService.TranslateStatusWord(
-                            result.Error
-                        );
+                        string errorMessage = ErrorTranslation.TranslateStatusWord(result.Error);
                         AnsiConsole.MarkupLine(
                             $"[red]✗ Failed to delete {description}: {errorMessage}[/]"
                         );

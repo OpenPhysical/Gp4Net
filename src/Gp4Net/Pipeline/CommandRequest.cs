@@ -15,14 +15,18 @@ public record CommandRequest
     /// <summary>
     /// Gets the pipeline context used for execution.
     /// </summary>
-    public IPipelineContext Context { get; init; }
+    public ImmutablePipelineContext Context { get; init; }
 
     /// <summary>
     /// Gets the execution options to apply.
     /// </summary>
     public CommandOptions Options { get; init; }
 
-    private CommandRequest(CommandAPDU command, IPipelineContext context, CommandOptions options)
+    private CommandRequest(
+        CommandAPDU command,
+        ImmutablePipelineContext context,
+        CommandOptions options
+    )
     {
         Command = command;
         Context = context;
@@ -40,7 +44,7 @@ public record CommandRequest
     /// <summary>
     /// Creates a request with a command and context.
     /// </summary>
-    public static CommandRequest Create(CommandAPDU command, IPipelineContext context)
+    public static CommandRequest Create(CommandAPDU command, ImmutablePipelineContext context)
     {
         return new(command, context, CommandOptions.Default);
     }
@@ -50,7 +54,7 @@ public record CommandRequest
     /// </summary>
     public static CommandRequest Create(
         CommandAPDU command,
-        IPipelineContext context,
+        ImmutablePipelineContext context,
         CommandOptions options
     )
     {
@@ -60,7 +64,7 @@ public record CommandRequest
     /// <summary>
     /// Creates a new request with updated context.
     /// </summary>
-    public CommandRequest WithContext(IPipelineContext context)
+    public CommandRequest WithContext(ImmutablePipelineContext context)
     {
         return new(Command, context, Options);
     }

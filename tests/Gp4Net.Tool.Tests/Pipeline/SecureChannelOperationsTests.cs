@@ -26,12 +26,12 @@ public class SecureChannelOperationsTests
         "p71_card_1.json"
     );
 
-    private IKeysetResolver resolver = default!;
+    private KeysetResolution resolver = new();
 
     [SetUp]
     public void SetUp()
     {
-        resolver = new KeysetResolver();
+        resolver = new KeysetResolution();
     }
 
     [Test]
@@ -136,12 +136,12 @@ public class SecureChannelOperationsTests
         Assert.That(result.Error.Message, Does.Contain("Unknown keyset"));
     }
 
-    private static async Task<ISmartCardService> CreateSmartCardServiceAsync()
+    private static async Task<ICardSessionCommands> CreateSmartCardServiceAsync()
     {
         string readerSpec = $"virtual:{ProfilePath}";
-        var serviceResult = await VirtualCardConnectionService.CreateServiceAsync(
+        var serviceResult = await VirtualCardConnections.CreateServiceAsync(
             readerSpec,
-            NullLogger<SmartCardService>.Instance,
+            NullLogger<CardSessionCommands>.Instance,
             CancellationToken.None
         );
 

@@ -4,7 +4,7 @@ using Gp4Net.Core;
 using Gp4Net.Domain.Keys;
 using JetBrains.Annotations;
 using Org.BouncyCastle.Security;
-using static Gp4Net.Cryptography.CryptoService;
+using static Gp4Net.Cryptography.CryptoOperations;
 
 namespace Gp4Net.Domain;
 

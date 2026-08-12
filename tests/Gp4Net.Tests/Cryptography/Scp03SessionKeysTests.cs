@@ -48,7 +48,7 @@ public class Scp03SessionKeysTests
         Assert.That(contextResult.IsSuccess, Is.True, "Failed to create context");
         var context = contextResult.Value;
 
-        var sessionKeysResult = CryptoService.KeyDerivation.DeriveSessionKeys(context);
+        var sessionKeysResult = CryptoOperations.KeyDerivation.DeriveSessionKeys(context);
 
         Assert.That(sessionKeysResult.IsSuccess, Is.True, "Failed to derive session keys");
         var sessionKeys = sessionKeysResult.Value;
@@ -77,7 +77,7 @@ public class Scp03SessionKeysTests
             )
             .Value;
 
-        var sessionKeys = CryptoService.KeyDerivation.DeriveSessionKeys(context).Value;
+        var sessionKeys = CryptoOperations.KeyDerivation.DeriveSessionKeys(context).Value;
 
         Assert.That(
             sessionKeys.SEnc,
@@ -118,8 +118,8 @@ public class Scp03SessionKeysTests
             )
             .Value;
 
-        var keysDefault = CryptoService.KeyDerivation.DeriveSessionKeys(contextDefault).Value;
-        var keysPseudoRandom = CryptoService
+        var keysDefault = CryptoOperations.KeyDerivation.DeriveSessionKeys(contextDefault).Value;
+        var keysPseudoRandom = CryptoOperations
             .KeyDerivation.DeriveSessionKeys(contextPseudoRandom)
             .Value;
 
@@ -159,7 +159,7 @@ public class Scp03SessionKeysTests
             Maybe<ScpImplementation>.From(ScpImplementation.Scp03I70)
         );
         Assert.That(context128Result.IsSuccess, Is.True, "Failed to create context for AES-128");
-        var session128Result = CryptoService.KeyDerivation.DeriveSessionKeys(
+        var session128Result = CryptoOperations.KeyDerivation.DeriveSessionKeys(
             context128Result.Value
         );
         Assert.That(
@@ -176,7 +176,7 @@ public class Scp03SessionKeysTests
             Maybe<ScpImplementation>.From(ScpImplementation.Scp03I70)
         );
         Assert.That(context192Result.IsSuccess, Is.True, "Failed to create context for AES-192");
-        var session192Result = CryptoService.KeyDerivation.DeriveSessionKeys(
+        var session192Result = CryptoOperations.KeyDerivation.DeriveSessionKeys(
             context192Result.Value
         );
         Assert.That(
@@ -193,7 +193,7 @@ public class Scp03SessionKeysTests
             Maybe<ScpImplementation>.From(ScpImplementation.Scp03I70)
         );
         Assert.That(context256Result.IsSuccess, Is.True, "Failed to create context for AES-256");
-        var session256Result = CryptoService.KeyDerivation.DeriveSessionKeys(
+        var session256Result = CryptoOperations.KeyDerivation.DeriveSessionKeys(
             context256Result.Value
         );
         Assert.That(
@@ -236,7 +236,7 @@ public class Scp03SessionKeysTests
         Assert.That(contextResult.IsSuccess, Is.True, "Failed to create context");
         var context = contextResult.Value;
 
-        var result1 = CryptoService.KeyDerivation.DeriveSessionKeys(context);
+        var result1 = CryptoOperations.KeyDerivation.DeriveSessionKeys(context);
         Assert.That(result1.IsSuccess, Is.True, "First derivation should succeed");
         var keys1 = result1.Value;
 
@@ -245,11 +245,11 @@ public class Scp03SessionKeysTests
         Assert.That(keys1.Dek.HasValue, Is.True);
         Assert.That(keys1.Dek.Value, Is.EqualTo(keySet.DekKey));
 
-        var result2 = CryptoService.KeyDerivation.DeriveSessionKeys(context);
+        var result2 = CryptoOperations.KeyDerivation.DeriveSessionKeys(context);
         Assert.That(result2.IsSuccess, Is.True, "Second derivation should succeed");
         var keys2 = result2.Value;
 
-        var result3 = CryptoService.KeyDerivation.DeriveSessionKeys(context);
+        var result3 = CryptoOperations.KeyDerivation.DeriveSessionKeys(context);
         Assert.That(result3.IsSuccess, Is.True, "Third derivation should succeed");
         var keys3 = result3.Value;
 
@@ -278,7 +278,7 @@ public class Scp03SessionKeysTests
             Maybe<ScpImplementation>.From(ScpImplementation.Scp03I60)
         );
         Assert.That(context60Result.IsSuccess, Is.True, "Failed to create context for i=60");
-        var sessionKeys60Result = CryptoService.KeyDerivation.DeriveSessionKeys(
+        var sessionKeys60Result = CryptoOperations.KeyDerivation.DeriveSessionKeys(
             context60Result.Value
         );
         Assert.That(sessionKeys60Result.IsSuccess, Is.True, "i=60 should be supported");
@@ -291,7 +291,7 @@ public class Scp03SessionKeysTests
             Maybe<ScpImplementation>.From(ScpImplementation.Scp03I70)
         );
         Assert.That(context70Result.IsSuccess, Is.True, "Failed to create context for i=70");
-        var sessionKeys70Result = CryptoService.KeyDerivation.DeriveSessionKeys(
+        var sessionKeys70Result = CryptoOperations.KeyDerivation.DeriveSessionKeys(
             context70Result.Value
         );
         Assert.That(sessionKeys70Result.IsSuccess, Is.True, "i=70 should be supported");

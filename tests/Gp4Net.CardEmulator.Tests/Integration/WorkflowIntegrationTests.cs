@@ -9,7 +9,7 @@ namespace Gp4Net.CardEmulator.Tests.Integration;
 
 /// <summary>
 /// End-to-end integration tests verifying complete workflows with real implementations.
-/// Tests actual CAP file operations using VirtualCardService (no mocks).
+/// Tests actual CAP file operations using VirtualCardOperations (no mocks).
 /// </summary>
 [TestFixture]
 [Category("Integration")]
@@ -52,7 +52,7 @@ public sealed class WorkflowIntegrationTests
     [Test]
     public void Should_Initialize_Virtual_Card_Service()
     {
-        using var virtualCardService = new VirtualCardService();
+        using var virtualCardService = new VirtualCardOperations();
         var readerManager = virtualCardService.GetReaderManager();
 
         var readers = virtualCardService.GetReaders();
@@ -62,7 +62,7 @@ public sealed class WorkflowIntegrationTests
     [Test]
     public async Task Should_List_Virtual_Card_Readers()
     {
-        using var virtualCardService = new VirtualCardService();
+        using var virtualCardService = new VirtualCardOperations();
 
         await Task.CompletedTask;
 

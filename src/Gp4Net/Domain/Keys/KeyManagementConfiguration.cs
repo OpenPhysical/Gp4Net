@@ -122,13 +122,13 @@ public sealed record KeyManagementConfiguration
 /// <summary>
 /// Manages key lifecycle with security policies.
 /// </summary>
-public sealed class KeyLifecycleManager
+public sealed class KeyLifecycle
 {
     private readonly KeyManagementConfiguration _config;
     private readonly SecureKeyStore _keyStore;
     private readonly ImmutableDictionary<string, KeyMetadata> _metadata;
 
-    private KeyLifecycleManager(
+    private KeyLifecycle(
         KeyManagementConfiguration config,
         SecureKeyStore keyStore,
         ImmutableDictionary<string, KeyMetadata> metadata
@@ -142,7 +142,7 @@ public sealed class KeyLifecycleManager
     /// <summary>
     /// Creates a new key lifecycle manager.
     /// </summary>
-    public static Result<KeyLifecycleManager, SmartCardError> Create(
+    public static Result<KeyLifecycle, SmartCardError> Create(
         Maybe<KeyManagementConfiguration> config = default
     )
     {
@@ -150,7 +150,7 @@ public sealed class KeyLifecycleManager
 
         return SecureKeyStore
             .Create()
-            .Map(store => new KeyLifecycleManager(
+            .Map(store => new KeyLifecycle(
                 configuration,
                 store,
                 ImmutableDictionary<string, KeyMetadata>.Empty
@@ -160,7 +160,7 @@ public sealed class KeyLifecycleManager
     /// <summary>
     /// Registers a new key with lifecycle management.
     /// </summary>
-    public Result<KeyLifecycleManager, SmartCardError> RegisterKey(
+    public Result<KeyLifecycle, SmartCardError> RegisterKey(
         string keyId,
         byte[] keyData,
         KeyPurpose purpose
@@ -170,7 +170,7 @@ public sealed class KeyLifecycleManager
         var validationResult = _config.ValidateKey(keyData, purpose.ToString());
         if (validationResult.IsFailure)
         {
-            return Result.Failure<KeyLifecycleManager, SmartCardError>(
+            return Result.Failure<KeyLifecycle, SmartCardError>(
                 SmartCardError.SecurityError(validationResult.Error)
             );
         }
@@ -183,21 +183,21 @@ public sealed class KeyLifecycleManager
                 var metadata = new KeyMetadata(keyId, purpose, DateTime.UtcNow, 0, DateTime.UtcNow);
 
                 var newMetadata = _metadata.Add(keyId, metadata);
-                return new KeyLifecycleManager(_config, newStore, newMetadata);
+                return new KeyLifecycle(_config, newStore, newMetadata);
             });
     }
 
     /// <summary>
     /// Uses a key with lifecycle tracking.
     /// </summary>
-    public Result<(T Result, KeyLifecycleManager Manager), SmartCardError> UseKey<T>(
+    public Result<(T Result, KeyLifecycle Manager), SmartCardError> UseKey<T>(
         string keyId,
         Func<byte[], Result<T, SmartCardError>> operation
     )
     {
         if (!_metadata.TryGetValue(keyId, out var metadata))
         {
-            return Result.Failure<(T, KeyLifecycleManager), SmartCardError>(
+            return Result.Failure<(T, KeyLifecycle), SmartCardError>(
                 SmartCardError.InvalidArgument($"Key '{keyId}' not found")
             );
         }
@@ -205,7 +205,7 @@ public sealed class KeyLifecycleManager
         // Check if key needs rotation
         if (_config.RequireKeyRotation && IsRotationRequired(metadata))
         {
-            return Result.Failure<(T, KeyLifecycleManager), SmartCardError>(
+            return Result.Failure<(T, KeyLifecycle), SmartCardError>(
                 SmartCardError.SecurityError($"Key '{keyId}' requires rotation")
             );
         }
@@ -213,7 +213,7 @@ public sealed class KeyLifecycleManager
         // Check usage count
         if (metadata.UsageCount >= _config.MaxKeyUsageCount)
         {
-            return Result.Failure<(T, KeyLifecycleManager), SmartCardError>(
+            return Result.Failure<(T, KeyLifecycle), SmartCardError>(
                 SmartCardError.SecurityError($"Key '{keyId}' has exceeded maximum usage count")
             );
         }
@@ -231,7 +231,7 @@ public sealed class KeyLifecycleManager
                 };
 
                 var newMetadata = _metadata.SetItem(keyId, updatedMetadata);
-                var newManager = new KeyLifecycleManager(_config, _keyStore, newMetadata);
+                var newManager = new KeyLifecycle(_config, _keyStore, newMetadata);
 
                 return (result, newManager);
             });

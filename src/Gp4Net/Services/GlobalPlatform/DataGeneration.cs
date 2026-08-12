@@ -12,7 +12,7 @@ using Gp4Net.Core;
 using Gp4Net.Domain.DataObjects;
 using JetBrains.Annotations;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
-using static Gp4Net.Services.TlvService;
+using static Gp4Net.Services.TlvCodec;
 
 namespace Gp4Net.Services.GlobalPlatform;
 

@@ -56,12 +56,28 @@ public sealed class VirtualCardChannel : ICardChannel
     /// <param name="command">The raw APDU command bytes.</param>
     /// <param name="cancellationToken">Cancellation token (ignored for virtual cards).</param>
     /// <returns>The raw response from the virtual card.</returns>
-    public Task<byte[]> TransmitAsync(byte[] command, CancellationToken cancellationToken = default)
+    public Task<Result<ChannelExchange, SmartCardError>> TransmitAsync(
+        byte[] command,
+        CancellationToken cancellationToken = default
+    )
     {
         var result = _virtualCard.ProcessCommand(command);
         return result.Match(
-            success => Task.FromResult(BuildResponseBytes(success.Response)),
-            error => Task.FromResult(VirtualCardErrorResponse.ToBytes(error))
+            success =>
+                Task.FromResult(
+                    Result.Success<ChannelExchange, SmartCardError>(
+                        new ChannelExchange(
+                            BuildResponseBytes(success.Response),
+                            new VirtualCardChannel(success.UpdatedCard)
+                        )
+                    )
+                ),
+            error =>
+                Task.FromResult(
+                    Result.Success<ChannelExchange, SmartCardError>(
+                        new ChannelExchange(VirtualCardErrorResponse.ToBytes(error), this)
+                    )
+                )
         );
     }
 

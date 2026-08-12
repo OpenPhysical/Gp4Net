@@ -56,7 +56,7 @@ public class T1ApduTransport : IApduTransport
     }
 
     /// <inheritdoc />
-    public async Task<Result<ApduResponse, SmartCardError>> TransmitAsync(
+    public async Task<Result<TransportExchange, SmartCardError>> TransmitAsync(
         IApduCommand command,
         ICardChannel channel,
         CancellationToken cancellationToken = default
@@ -66,7 +66,7 @@ public class T1ApduTransport : IApduTransport
         var apduBytesResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
         if (apduBytesResult.IsFailure)
         {
-            return Result.Failure<ApduResponse, SmartCardError>(
+            return Result.Failure<TransportExchange, SmartCardError>(
                 SmartCardError.InvalidArgument($"APDU build failed: {apduBytesResult.Error}")
             );
         }
@@ -80,7 +80,7 @@ public class T1ApduTransport : IApduTransport
             && !_supportsExtendedLength
         ) // 5 header + 255 data + 1 Le for short APDU
         {
-            return Result.Failure<ApduResponse, SmartCardError>(
+            return Result.Failure<TransportExchange, SmartCardError>(
                 SmartCardError.InvalidArgument(
                     "Extended length APDUs not supported by this transport"
                 )
@@ -88,43 +88,32 @@ public class T1ApduTransport : IApduTransport
         }
         _logger.LogDebug("T=1 Transmit: {Apdu}", BitConverter.ToString(apduBytes));
 
-        // Send command and handle exceptions functionally
-        var responseResult = await Gp4Net
-            .Core.Functional.ResultExtensions.TryAsync<byte[], SmartCardError>(
-                async () =>
-                    await channel.TransmitAsync(apduBytes, cancellationToken).ConfigureAwait(false),
-                ex =>
-                {
-                    _logger.LogError(ex, "T=1 transmission failed");
-                    return SmartCardError.CommunicationFailed(
-                        $"T=1 transmission failed: {ex.Message}"
-                    );
-                }
-            )
+        var responseResult = await channel
+            .TransmitAsync(apduBytes, cancellationToken)
             .ConfigureAwait(false);
 
         // If transmission failed, return error
         if (responseResult.IsFailure)
         {
-            return Result.Failure<ApduResponse, SmartCardError>(responseResult.Error);
+            return Result.Failure<TransportExchange, SmartCardError>(responseResult.Error);
         }
 
-        var response = ProcessResponse(responseResult.Value);
+        var response = ProcessResponse(responseResult.Value.Response);
         if ((response.StatusWord >> 8) != 0x61)
         {
-            return Result.Success<ApduResponse, SmartCardError>(response);
+            return Result.Success<TransportExchange, SmartCardError>(
+                new TransportExchange(response, responseResult.Value.Channel)
+            );
         }
 
-        return Result.Success<ApduResponse, SmartCardError>(
-            await GetResponseAsync(
-                    apduBytes[0],
-                    (byte)response.StatusWord,
-                    response.Data,
-                    channel,
-                    cancellationToken
-                )
-                .ConfigureAwait(false)
-        );
+        return await GetResponseAsync(
+                apduBytes[0],
+                (byte)response.StatusWord,
+                response.Data,
+                responseResult.Value.Channel,
+                cancellationToken
+            )
+            .ConfigureAwait(false);
     }
 
     private static byte GetLeByte(int expectedLength)
@@ -153,7 +142,7 @@ public class T1ApduTransport : IApduTransport
         return new ApduResponse(data, statusWord);
     }
 
-    private async Task<ApduResponse> GetResponseAsync(
+    private async Task<Result<TransportExchange, SmartCardError>> GetResponseAsync(
         byte cla,
         byte length,
         byte[] initialData,
@@ -168,15 +157,23 @@ public class T1ApduTransport : IApduTransport
         {
             // ISO/IEC 7816-4:2020 §5.3.4 requires the same CLA throughout response chaining.
             byte[] getResponse = [cla, 0xC0, 0x00, 0x00, currentLength];
-            byte[] rawResponse = await channel
+            var exchange = await channel
                 .TransmitAsync(getResponse, cancellationToken)
                 .ConfigureAwait(false);
-            var response = ProcessResponse(rawResponse);
+            if (exchange.IsFailure)
+            {
+                return Result.Failure<TransportExchange, SmartCardError>(exchange.Error);
+            }
+
+            channel = exchange.Value.Channel;
+            var response = ProcessResponse(exchange.Value.Response);
             data.AddRange(response.Data);
 
             if ((response.StatusWord >> 8) != 0x61)
             {
-                return new ApduResponse([.. data], response.StatusWord);
+                return Result.Success<TransportExchange, SmartCardError>(
+                    new TransportExchange(new ApduResponse([.. data], response.StatusWord), channel)
+                );
             }
 
             currentLength = (byte)response.StatusWord;

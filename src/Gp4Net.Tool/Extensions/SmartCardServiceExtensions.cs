@@ -11,7 +11,7 @@ using WSCT.ISO7816;
 namespace Gp4Net.Tool.Extensions;
 
 /// <summary>
-/// Extension methods for SmartCardService to support CLI logging configuration.
+/// Extension methods for CardSessionCommands to support CLI logging configuration.
 /// </summary>
 public static class SmartCardServiceExtensions
 {
@@ -27,7 +27,7 @@ public static class SmartCardServiceExtensions
         CancellationToken,
         Task<Result<CommandResponse, SmartCardError>>
     > CreateExecutor(
-        this ISmartCardService service,
+        this ICardSessionCommands service,
         StandardCommandSettings settings,
         bool useSecureChannel = false
     )
@@ -50,7 +50,7 @@ public static class SmartCardServiceExtensions
         CancellationToken,
         Task<Result<CommandResponse, SmartCardError>>
     > CreateExecutor(
-        this ISmartCardService service,
+        this ICardSessionCommands service,
         CardCommandSettings settings,
         bool useSecureChannel = false
     )
@@ -72,7 +72,7 @@ public static class SmartCardServiceExtensions
         CancellationToken,
         Task<Result<CommandResponse, SmartCardError>>
     > CreateExecutor(
-        this ISmartCardService service,
+        this ICardSessionCommands service,
         SecureCommandSettings settings,
         bool useSecureChannel = true
     )

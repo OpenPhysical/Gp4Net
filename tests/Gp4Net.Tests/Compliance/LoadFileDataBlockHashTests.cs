@@ -24,7 +24,7 @@ public class LoadFileDataBlockHashTests
     )]
     public void Should_Verify_Each_Supported_Lfdbh_Length(string expectedHashHex)
     {
-        var result = new CapFileService().VerifyLoadFileDataBlockHash(
+        var result = new CapFileOperations().VerifyLoadFileDataBlockHash(
             "abc"u8.ToArray(),
             Convert.FromHexString(expectedHashHex)
         );
@@ -40,7 +40,7 @@ public class LoadFileDataBlockHashTests
     [Test]
     public void Should_Reject_An_Unsupported_Lfdbh_Length()
     {
-        var result = new CapFileService().VerifyLoadFileDataBlockHash(
+        var result = new CapFileOperations().VerifyLoadFileDataBlockHash(
             "abc"u8.ToArray(),
             new byte[16]
         );
@@ -55,7 +55,7 @@ public class LoadFileDataBlockHashTests
     [Test]
     public void Should_Not_Fabricate_A_Dap_Verification_Key()
     {
-        var result = new CapFileService().VerifyDapSignature([0x01], [0x02]);
+        var result = new CapFileOperations().VerifyDapSignature([0x01], [0x02]);
 
         _ = result.IsFailure.Should().BeTrue();
     }

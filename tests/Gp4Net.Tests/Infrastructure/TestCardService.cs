@@ -10,38 +10,41 @@ using WSCT.ISO7816;
 namespace Gp4Net.Tests.Infrastructure;
 
 /// <summary>
-/// Test implementation of ISmartCardService that adapts VirtualCardService for testing.
-/// Provides a bridge between the emulator's VirtualCardService and the ISmartCardService interface.
+/// Test implementation of ICardSessionCommands that adapts VirtualCardOperations for testing.
+/// Provides a bridge between the emulator's VirtualCardOperations and the ICardSessionCommands interface.
 /// </summary>
-public sealed class TestCardService : ISmartCardService
+public sealed class TestCardService : ICardSessionCommands
 {
-    private readonly Maybe<VirtualCardService> _virtualCardService;
-    private readonly IPipelineContext _context;
+    private readonly Maybe<VirtualCardOperations> _virtualCardService;
+    private readonly ImmutablePipelineContext _context;
     private bool _disposed;
 
     /// <summary>
-    /// Creates a TestCardService with the specified VirtualCardService.
+    /// Creates a TestCardService with the specified VirtualCardOperations.
     /// </summary>
     /// <param name="virtualCardService">The virtual card service to adapt.</param>
     /// <returns>A Result containing the TestCardService or an error.</returns>
     public static Result<TestCardService, SmartCardError> Create(
-        VirtualCardService virtualCardService
+        VirtualCardOperations virtualCardService
     )
     {
         return Maybe
             .From(virtualCardService)
-            .ToResult(SmartCardError.InvalidArgument("VirtualCardService cannot be null"))
+            .ToResult(SmartCardError.InvalidArgument("VirtualCardOperations cannot be null"))
             .Map(service => new TestCardService(service, ImmutablePipelineContext.Empty));
     }
 
-    private TestCardService(VirtualCardService virtualCardService, IPipelineContext context)
+    private TestCardService(
+        VirtualCardOperations virtualCardService,
+        ImmutablePipelineContext context
+    )
     {
         _virtualCardService = Maybe.From(virtualCardService);
         _context = context;
     }
 
     /// <inheritdoc />
-    public IPipelineContext Context => _context;
+    public ImmutablePipelineContext Context => _context;
 
     /// <inheritdoc />
     public async Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
@@ -77,9 +80,11 @@ public sealed class TestCardService : ISmartCardService
     }
 
     /// <inheritdoc />
-    public Result<ISmartCardService, SmartCardError> WithContext(IPipelineContext context)
+    public Result<ICardSessionCommands, SmartCardError> WithContext(
+        ImmutablePipelineContext context
+    )
     {
-        return Maybe<IPipelineContext>
+        return Maybe<ImmutablePipelineContext>
             .From(context)
             .ToResult(SmartCardError.InvalidArgument("Context cannot be null"))
             .Bind(validContext =>
@@ -87,17 +92,19 @@ public sealed class TestCardService : ISmartCardService
                     .ToResult(
                         SmartCardError.CommunicationError("Virtual card service not available")
                     )
-                    .Map(service => (ISmartCardService)new TestCardService(service, validContext))
+                    .Map(service =>
+                        (ICardSessionCommands)new TestCardService(service, validContext)
+                    )
             );
     }
 
     /// <inheritdoc />
-    public Result<ISmartCardService, SmartCardError> WithContextValue<T>(string key, T value)
+    public Result<ICardSessionCommands, SmartCardError> WithContextValue<T>(string key, T value)
     {
         var newContext = _context.With(key, value);
         return _virtualCardService
             .ToResult(SmartCardError.CommunicationError("Virtual card service not available"))
-            .Map(service => (ISmartCardService)new TestCardService(service, newContext));
+            .Map(service => (ICardSessionCommands)new TestCardService(service, newContext));
     }
 
     /// <inheritdoc />

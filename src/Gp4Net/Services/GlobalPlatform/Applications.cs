@@ -96,7 +96,7 @@ public static class Applications
             cancellationToken
         );
 
-        return dataResult.Bind(TlvService.GlobalPlatformParsers.ParseApplicationsResponse);
+        return dataResult.Bind(TlvCodec.GlobalPlatformParsers.ParseApplicationsResponse);
     }
 
     /// <summary>
@@ -120,7 +120,7 @@ public static class Applications
             cancellationToken
         );
 
-        return dataResult.Bind(TlvService.GlobalPlatformParsers.ParseApplicationsResponse);
+        return dataResult.Bind(TlvCodec.GlobalPlatformParsers.ParseApplicationsResponse);
     }
 
     /// <summary>
@@ -144,7 +144,7 @@ public static class Applications
             cancellationToken
         );
 
-        return dataResult.Bind(TlvService.GlobalPlatformParsers.ParseLoadFilesResponse);
+        return dataResult.Bind(TlvCodec.GlobalPlatformParsers.ParseLoadFilesResponse);
     }
 
     /// <summary>
@@ -168,7 +168,7 @@ public static class Applications
             cancellationToken
         );
 
-        return dataResult.Bind(TlvService.GlobalPlatformParsers.ParseLoadFilesResponse);
+        return dataResult.Bind(TlvCodec.GlobalPlatformParsers.ParseLoadFilesResponse);
     }
 
     #region Private Helper Methods

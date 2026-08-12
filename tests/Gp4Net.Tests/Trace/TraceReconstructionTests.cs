@@ -104,7 +104,7 @@ public class TraceReconstructionTests
         var masterKey = Convert.FromHexString("404142434445464748494A4B4C4D4E4F");
 
         // Derive session MAC key for SCP02 using sequence counter from response
-        var sMacResult = CryptoService.KeyDerivation.DeriveScp02SessionKey(
+        var sMacResult = CryptoOperations.KeyDerivation.DeriveScp02SessionKey(
             masterKey,
             initUpdateResponse.SequenceCounter,
             [0x01, 0x01] // S-MAC derivation constant
@@ -133,7 +133,7 @@ public class TraceReconstructionTests
         var extAuthIcv = new byte[8];
 
         // Calculate MAC for EXTERNAL AUTHENTICATE
-        var extAuthMacResult = CryptoService.ScpOperations.Scp02.CalculateMac(
+        var extAuthMacResult = CryptoOperations.ScpOperations.Scp02.CalculateMac(
             sMacKey,
             extAuthMacInput,
             extAuthIcv
@@ -217,12 +217,12 @@ public class TraceReconstructionTests
         // For SCP02 with C-MAC enabled, the ICV must be encrypted before use
         // (except for EXTERNAL AUTHENTICATE which uses unencrypted ICV)
         // Since this is GET STATUS (INS=0xF2), we need to encrypt the ICV
-        var encryptedIcvResult = CryptoService.Mac.EncryptScp02Icv(initialIcv, sMacKey);
+        var encryptedIcvResult = CryptoOperations.Mac.EncryptScp02Icv(initialIcv, sMacKey);
         Assert.That(encryptedIcvResult.IsSuccess, Is.True, "ICV encryption should succeed");
         var encryptedIcv = encryptedIcvResult.Value;
 
         // For SCP02 with security level 01 (C-MAC only), calculate MAC with encrypted ICV
-        var macResult = CryptoService.ScpOperations.Scp02.CalculateMac(
+        var macResult = CryptoOperations.ScpOperations.Scp02.CalculateMac(
             sMacKey,
             macInputBytes,
             encryptedIcv
@@ -337,7 +337,7 @@ public class TraceReconstructionTests
         var masterKey = Convert.FromHexString("404142434445464748494A4B4C4D4E4F");
 
         // Derive S-ENC key for encryption using sequence counter from INITIALIZE UPDATE response
-        var sEncResult = CryptoService.KeyDerivation.DeriveScp02SessionKey(
+        var sEncResult = CryptoOperations.KeyDerivation.DeriveScp02SessionKey(
             masterKey,
             initUpdateResponse.SequenceCounter,
             [0x01, 0x82] // S-ENC derivation constant
@@ -353,7 +353,7 @@ public class TraceReconstructionTests
         paddedData[plaintextData.Length] = 0x80;
 
         // Encrypt with 3DES-CBC
-        var encryptResult = CryptoService.Cipher.Encrypt3DesCbc(
+        var encryptResult = CryptoOperations.Cipher.Encrypt3DesCbc(
             sEncKey,
             new byte[8], // Zero IV for SCP02
             paddedData

@@ -33,7 +33,7 @@ public class Scp03CryptogramTests
     public void Should_Calculate_Correct_Card_Cryptogram_With_Known_Test_Values()
     {
         var macKey = DeriveMacSessionKey(HostChallenge, CardChallenge);
-        var cardCryptogramResult = CryptoService.Cryptogram.CalculateScp03CardCryptogram(
+        var cardCryptogramResult = CryptoOperations.Cryptogram.CalculateScp03CardCryptogram(
             macKey,
             HostChallenge,
             CardChallenge
@@ -53,7 +53,7 @@ public class Scp03CryptogramTests
     public void Should_Calculate_Correct_Host_Cryptogram_With_Known_Test_Values()
     {
         var macKey = DeriveMacSessionKey(HostChallenge, CardChallenge);
-        var hostCryptogramResult = CryptoService.Cryptogram.CalculateScp03HostCryptogram(
+        var hostCryptogramResult = CryptoOperations.Cryptogram.CalculateScp03HostCryptogram(
             macKey,
             HostChallenge,
             CardChallenge
@@ -92,7 +92,7 @@ public class Scp03CryptogramTests
         // Build cryptogram data using the response
         var hostChallengeForResponse = Convert.FromHexString("A51709B085AF91C1");
         var macKey = DeriveMacSessionKey(hostChallengeForResponse, response.CardChallenge);
-        var calculatedCryptogramResult = CryptoService.Cryptogram.CalculateScp03CardCryptogram(
+        var calculatedCryptogramResult = CryptoOperations.Cryptogram.CalculateScp03CardCryptogram(
             macKey,
             hostChallengeForResponse,
             response.CardChallenge
@@ -119,13 +119,13 @@ public class Scp03CryptogramTests
         // due to using different derivation constants per GP spec
 
         var macKey = DeriveMacSessionKey(HostChallenge, CardChallenge);
-        var cardCryptogramResult = CryptoService.Cryptogram.CalculateScp03CardCryptogram(
+        var cardCryptogramResult = CryptoOperations.Cryptogram.CalculateScp03CardCryptogram(
             macKey,
             HostChallenge,
             CardChallenge
         );
 
-        var hostCryptogramResult = CryptoService.Cryptogram.CalculateScp03HostCryptogram(
+        var hostCryptogramResult = CryptoOperations.Cryptogram.CalculateScp03HostCryptogram(
             macKey,
             HostChallenge,
             CardChallenge
@@ -149,7 +149,7 @@ public class Scp03CryptogramTests
     {
         // Test with invalid MAC key length
         var invalidMacKey = new byte[8]; // Too short
-        var result = CryptoService.Cryptogram.CalculateScp03CardCryptogram(
+        var result = CryptoOperations.Cryptogram.CalculateScp03CardCryptogram(
             invalidMacKey,
             HostChallenge,
             CardChallenge
@@ -165,7 +165,7 @@ public class Scp03CryptogramTests
 
         // Test with wrong host challenge length
         var shortHostChallenge = new byte[4];
-        var result1 = CryptoService.Cryptogram.CalculateScp03CardCryptogram(
+        var result1 = CryptoOperations.Cryptogram.CalculateScp03CardCryptogram(
             macKey,
             shortHostChallenge,
             CardChallenge
@@ -174,7 +174,7 @@ public class Scp03CryptogramTests
 
         // Test with wrong card challenge length (SCP03 requires 8 bytes)
         var shortCardChallenge = new byte[6];
-        var result2 = CryptoService.Cryptogram.CalculateScp03CardCryptogram(
+        var result2 = CryptoOperations.Cryptogram.CalculateScp03CardCryptogram(
             macKey,
             HostChallenge,
             shortCardChallenge
@@ -188,7 +188,7 @@ public class Scp03CryptogramTests
     [Test]
     public void Should_Reject_Rfu_SDek_Derivation_Constant()
     {
-        var result = CryptoService.KeyDerivation.DeriveScp03SessionKey(
+        var result = CryptoOperations.KeyDerivation.DeriveScp03SessionKey(
             MasterKey,
             HostChallenge,
             CardChallenge,
@@ -203,7 +203,7 @@ public class Scp03CryptogramTests
         var keySetResult = Scp03KeySet.Create(MasterKey, MasterKey, MasterKey, 0x01);
         Assert.That(keySetResult.IsSuccess, Is.True, "Failed to create SCP03 key set");
 
-        var macKeyResult = CryptoService.KeyDerivation.DeriveScp03SessionKey(
+        var macKeyResult = CryptoOperations.KeyDerivation.DeriveScp03SessionKey(
             keySetResult.Value.MacKey,
             hostChallenge,
             cardChallenge,

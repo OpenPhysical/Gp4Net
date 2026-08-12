@@ -10,7 +10,7 @@ using Gp4Net.Domain;
 using Gp4Net.Shared;
 using JetBrains.Annotations;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
-using static Gp4Net.Services.TlvService;
+using static Gp4Net.Services.TlvCodec;
 using ApduIns = Gp4Net.Constants.Apdu.Instructions;
 using GpIns = Gp4Net.Constants.Constants.GlobalPlatform.Ins;
 
@@ -145,7 +145,7 @@ public sealed record ApplicationRegistry
         if (Applications.ContainsKey(application.Aid))
         {
             return Result.Failure<ApplicationRegistry, SmartCardError>(
-                ErrorFactory.ApplicationInstallationFailed("Application AID already exists")
+                Errors.ApplicationInstallationFailed("Application AID already exists")
             );
         }
 
@@ -169,7 +169,7 @@ public sealed record ApplicationRegistry
         if (!Applications.ContainsKey(aid))
         {
             return Result.Failure<ApplicationRegistry, SmartCardError>(
-                ErrorFactory.ApplicationNotFound(Convert.ToHexString(aid.ToArray()))
+                Errors.ApplicationNotFound(Convert.ToHexString(aid.ToArray()))
             );
         }
 
@@ -205,9 +205,7 @@ public sealed record ApplicationRegistry
         if (!Applications.ContainsKey(updatedApplication.Aid))
         {
             return Result.Failure<ApplicationRegistry, SmartCardError>(
-                ErrorFactory.ApplicationNotFound(
-                    Convert.ToHexString(updatedApplication.Aid.ToArray())
-                )
+                Errors.ApplicationNotFound(Convert.ToHexString(updatedApplication.Aid.ToArray()))
             );
         }
 

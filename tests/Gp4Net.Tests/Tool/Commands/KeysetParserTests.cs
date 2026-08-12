@@ -4,7 +4,7 @@ using Gp4Net.Domain.Keys;
 using Gp4Net.Services;
 using Gp4Net.Tool.Commands.Common;
 using NUnit.Framework;
-using static Gp4Net.Cryptography.CryptoService;
+using static Gp4Net.Cryptography.CryptoOperations;
 
 namespace Gp4Net.Tests.Tool.Commands;
 

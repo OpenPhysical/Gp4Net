@@ -42,7 +42,7 @@ public class P71VirtualCard
     public static Result<P71VirtualCard, SmartCardError> FromJsonProfile(
         string jsonPath,
         IRngContext rngContext,
-        LoggingService loggingService
+        CardLogging loggingService
     )
     {
         return CardProfileLoader
@@ -69,7 +69,7 @@ public class P71VirtualCard
         string json,
         string profileName,
         IRngContext rngContext,
-        LoggingService loggingService
+        CardLogging loggingService
     )
     {
         return CardProfileLoader
@@ -91,7 +91,7 @@ public class P71VirtualCard
     /// <returns>Result containing P71 virtual card with SCP02 support.</returns>
     public static Result<P71VirtualCard, SmartCardError> CreateScp02Card(
         IRngContext rngContext,
-        LoggingService loggingService
+        CardLogging loggingService
     )
     {
         return CardConfiguration
@@ -108,7 +108,7 @@ public class P71VirtualCard
     /// <returns>Result containing P71 virtual card with SCP03 support.</returns>
     public static Result<P71VirtualCard, SmartCardError> CreateScp03Card(
         IRngContext rngContext,
-        LoggingService loggingService
+        CardLogging loggingService
     )
     {
         // Use dual protocol config but default to SCP03

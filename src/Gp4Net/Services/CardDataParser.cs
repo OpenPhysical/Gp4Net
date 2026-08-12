@@ -6,7 +6,7 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.CardInfo;
 using Org.BouncyCastle.Asn1;
-using static Gp4Net.Services.TlvService;
+using static Gp4Net.Services.TlvCodec;
 
 namespace Gp4Net.Services;
 

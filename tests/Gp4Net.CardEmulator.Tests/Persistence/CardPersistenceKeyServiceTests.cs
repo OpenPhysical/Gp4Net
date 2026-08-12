@@ -9,19 +9,19 @@ using NUnit.Framework;
 namespace Gp4Net.CardEmulator.Tests.Persistence;
 
 /// <summary>
-/// Tests for CardPersistenceKeyService functionality.
+/// Tests for CardPersistenceKeys functionality.
 /// Verifies KDF108-based key derivation, UUID generation, and key fingerprinting.
 /// </summary>
 [TestFixture]
 public class CardPersistenceKeyServiceTests
 {
     // @TODO THIS NEEDS TO BE IMMUTABLE
-    private CardPersistenceKeyService _service;
+    private CardPersistenceKeys _service;
 
     [SetUp]
     public void SetUp()
     {
-        _service = new CardPersistenceKeyService();
+        _service = new CardPersistenceKeys();
     }
 
     [Test]

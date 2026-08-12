@@ -1234,7 +1234,7 @@ public class TraceConverter
 
         // Convert RawKeyset to appropriate IKeySet based on detected SCP version
         var keysetConversionResult =
-            scpVersion == CryptoService.ScpVersion.Scp03
+            scpVersion == CryptoOperations.ScpVersion.Scp03
                 ? keysetResult.Value.ToScp03KeySet().Map(ks => (IKeySet)ks)
                 : keysetResult.Value.ToScp02KeySet().Map(ks => (IKeySet)ks);
 
@@ -1449,7 +1449,7 @@ public class TraceConverter
         }
     }
 
-    private static CryptoService.ScpVersion DetectScpVersionFromTrace(List<Exchange> exchanges)
+    private static CryptoOperations.ScpVersion DetectScpVersionFromTrace(List<Exchange> exchanges)
     {
         // Find INITIALIZE UPDATE response to determine SCP version
         var initUpdateList = exchanges
@@ -1457,7 +1457,7 @@ public class TraceConverter
             .ToList();
 
         if (!initUpdateList.Any())
-            return CryptoService.ScpVersion.Scp02; // Default if no INITIALIZE UPDATE found
+            return CryptoOperations.ScpVersion.Scp02; // Default if no INITIALIZE UPDATE found
 
         var initUpdate = initUpdateList.First();
         var responseData = initUpdate.Response.Replace(" ", "");
@@ -1466,10 +1466,12 @@ public class TraceConverter
         {
             // SCP identifier is at byte 11 (position 22-23 in hex string)
             var scpId = responseData.Substring(22, 2);
-            return scpId == "03" ? CryptoService.ScpVersion.Scp03 : CryptoService.ScpVersion.Scp02;
+            return scpId == "03"
+                ? CryptoOperations.ScpVersion.Scp03
+                : CryptoOperations.ScpVersion.Scp02;
         }
 
-        return CryptoService.ScpVersion.Scp02;
+        return CryptoOperations.ScpVersion.Scp02;
     }
 
     /// <summary>
@@ -1480,7 +1482,7 @@ public class TraceConverter
         byte[] wrappedCommand,
         SessionKeys sessionKeys,
         byte securityLevel,
-        CryptoService.ScpVersion scpVersion,
+        CryptoOperations.ScpVersion scpVersion,
         Maybe<byte[]> commandIcv
     )
     {
@@ -1518,8 +1520,8 @@ public class TraceConverter
             hasCEnc && data.Length > 0
                 ? scpVersion switch
                 {
-                    CryptoService.ScpVersion.Scp02
-                        => CryptoService
+                    CryptoOperations.ScpVersion.Scp02
+                        => CryptoOperations
                             .Cipher.Decrypt3DesCbc(
                                 sessionKeys.SEnc,
                                 new byte[8], // Always zero IV for SCP02 command encryption per GP spec E.3.1
@@ -1530,8 +1532,8 @@ public class TraceConverter
                                 success => Maybe<byte[]>.From(success),
                                 failure => Maybe<byte[]>.None
                             ),
-                    CryptoService.ScpVersion.Scp03
-                        => CryptoService
+                    CryptoOperations.ScpVersion.Scp03
+                        => CryptoOperations
                             .Cipher.DecryptAesCbc(sessionKeys.SEnc, new byte[16], data)
                             .Map(RemovePadding)
                             .Match(
@@ -1571,7 +1573,7 @@ public class TraceConverter
         byte[] wrappedResponse,
         SessionKeys sessionKeys,
         byte securityLevel,
-        CryptoService.ScpVersion scpVersion,
+        CryptoOperations.ScpVersion scpVersion,
         Maybe<byte[]> responseIcv
     )
     {
@@ -1595,8 +1597,8 @@ public class TraceConverter
             hasREnc && data.Length > 0
                 ? scpVersion switch
                 {
-                    CryptoService.ScpVersion.Scp02
-                        => CryptoService
+                    CryptoOperations.ScpVersion.Scp02
+                        => CryptoOperations
                             .Cipher.Decrypt3DesCbc(
                                 sessionKeys.SEnc,
                                 new byte[8], // Always zero IV for SCP02 response encryption per GP spec E.3.1
@@ -1607,8 +1609,8 @@ public class TraceConverter
                                 success => Maybe<byte[]>.From(success),
                                 failure => Maybe<byte[]>.None
                             ),
-                    CryptoService.ScpVersion.Scp03
-                        => CryptoService
+                    CryptoOperations.ScpVersion.Scp03
+                        => CryptoOperations
                             .Cipher.DecryptAesCbc(sessionKeys.SEnc, new byte[16], data)
                             .Map(RemovePadding)
                             .Match(

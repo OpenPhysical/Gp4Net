@@ -13,19 +13,19 @@ using WSCT.ISO7816;
 
 namespace Gp4Net.Tool.Tests.Support;
 
-internal sealed class RecordingSmartCardService : ISmartCardService
+internal sealed class RecordingSmartCardService : ICardSessionCommands
 {
-    private readonly ISmartCardService inner;
+    private readonly ICardSessionCommands inner;
 
     public List<(byte[] Command, Result<CommandResponse, SmartCardError> Result)> Records { get; } =
         new();
 
-    public RecordingSmartCardService(ISmartCardService inner)
+    public RecordingSmartCardService(ICardSessionCommands inner)
     {
         this.inner = inner;
     }
 
-    public IPipelineContext Context => inner.Context;
+    public ImmutablePipelineContext Context => inner.Context;
 
     public void Dispose() => inner.Dispose();
 
@@ -46,10 +46,11 @@ internal sealed class RecordingSmartCardService : ISmartCardService
         CancellationToken cancellationToken = default
     ) => inner.ExecuteCommandAsync(command, options, cancellationToken);
 
-    public Result<ISmartCardService, SmartCardError> WithContext(IPipelineContext context) =>
-        inner.WithContext(context);
+    public Result<ICardSessionCommands, SmartCardError> WithContext(
+        ImmutablePipelineContext context
+    ) => inner.WithContext(context);
 
-    public Result<ISmartCardService, SmartCardError> WithContextValue<T>(string key, T value) =>
+    public Result<ICardSessionCommands, SmartCardError> WithContextValue<T>(string key, T value) =>
         inner.WithContextValue(key, value);
 
     public Task<Result<bool, SmartCardError>> IsConnectedAsync(

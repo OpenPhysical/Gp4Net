@@ -1,5 +1,5 @@
 using JetBrains.Annotations;
-using static Gp4Net.Cryptography.CryptoService;
+using static Gp4Net.Cryptography.CryptoOperations;
 
 namespace Gp4Net.Domain.Keys;
 
@@ -16,7 +16,7 @@ public sealed record CryptogramContext(
     byte[] Key,
     byte[] Data,
     CryptogramType Type
-) : ICryptogramContext
+)
 {
     /// <summary>
     /// Gets the protocol version as byte to match interface.

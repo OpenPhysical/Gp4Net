@@ -1,7 +1,7 @@
 using System;
 using System.Linq;
 using CSharpFunctionalExtensions;
-using static Gp4Net.Cryptography.CryptoService;
+using static Gp4Net.Cryptography.CryptoOperations;
 
 namespace Gp4Net.Core.Functional;
 

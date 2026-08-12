@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Services;
+using Gp4Net.Core;
 using Gp4Net.Tests.Infrastructure;
 using Gp4Net.Transport;
 using Microsoft.Extensions.Logging;
@@ -24,7 +25,7 @@ public class T0ApduTransportTests
     public T0ApduTransportTests()
     {
         _logger = NullLogger<T0ApduTransport>.Instance;
-        var virtualCardService = new VirtualCardService();
+        var virtualCardService = new VirtualCardOperations();
         virtualCardService.SetupTestEnvironment();
         // Connect to the first virtual reader
         var readers = virtualCardService.GetReadersLegacy();
@@ -197,10 +198,17 @@ internal sealed class ScriptedCardChannel : ICardChannel
     public TransportProtocol Protocol { get; }
     public bool IsOpen => true;
 
-    public Task<byte[]> TransmitAsync(byte[] command, CancellationToken cancellationToken = default)
+    public Task<Result<ChannelExchange, SmartCardError>> TransmitAsync(
+        byte[] command,
+        CancellationToken cancellationToken = default
+    )
     {
         Commands.Add((byte[])command.Clone());
-        return Task.FromResult(_responses.Dequeue());
+        return Task.FromResult(
+            Result.Success<ChannelExchange, SmartCardError>(
+                new ChannelExchange(_responses.Dequeue(), this)
+            )
+        );
     }
 }
 
@@ -210,9 +218,9 @@ internal sealed class ScriptedCardChannel : ICardChannel
 /// </summary>
 internal class TestCardChannel : ICardChannel
 {
-    private readonly VirtualCardService _virtualCardService;
+    private readonly VirtualCardOperations _virtualCardService;
 
-    public TestCardChannel(VirtualCardService virtualCardService)
+    public TestCardChannel(VirtualCardOperations virtualCardService)
     {
         _virtualCardService = virtualCardService;
     }
@@ -220,7 +228,7 @@ internal class TestCardChannel : ICardChannel
     public TransportProtocol Protocol => TransportProtocol.T0;
     public bool IsOpen => true;
 
-    public async Task<byte[]> TransmitAsync(
+    public async Task<Result<ChannelExchange, SmartCardError>> TransmitAsync(
         byte[] command,
         CancellationToken cancellationToken = default
     )
@@ -236,6 +244,8 @@ internal class TestCardChannel : ICardChannel
         fullResponse[^2] = (byte)(response.StatusWord >> 8);
         fullResponse[^1] = (byte)(response.StatusWord & 0xFF);
 
-        return fullResponse;
+        return Result.Success<ChannelExchange, SmartCardError>(
+            new ChannelExchange(fullResponse, this)
+        );
     }
 }

@@ -4,7 +4,7 @@ using Gp4Net.Core;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Services;
 using JetBrains.Annotations;
-using static Gp4Net.Cryptography.CryptoService;
+using static Gp4Net.Cryptography.CryptoOperations;
 
 namespace Gp4Net.Tool.Commands.Common;
 
@@ -117,7 +117,7 @@ public static class KeysetParser
         var schemeCandidate = spec[..firstColon];
         var rest = spec[(firstColon + 1)..];
 
-        var specResult = KeyDiversificationService.CreateSpec(schemeCandidate);
+        var specResult = KeyDiversification.CreateSpec(schemeCandidate);
         if (specResult.IsFailure)
         {
             // Not a recognized diversification scheme - fall back to standard parsing
@@ -166,9 +166,7 @@ public static class KeysetParser
                     },
                 ex => SmartCardError.InvalidArgument($"Invalid hex in keyset: {ex.Message}")
             )
-            .Bind(keys =>
-                KeysetFactory.CreateRawFromThreeKeys(keys.Enc, keys.Mac, keys.Dek, keyVersion)
-            );
+            .Bind(keys => Keysets.CreateRawFromThreeKeys(keys.Enc, keys.Mac, keys.Dek, keyVersion));
     }
 
     private static Result<RawKeyset, SmartCardError> ParseRawSingleKeyFormat(
@@ -181,7 +179,7 @@ public static class KeysetParser
                 () => Convert.FromHexString(hexKey),
                 ex => SmartCardError.InvalidArgument($"Invalid hex key: {ex.Message}")
             )
-            .Bind(key => KeysetFactory.CreateRawFromSingleKey(key, keyVersion));
+            .Bind(key => Keysets.CreateRawFromSingleKey(key, keyVersion));
     }
 
     private static Result<IKeySet, SmartCardError> ParseThreeKeyFormat(
@@ -210,13 +208,7 @@ public static class KeysetParser
                 ex => SmartCardError.InvalidArgument($"Invalid hex in keyset: {ex.Message}")
             )
             .Bind(keys =>
-                KeysetFactory.CreateFromThreeKeys(
-                    keys.Enc,
-                    keys.Mac,
-                    keys.Dek,
-                    scpVersion,
-                    keyVersion
-                )
+                Keysets.CreateFromThreeKeys(keys.Enc, keys.Mac, keys.Dek, scpVersion, keyVersion)
             );
     }
 
@@ -231,6 +223,6 @@ public static class KeysetParser
                 () => Convert.FromHexString(hexKey),
                 ex => SmartCardError.InvalidArgument($"Invalid hex key: {ex.Message}")
             )
-            .Bind(key => KeysetFactory.CreateFromSingleKey(key, scpVersion, keyVersion));
+            .Bind(key => Keysets.CreateFromSingleKey(key, scpVersion, keyVersion));
     }
 }

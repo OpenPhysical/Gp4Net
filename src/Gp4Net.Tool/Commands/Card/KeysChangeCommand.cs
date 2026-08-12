@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Services.GlobalPlatform;
@@ -128,7 +129,7 @@ public class KeysChangeCommand : IPipelineCommand<KeysChangeCommand.Settings>
 
     private static Result<IKeySet, SmartCardError> ResolveNewKeyset(
         Settings settings,
-        Gp4Net.Cryptography.CryptoService.ScpVersion protocol,
+        Gp4Net.Cryptography.CryptoOperations.ScpVersion protocol,
         byte newVersion
     )
     {
@@ -145,8 +146,19 @@ public class KeysChangeCommand : IPipelineCommand<KeysChangeCommand.Settings>
         context.Display.Info($"New key version: {newKeyset.KeyVersion:X2}");
         context.Display.Info($"Protocol: {(newKeyset is Scp02KeySet ? "SCP02" : "SCP03")}");
 
+        var secureChannel = context.CardService.Context.Get<SecureChannelState>(
+            "SecureChannelSession"
+        );
+        if (!secureChannel.HasValue)
+        {
+            return SmartCardError.AuthenticationFailed(
+                "An authenticated secure channel is required."
+            );
+        }
+
         var response = await KeyChange.ExecuteAsync(
-            context.CardService,
+            context.CardService.ExecuteCommandAsync,
+            secureChannel.Value,
             newKeyset,
             replacedVersion
         );

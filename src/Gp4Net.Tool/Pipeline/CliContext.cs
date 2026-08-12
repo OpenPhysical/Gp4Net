@@ -19,13 +19,13 @@ namespace Gp4Net.Tool.Pipeline;
 public class CliContext : ICliExecutionContext
 {
     private readonly ILogger<CliContext> _logger;
-    private readonly IKeysetResolver _keysetResolver;
-    private readonly ISmartCardServiceFactory? _serviceFactory;
-    private readonly IReaderResolutionService? _readerResolutionService;
+    private readonly KeysetResolution _keysetResolver;
+    private readonly CardSessionConnections? _serviceFactory;
+    private readonly ReaderSelectionOperations? _readerResolutionService;
 
-    public IDisplayService Display { get; }
-    public ISmartCardService CardService { get; }
-    public IKeysetResolver KeysetResolver => _keysetResolver;
+    public IDisplay Display { get; }
+    public ICardSessionCommands CardService { get; }
+    public KeysetResolution KeysetResolution => _keysetResolver;
 
     /// <summary>
     /// Pure function for establishing secure channels from user requests.
@@ -38,12 +38,12 @@ public class CliContext : ICliExecutionContext
     > EstablishSecureChannelAsync { get; }
 
     public CliContext(
-        IDisplayService display,
-        ISmartCardService cardService,
-        IKeysetResolver keysetResolver,
+        IDisplay display,
+        ICardSessionCommands cardService,
+        KeysetResolution keysetResolver,
         ILogger<CliContext> logger,
-        ISmartCardServiceFactory? serviceFactory = null,
-        IReaderResolutionService? readerResolutionService = null
+        CardSessionConnections? serviceFactory = null,
+        ReaderSelectionOperations? readerResolutionService = null
     )
     {
         // Pure assignment - dependency injection framework ensures non-null services

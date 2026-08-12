@@ -8,7 +8,7 @@ using Gp4Net.Transport;
 using JetBrains.Annotations;
 using WSCT.ISO7816;
 using static Gp4Net.Constants.Constants;
-using static Gp4Net.Services.TlvService;
+using static Gp4Net.Services.TlvCodec;
 
 namespace Gp4Net.Domain.Commands;
 

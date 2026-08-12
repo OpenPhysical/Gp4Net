@@ -14,7 +14,7 @@ namespace Gp4Net.Tests.Tool.Services;
 
 public class CardCompatibilityServiceTests
 {
-    private CardCompatibilityService _service = default!;
+    private CardCompatibility _service = default!;
     private TestEnvironmentValidationService _envValidation = default!;
     private TestCardChannel _channel = default!;
     private TestApduTransport _transport = default!;
@@ -23,8 +23,8 @@ public class CardCompatibilityServiceTests
     public void Setup()
     {
         _envValidation = new TestEnvironmentValidationService();
-        var serviceResult = CardCompatibilityService.Create(
-            NullLogger<CardCompatibilityService>.Instance,
+        var serviceResult = CardCompatibility.Create(
+            NullLogger<CardCompatibility>.Instance,
             _envValidation
         );
         _service = serviceResult.Value;
@@ -200,7 +200,7 @@ public class CardCompatibilityServiceTests
     }
 }
 
-public class TestEnvironmentValidationService : IEnvironmentValidationService
+public class TestEnvironmentValidationService : IEnvironmentValidation
 {
     private EnvironmentValidationResult _result =
         new(
@@ -246,10 +246,13 @@ public class TestEnvironmentValidationService : IEnvironmentValidationService
 
 public class TestCardChannel : ICardChannel
 {
-    public Task<byte[]> TransmitAsync(byte[] command, CancellationToken cancellationToken = default)
-    {
-        return Task.FromResult(new byte[] { 0x90, 0x00 });
-    }
+    public Task<Result<ChannelExchange, SmartCardError>> TransmitAsync(
+        byte[] command,
+        CancellationToken cancellationToken = default
+    ) =>
+        Task.FromResult(
+            Result.Success<ChannelExchange, SmartCardError>(new ChannelExchange([0x90, 0x00], this))
+        );
 
     public TransportProtocol Protocol => TransportProtocol.T1;
     public bool IsOpen => true;
@@ -262,13 +265,17 @@ public class TestApduTransport : IApduTransport
     public int MaxResponseDataLength => 256;
     public bool SupportsExtendedLength => false;
 
-    public Task<Result<ApduResponse, SmartCardError>> TransmitAsync(
+    public Task<Result<TransportExchange, SmartCardError>> TransmitAsync(
         IApduCommand command,
         ICardChannel channel,
         CancellationToken cancellationToken = default
     )
     {
         var response = new ApduResponse(Array.Empty<byte>(), 0x9000);
-        return Task.FromResult(Result.Success<ApduResponse, SmartCardError>(response));
+        return Task.FromResult(
+            Result.Success<TransportExchange, SmartCardError>(
+                new TransportExchange(response, channel)
+            )
+        );
     }
 }

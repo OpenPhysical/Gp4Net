@@ -1,5 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Transport;
@@ -17,7 +19,10 @@ public interface ICardChannel
     /// <param name="command">The raw APDU command bytes.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The raw response from the card.</returns>
-    Task<byte[]> TransmitAsync(byte[] command, CancellationToken cancellationToken = default);
+    Task<Result<ChannelExchange, SmartCardError>> TransmitAsync(
+        byte[] command,
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Gets the active transport protocol for this channel.
@@ -29,3 +34,8 @@ public interface ICardChannel
     /// </summary>
     bool IsOpen { get; }
 }
+
+/// <summary>
+/// Raw response bytes paired with the channel state produced by the exchange.
+/// </summary>
+public sealed record ChannelExchange(byte[] Response, ICardChannel Channel);

@@ -91,7 +91,7 @@ public sealed record IssuerSecurityDomain : IApplication
         if (aid.Length < 5 || aid.Length > 16)
         {
             return Result.Failure<IssuerSecurityDomain, SmartCardError>(
-                ErrorFactory.InvalidLength("AID", 5, aid.Length)
+                Errors.InvalidLength("AID", 5, aid.Length)
             );
         }
 
@@ -129,7 +129,7 @@ public sealed record IssuerSecurityDomain : IApplication
         if (aid.Length < 5 || aid.Length > 16)
         {
             return Result.Failure<IssuerSecurityDomain, SmartCardError>(
-                ErrorFactory.InvalidLength("AID", 5, aid.Length)
+                Errors.InvalidLength("AID", 5, aid.Length)
             );
         }
 
@@ -273,7 +273,7 @@ public sealed record IssuerSecurityDomain : IApplication
     )
     {
         return CommandProcessors
-            .ProcessInitializeUpdate(command, cardState, config, rngContext, LoggingService.None)
+            .ProcessInitializeUpdate(command, cardState, config, rngContext, CardLogging.None)
             .Map(result =>
             {
                 var (response, updatedState) = result;
@@ -300,7 +300,7 @@ public sealed record IssuerSecurityDomain : IApplication
                     cardState,
                     config,
                     rngContext,
-                    LoggingService.None
+                    CardLogging.None
                 ),
             0x03
                 => Scp03CommandProcessors.ProcessScp03ExternalAuthenticate(
@@ -308,7 +308,7 @@ public sealed record IssuerSecurityDomain : IApplication
                     cardState,
                     config,
                     rngContext,
-                    LoggingService.None
+                    CardLogging.None
                 ),
             _
                 => Result.Failure<(CoreApduResponse, CardState), SmartCardError>(
@@ -830,7 +830,7 @@ public sealed record IssuerSecurityDomain : IApplication
             0x03 => CalculateScp03CardCryptogram(hostChallenge, cardChallenge, keySet),
             _
                 => Result.Failure<byte[], SmartCardError>(
-                    ErrorFactory.UnsupportedProtocol($"SCP{scpVersion:X2}")
+                    Errors.UnsupportedProtocol($"SCP{scpVersion:X2}")
                 ),
         };
     }
@@ -845,13 +845,13 @@ public sealed record IssuerSecurityDomain : IApplication
         if (keySet is not Scp02KeySet scp02Keys)
         {
             return Result.Failure<byte[], SmartCardError>(
-                ErrorFactory.InvalidKey("SCP02", "Invalid key set type")
+                Errors.InvalidKey("SCP02", "Invalid key set type")
             );
         }
 
         // Calculate SCP02 card cryptogram using sequence counter
         var sequenceCounterResult = Maybe<byte[]>.From(sequenceCounter);
-        return CryptoService
+        return CryptoOperations
             .Cryptogram.CalculateCardCryptogram(
                 hostChallenge,
                 cardChallenge,
@@ -872,12 +872,12 @@ public sealed record IssuerSecurityDomain : IApplication
         if (keySet is not Scp03KeySet scp03Keys)
         {
             return Result.Failure<byte[], SmartCardError>(
-                ErrorFactory.InvalidKey("SCP03", "Invalid key set type")
+                Errors.InvalidKey("SCP03", "Invalid key set type")
             );
         }
 
         // Calculate SCP03 card cryptogram (no sequence counter needed)
-        return CryptoService
+        return CryptoOperations
             .Cryptogram.CalculateCardCryptogram(
                 hostChallenge,
                 cardChallenge,

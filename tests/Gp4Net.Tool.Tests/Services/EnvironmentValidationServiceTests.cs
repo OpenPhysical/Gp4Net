@@ -19,14 +19,12 @@ public class EnvironmentValidationServiceTests
         Convert.FromHexString("DEADBEEFDEADBEEFDEADBEEFDEADBEEF"),
     ];
 
-    private EnvironmentValidationService service = default!;
+    private EnvironmentValidation service = default!;
 
     [SetUp]
     public void SetUp()
     {
-        service = new EnvironmentValidationService(
-            NullLogger<EnvironmentValidationService>.Instance
-        );
+        service = new EnvironmentValidation(NullLogger<EnvironmentValidation>.Instance);
     }
 
     [Test]

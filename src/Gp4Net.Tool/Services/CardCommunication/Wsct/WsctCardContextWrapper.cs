@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using WSCT.Wrapper;
 using WSCT.Wrapper.Desktop.Core;
@@ -5,69 +6,33 @@ using WSCT.Wrapper.Desktop.Core;
 namespace Gp4Net.Tool.Services.CardCommunication.Wsct;
 
 /// <summary>
-/// Concrete implementation of ICardContextWrapper using WSCT.
+/// Owns the native WSCT context used to enumerate and connect card readers.
 /// </summary>
-public class WsctCardContextWrapper : ICardContextWrapper
+public sealed class WsctCardContextWrapper : IDisposable
 {
-    private readonly CardContext _context;
-    private bool _disposed;
+    private readonly CardContext context = new();
+    private bool disposed;
 
-    /// <summary>
-    /// Initializes a new instance of the WsctCardContextWrapper class.
-    /// </summary>
-    public WsctCardContextWrapper()
-    {
-        _context = new CardContext();
-    }
+    public IReadOnlyList<string> Readers =>
+        context.Readers is IReadOnlyList<string> readers ? readers : [];
 
-    /// <inheritdoc />
-    public IReadOnlyList<string> Readers
-    {
-        get { return _context.Readers ?? []; }
-    }
+    public ErrorCode Establish() => context.Establish();
 
-    /// <inheritdoc />
-    public ErrorCode Establish()
-    {
-        return _context.Establish();
-    }
+    public ErrorCode ListReaders(string groups) => context.ListReaders(groups);
 
-    /// <inheritdoc />
-    public ErrorCode ListReaders(string groups)
-    {
-        return _context.ListReaders(groups);
-    }
+    public WsctCardChannelWrapper CreateCardChannel(string readerName) =>
+        new WsctCardChannelWrapper(context, readerName, ShareMode.Exclusive);
 
-    /// <inheritdoc />
-    public ICardChannelWrapper CreateCardChannel(string readerName)
-    {
-        return new WsctCardChannelWrapper(_context, readerName, ShareMode.Exclusive);
-    }
+    public ErrorCode Release() => disposed ? ErrorCode.Success : context.Release();
 
-    /// <inheritdoc />
-    public ErrorCode Release()
-    {
-        if (!_disposed)
-        {
-            return _context.Release();
-        }
-        return ErrorCode.Success;
-    }
-
-    /// <inheritdoc />
     public void Dispose()
     {
-        if (!_disposed)
+        if (disposed)
         {
-            try
-            {
-                _ = _context.Release();
-            }
-            catch
-            {
-                // Ignore errors during cleanup
-            }
-            _disposed = true;
+            return;
         }
+
+        _ = context.Release();
+        disposed = true;
     }
 }

@@ -13,18 +13,19 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
-using ScpVersion = Gp4Net.Cryptography.CryptoService.ScpVersion;
+using ScpVersion = Gp4Net.Cryptography.CryptoOperations.ScpVersion;
 
 namespace Gp4Net.CardEmulator.Tests.Functional;
 
 /// <summary>
-/// Tests for CardStateService ensuring proper immutable state management.
+/// Tests for CardStateTransitions ensuring proper immutable state management.
 /// Validates all state transitions are pure functions with no side effects.
 /// </summary>
 [TestFixture]
 public class CardStateServiceTests
 {
-    private readonly CardStateService _stateService = new(Maybe<ILogger>.From(NullLogger.Instance));
+    private readonly CardStateTransitions _stateService =
+        new(Maybe<ILogger>.From(NullLogger.Instance));
 
     [Test]
     public void CreateInitialState_Success_ReturnsValidCardState()

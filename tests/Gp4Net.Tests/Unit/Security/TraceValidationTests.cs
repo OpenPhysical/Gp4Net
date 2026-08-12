@@ -3,7 +3,7 @@ using System.Linq;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Trace;
 using NUnit.Framework;
-using static Gp4Net.Cryptography.CryptoService;
+using static Gp4Net.Cryptography.CryptoOperations;
 
 namespace Gp4Net.Tests.Unit.Security;
 

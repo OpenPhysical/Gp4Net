@@ -364,14 +364,14 @@ public class KeyDiversificationIntegrationTests
         var sessionKeysResult = keySetResult.Bind(diversifiedKeys =>
         {
             Result<byte[], SmartCardError> sessionEncResult =
-                CryptoService.KeyDerivation.DeriveScp02SessionKey(
+                CryptoOperations.KeyDerivation.DeriveScp02SessionKey(
                     diversifiedKeys.EncKey,
                     TestVectors.TestSequenceCounter1,
                     Constants.Constants.Scp.Scp02.KeyDerivationConstants.SEnc
                 );
 
             Result<byte[], SmartCardError> sessionMacResult =
-                CryptoService.KeyDerivation.DeriveScp02SessionKey(
+                CryptoOperations.KeyDerivation.DeriveScp02SessionKey(
                     diversifiedKeys.MacKey,
                     TestVectors.TestSequenceCounter1,
                     Constants.Constants.Scp.Scp02.KeyDerivationConstants.SMac
@@ -467,14 +467,14 @@ public class KeyDiversificationIntegrationTests
         var sessionKeysResult = keySetResult.Bind(keySet =>
         {
             Result<byte[], SmartCardError> sessionEncResult =
-                CryptoService.KeyDerivation.DeriveScp02SessionKey(
+                CryptoOperations.KeyDerivation.DeriveScp02SessionKey(
                     keySet.EncKey,
                     sequenceCounter,
                     Constants.Constants.Scp.Scp02.KeyDerivationConstants.SEnc
                 );
 
             Result<byte[], SmartCardError> sessionMacResult =
-                CryptoService.KeyDerivation.DeriveScp02SessionKey(
+                CryptoOperations.KeyDerivation.DeriveScp02SessionKey(
                     keySet.MacKey,
                     sequenceCounter,
                     Constants.Constants.Scp.Scp02.KeyDerivationConstants.SMac

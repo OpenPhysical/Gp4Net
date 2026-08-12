@@ -14,7 +14,7 @@ namespace Gp4Net.CardEmulator.Tests.Core;
 
 /// <summary>
 /// Tests for VirtualCard with immutable state management.
-/// Validates that all state transitions use the ICardStateService properly.
+/// Validates that all state transitions use the  properly.
 /// </summary>
 [TestFixture]
 public class ImmutableVirtualCardTests
@@ -22,7 +22,7 @@ public class ImmutableVirtualCardTests
     private readonly CardConfiguration _config = CardConfiguration.P71().Value;
     private readonly IRngContext _rngContext = new TestRngContext();
     private readonly ILogger _logger = NullLogger.Instance;
-    private readonly ICardStateService _stateService = new CardStateService(
+    private readonly CardStateTransitions _stateService = new CardStateTransitions(
         Maybe<ILogger>.From(NullLogger.Instance)
     );
 
@@ -33,8 +33,8 @@ public class ImmutableVirtualCardTests
             _config,
             _rngContext,
             Maybe<ILogger>.From(_logger),
-            Maybe<CapFileServiceAdapter>.None,
-            Maybe<ICardStateService>.From(_stateService)
+            Maybe<EmulatorCapFiles>.None,
+            Maybe<CardStateTransitions>.From(_stateService)
         );
 
         result.IsSuccess.Should().BeTrue();

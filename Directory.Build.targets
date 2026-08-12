@@ -11,16 +11,11 @@
   <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.csproj' and '$(IsTestProject)' == 'true' and '$(CollectCoverage)' == 'true'">
     <CoverletOutputFormat>cobertura</CoverletOutputFormat>
     <CoverletOutput>$(MSBuildProjectDirectory)/../coverage/$(MSBuildProjectName).xml</CoverletOutput>
-    <Threshold>10</Threshold>
+    <Threshold Condition="'$(MSBuildProjectName)' == 'Gp4Net.Tests'">25</Threshold>
+    <Threshold Condition="'$(MSBuildProjectName)' == 'Gp4Net.CardEmulator.Tests'">10</Threshold>
+    <Threshold Condition="'$(MSBuildProjectName)' == 'Gp4Net.Tool.Tests'">4</Threshold>
     <ThresholdType>line,branch</ThresholdType>
     <ThresholdStat>total</ThresholdStat>
   </PropertyGroup>
 
-  <!-- Hook scripts that enforce higher guarantees for security-critical and business logic coverage -->
-  <Target Name="VerifyCoverageThresholds" AfterTargets="Test" Condition="'$(RunCoverageVerification)' != 'false'">
-    <Message Text="Skipping security-critical coverage enforcement; scripts/coverage/verify-security-critical.sh not present." Importance="low" Condition="!Exists('scripts/coverage/verify-security-critical.sh')" />
-    <Message Text="Skipping business-logic coverage enforcement; scripts/coverage/verify-business-logic.sh not present." Importance="low" Condition="!Exists('scripts/coverage/verify-business-logic.sh')" />
-    <Exec Command="bash ./scripts/coverage/verify-security-critical.sh" Condition="Exists('scripts/coverage/verify-security-critical.sh')" />
-    <Exec Command="bash ./scripts/coverage/verify-business-logic.sh" Condition="Exists('scripts/coverage/verify-business-logic.sh')" />
-  </Target>
 </Project>

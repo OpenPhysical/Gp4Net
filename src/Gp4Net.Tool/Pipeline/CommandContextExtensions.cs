@@ -25,10 +25,10 @@ public static class CommandContextExtensions
     /// </summary>
     public static ICliExecutionContext WithVerbose(this ICliExecutionContext context, bool verbose)
     {
-        if (context.Display is DisplayService displayService)
+        if (context.Display is ConsoleDisplay displayService)
         {
             // Create a new display service with updated verbose setting
-            var newDisplayService = new DisplayService(verbose);
+            var newDisplayService = new ConsoleDisplay(verbose);
             // Note: This creates a new context but loses the domain service factory
             // In practice, commands should just use the existing context
             return context;

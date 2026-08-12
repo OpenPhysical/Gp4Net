@@ -9,7 +9,7 @@ a command-line interface, and a virtual-card emulator, with support centered on 
 Card Specification 2.3.1 and SCP02/SCP03 secure channels.
 
 > [!IMPORTANT]
-> This repository is private and the project is pre-release. NuGet publishing is planned, but the
+> This repository is public and the project is pre-release. NuGet publishing is planned, but the
 > packages are not available yet. Build and run Gp4Net from source for now.
 
 ## Capabilities
@@ -51,9 +51,10 @@ dotnet build
 dotnet test
 ```
 
-GitHub Actions also collects Cobertura coverage, enforces a 10% total line and branch baseline for
-each solution test project, and uploads the reports. It publishes the Ubuntu report to Codecov when
-the private repository has a `CODECOV_TOKEN` secret configured.
+GitHub Actions also collects Cobertura coverage and enforces total line and branch baselines for
+every solution test project: 25% for the core suite, 10% for the emulator suite, and 4% for the CLI
+suite. It uploads all reports and publishes the Ubuntu reports to Codecov when a `CODECOV_TOKEN`
+secret is configured.
 
 Skip slower integration scenarios while iterating:
 
@@ -118,16 +119,18 @@ dotnet run --project src/Gp4Net.Tool/Gp4Net.Tool.csproj -- card test-sc --help
 
 ## Library architecture
 
-The core library separates protocol and card-management concerns:
+The core library separates protocol, state, and side-effect concerns:
 
 - `Domain`: commands, keys, security levels, CAP models, and protocol state
-- `Services`: SCP establishment, card communication, CAP handling, TLV handling, and GP operations
+- `Services`: pure SCP, CAP, TLV, capability, and GlobalPlatform operation modules
 - `Transport`: APDU construction, transmission, and response handling
 - `Constants`: shared GlobalPlatform, Java Card, APDU, TLV, and status-word constants
 
+`CardOperation<T>` threads immutable `CardSession` state through command workflows. Channel and
+transport exchanges return their updated state explicitly, including immutable virtual-card state.
 Public operations favor `Result<T, SmartCardError>` and `Maybe<T>` over implicit failure or optional
-state. Callers remain responsible for protecting production keys and selecting security levels that
-match their card policy.
+state. The CLI uses an explicit command catalog and startup composition, with no application DI
+container.
 
 ## Protocol support
 
@@ -142,7 +145,7 @@ against the exact card profile before deployment.
 
 ## Documentation
 
-- [Architecture notes](docs/architecture/)
+- [Architecture](docs/architecture/README.md)
 - [SCP02 notes](docs/SCP02_specification.md)
 - [Contributing guide](CONTRIBUTING.md)
 - [Contributor copyright assignment](CONTRIBUTOR_ASSIGNMENT.md)

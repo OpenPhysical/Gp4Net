@@ -53,7 +53,7 @@ public class T0ApduTransport : IApduTransport
     }
 
     /// <inheritdoc />
-    public async Task<Result<ApduResponse, SmartCardError>> TransmitAsync(
+    public async Task<Result<TransportExchange, SmartCardError>> TransmitAsync(
         IApduCommand command,
         ICardChannel channel,
         CancellationToken cancellationToken = default
@@ -63,7 +63,7 @@ public class T0ApduTransport : IApduTransport
         var apduBytesResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
         if (apduBytesResult.IsFailure)
         {
-            return Result.Failure<ApduResponse, SmartCardError>(
+            return Result.Failure<TransportExchange, SmartCardError>(
                 SmartCardError.InvalidArgument($"APDU build failed: {apduBytesResult.Error}")
             );
         }
@@ -77,37 +77,26 @@ public class T0ApduTransport : IApduTransport
         ) // 5 header + 255 data + 1 Le
         {
             _logger.LogWarning("T=0 does not support extended length APDUs");
-            return Result.Failure<ApduResponse, SmartCardError>(
+            return Result.Failure<TransportExchange, SmartCardError>(
                 SmartCardError.InvalidArgument("T=0 does not support extended length APDUs")
             );
         }
         _logger.LogDebug("T=0 Transmit: {Apdu}", BitConverter.ToString(apduBytes));
 
-        // Send command and handle exceptions functionally
-        var responseResult = await Gp4Net
-            .Core.Functional.ResultExtensions.TryAsync<byte[], SmartCardError>(
-                async () =>
-                    await channel.TransmitAsync(apduBytes, cancellationToken).ConfigureAwait(false),
-                ex =>
-                {
-                    _logger.LogError(ex, "T=0 transmission failed");
-                    return SmartCardError.CommunicationFailed(
-                        $"T=0 transmission failed: {ex.Message}"
-                    );
-                }
-            )
+        var responseResult = await channel
+            .TransmitAsync(apduBytes, cancellationToken)
             .ConfigureAwait(false);
 
         // If transmission failed, return error
         if (responseResult.IsFailure)
         {
-            return Result.Failure<ApduResponse, SmartCardError>(responseResult.Error);
+            return Result.Failure<TransportExchange, SmartCardError>(responseResult.Error);
         }
 
         // Process the response
         return await ProcessResponseAsync(
-                responseResult.Value,
-                channel,
+                responseResult.Value.Response,
+                responseResult.Value.Channel,
                 apduBytes,
                 cancellationToken
             )
@@ -120,7 +109,7 @@ public class T0ApduTransport : IApduTransport
         return expectedLength == 256 ? (byte)0 : (byte)expectedLength;
     }
 
-    private async Task<Result<ApduResponse, SmartCardError>> ProcessResponseAsync(
+    private async Task<Result<TransportExchange, SmartCardError>> ProcessResponseAsync(
         byte[] response,
         ICardChannel channel,
         byte[] originalApduBytes,
@@ -130,7 +119,9 @@ public class T0ApduTransport : IApduTransport
         if (response.Length < 2)
         {
             _logger.LogError("T=0 response too short: {Length} bytes", response.Length);
-            return Result.Success<ApduResponse, SmartCardError>(new ApduResponse([], 0x6987)); // Wrong data
+            return Result.Success<TransportExchange, SmartCardError>(
+                new TransportExchange(new ApduResponse([], 0x6987), channel)
+            );
         }
 
         byte sw1 = response[^2];
@@ -148,7 +139,7 @@ public class T0ApduTransport : IApduTransport
             // Handle T=0 specific status words
             case 0x61:
             {
-                var remainingData = await GetResponseAsync(
+                var remainingResult = await GetResponseAsync(
                         originalApduBytes[0],
                         sw2,
                         channel,
@@ -156,7 +147,12 @@ public class T0ApduTransport : IApduTransport
                     )
                     .ConfigureAwait(false);
 
-                // Combine data
+                if (remainingResult.IsFailure)
+                {
+                    return Result.Failure<TransportExchange, SmartCardError>(remainingResult.Error);
+                }
+
+                var remainingData = remainingResult.Value.Response;
                 int totalLength = data.Length + remainingData.Data.Length;
                 byte[] combinedData = new byte[totalLength];
                 Array.Copy(data, 0, combinedData, 0, data.Length);
@@ -168,8 +164,11 @@ public class T0ApduTransport : IApduTransport
                     remainingData.Data.Length
                 );
 
-                return Result.Success<ApduResponse, SmartCardError>(
-                    new ApduResponse(combinedData, remainingData.StatusWord)
+                return Result.Success<TransportExchange, SmartCardError>(
+                    new TransportExchange(
+                        new ApduResponse(combinedData, remainingData.StatusWord),
+                        remainingResult.Value.Channel
+                    )
                 );
             }
             case 0x6C:
@@ -185,13 +184,13 @@ public class T0ApduTransport : IApduTransport
                 }
 
                 // If retry failed, return original response
-                return Result.Success<ApduResponse, SmartCardError>(
-                    new ApduResponse(data, statusWord)
+                return Result.Success<TransportExchange, SmartCardError>(
+                    new TransportExchange(new ApduResponse(data, statusWord), channel)
                 );
             }
             default:
-                return Result.Success<ApduResponse, SmartCardError>(
-                    new ApduResponse(data, statusWord)
+                return Result.Success<TransportExchange, SmartCardError>(
+                    new TransportExchange(new ApduResponse(data, statusWord), channel)
                 );
         }
     }
@@ -227,7 +226,7 @@ public class T0ApduTransport : IApduTransport
         return Maybe<byte[]>.None;
     }
 
-    private async Task<ApduResponse> GetResponseAsync(
+    private async Task<Result<TransportExchange, SmartCardError>> GetResponseAsync(
         byte cla,
         byte length,
         ICardChannel channel,
@@ -251,9 +250,16 @@ public class T0ApduTransport : IApduTransport
                 chainCount
             );
 
-            byte[] response = await channel
+            var exchange = await channel
                 .TransmitAsync(getResponse, cancellationToken)
                 .ConfigureAwait(false);
+            if (exchange.IsFailure)
+            {
+                return Result.Failure<TransportExchange, SmartCardError>(exchange.Error);
+            }
+
+            channel = exchange.Value.Channel;
+            byte[] response = exchange.Value.Response;
 
             if (response.Length < 2)
             {
@@ -261,7 +267,9 @@ public class T0ApduTransport : IApduTransport
                     "T=0 GET RESPONSE failed: response too short ({Length} bytes)",
                     response.Length
                 );
-                return new ApduResponse([], 0x6F00); // Unknown error
+                return Result.Success<TransportExchange, SmartCardError>(
+                    new TransportExchange(new ApduResponse([], 0x6F00), channel)
+                );
             }
 
             byte sw1 = response[^2];
@@ -293,6 +301,8 @@ public class T0ApduTransport : IApduTransport
             }
         }
 
-        return new ApduResponse([.. allData], finalStatusWord);
+        return Result.Success<TransportExchange, SmartCardError>(
+            new TransportExchange(new ApduResponse([.. allData], finalStatusWord), channel)
+        );
     }
 }

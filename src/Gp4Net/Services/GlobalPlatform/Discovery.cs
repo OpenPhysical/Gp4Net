@@ -98,7 +98,7 @@ public static class Discovery
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The working key set and protocol version, or an error.</returns>
     public static async Task<
-        Result<(IKeySet KeySet, CryptoService.ScpVersion ProtocolVersion), SmartCardError>
+        Result<(IKeySet KeySet, CryptoOperations.ScpVersion ProtocolVersion), SmartCardError>
     > DiscoverKeySetAsync(
         ImmutableList<IKeySet> keySets,
         byte[] hostChallenge,
@@ -181,7 +181,7 @@ public static class Discovery
     /// Recursively tries key sets until one succeeds.
     /// </summary>
     private static async Task<
-        Result<(IKeySet KeySet, CryptoService.ScpVersion ProtocolVersion), SmartCardError>
+        Result<(IKeySet KeySet, CryptoOperations.ScpVersion ProtocolVersion), SmartCardError>
     > TryKeySetsRecursively(
         ImmutableList<IKeySet> keySets,
         int index,
@@ -196,7 +196,7 @@ public static class Discovery
     {
         if (index >= keySets.Count)
         {
-            return Result.Failure<(IKeySet, CryptoService.ScpVersion), SmartCardError>(
+            return Result.Failure<(IKeySet, CryptoOperations.ScpVersion), SmartCardError>(
                 SmartCardError.SecurityError("Failed to discover working key set")
             );
         }

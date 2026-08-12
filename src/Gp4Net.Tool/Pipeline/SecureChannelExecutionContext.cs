@@ -10,6 +10,6 @@ namespace Gp4Net.Tool.Pipeline;
 /// </summary>
 [PublicAPI]
 public sealed record SecureChannelExecutionContext(
-    ISmartCardService CardService,
+    ICardSessionCommands CardService,
     SecureChannelState SecureChannelState
 );

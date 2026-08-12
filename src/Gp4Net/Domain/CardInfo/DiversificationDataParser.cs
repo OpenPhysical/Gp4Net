@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using CSharpFunctionalExtensions;
-using static Gp4Net.Services.TlvService;
+using static Gp4Net.Services.TlvCodec;
 
 namespace Gp4Net.Domain.CardInfo;
 

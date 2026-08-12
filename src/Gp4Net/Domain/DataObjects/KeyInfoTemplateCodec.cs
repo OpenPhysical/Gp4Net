@@ -10,7 +10,7 @@ using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using JetBrains.Annotations;
-using static Gp4Net.Services.TlvService;
+using static Gp4Net.Services.TlvCodec;
 
 namespace Gp4Net.Domain.DataObjects;
 

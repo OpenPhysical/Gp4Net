@@ -7,9 +7,9 @@ using Gp4Net.Core;
 namespace Gp4Net.Pipeline;
 
 /// <summary>
-/// An immutable implementation of IPipelineContext using CSharpFunctionalExtensions and persistent data structures.
+/// An immutable implementation of ImmutablePipelineContext using CSharpFunctionalExtensions and persistent data structures.
 /// </summary>
-public sealed class ImmutablePipelineContext : IPipelineContext
+public sealed class ImmutablePipelineContext
 {
     private readonly ImmutableDictionary<string, object> _values;
 
@@ -43,7 +43,7 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     }
 
     /// <inheritdoc/>
-    public IPipelineContext With<T>(string key, T value)
+    public ImmutablePipelineContext With<T>(string key, T value)
     {
         if (value is null)
         {
@@ -57,7 +57,7 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     }
 
     /// <inheritdoc/>
-    public IPipelineContext Without(string key)
+    public ImmutablePipelineContext Without(string key)
     {
         return _values.ContainsKey(key) ? new ImmutablePipelineContext(_values.Remove(key)) : this;
     }
@@ -69,7 +69,7 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     }
 
     /// <inheritdoc/>
-    public IPipelineContext WithMany(ImmutableDictionary<string, object> values)
+    public ImmutablePipelineContext WithMany(ImmutableDictionary<string, object> values)
     {
         if (values.IsEmpty)
         {
@@ -99,7 +99,7 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     /// <summary>
     /// Creates an empty context.
     /// </summary>
-    public static IPipelineContext Empty
+    public static ImmutablePipelineContext Empty
     {
         get { return new ImmutablePipelineContext(); }
     }
@@ -107,7 +107,7 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     /// <summary>
     /// Creates a context with a single value.
     /// </summary>
-    public static IPipelineContext Create<T>(string key, T value)
+    public static ImmutablePipelineContext Create<T>(string key, T value)
     {
         return Empty.With(key, value);
     }
@@ -115,7 +115,7 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     /// <summary>
     /// Creates a context from a dictionary of values.
     /// </summary>
-    public static IPipelineContext Create(ImmutableDictionary<string, object> values)
+    public static ImmutablePipelineContext Create(ImmutableDictionary<string, object> values)
     {
         return new ImmutablePipelineContext(values);
     }
@@ -150,7 +150,7 @@ public static class PipelineContextExtensions
     /// <param name="key">The key to look up.</param>
     /// <returns>A result containing the value or an error if not found.</returns>
     public static Result<T, SmartCardError> GetRequired<T>(
-        this IPipelineContext context,
+        this ImmutablePipelineContext context,
         string key
     )
     {
@@ -168,7 +168,11 @@ public static class PipelineContextExtensions
     /// <summary>
     /// Gets a value from the context or a default if not found.
     /// </summary>
-    public static T GetOrDefault<T>(this IPipelineContext context, string key, T defaultValue)
+    public static T GetOrDefault<T>(
+        this ImmutablePipelineContext context,
+        string key,
+        T defaultValue
+    )
     {
         return context.Get<T>(key).GetValueOrDefault(defaultValue);
     }
@@ -176,7 +180,7 @@ public static class PipelineContextExtensions
     /// <summary>
     /// Gets a value from the context or computes it if not found.
     /// </summary>
-    public static T GetOrAdd<T>(this IPipelineContext context, string key, Func<T> factory)
+    public static T GetOrAdd<T>(this ImmutablePipelineContext context, string key, Func<T> factory)
     {
         return context.Get<T>(key).Match(value => value, factory);
     }
@@ -184,7 +188,7 @@ public static class PipelineContextExtensions
     /// <summary>
     /// Checks if a key exists in the context.
     /// </summary>
-    public static bool Contains(this IPipelineContext context, string key)
+    public static bool Contains(this ImmutablePipelineContext context, string key)
     {
         return context.Keys.Contains(key);
     }
@@ -192,7 +196,10 @@ public static class PipelineContextExtensions
     /// <summary>
     /// Creates a new context by merging with another context.
     /// </summary>
-    public static IPipelineContext Merge(this IPipelineContext context, IPipelineContext other)
+    public static ImmutablePipelineContext Merge(
+        this ImmutablePipelineContext context,
+        ImmutablePipelineContext other
+    )
     {
         return other.Keys.Aggregate(
             context,

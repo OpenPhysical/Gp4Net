@@ -64,7 +64,7 @@ public class ClApduTransport : IApduTransport
     }
 
     /// <inheritdoc />
-    public async Task<Result<ApduResponse, SmartCardError>> TransmitAsync(
+    public async Task<Result<TransportExchange, SmartCardError>> TransmitAsync(
         IApduCommand command,
         ICardChannel channel,
         CancellationToken cancellationToken = default
@@ -81,7 +81,7 @@ public class ClApduTransport : IApduTransport
 
         if (validationResult.IsFailure)
         {
-            return Result.Failure<ApduResponse, SmartCardError>(validationResult.Error);
+            return Result.Failure<TransportExchange, SmartCardError>(validationResult.Error);
         }
 
         return await _t1Transport.TransmitAsync(validationResult.Value, channel, cancellationToken);

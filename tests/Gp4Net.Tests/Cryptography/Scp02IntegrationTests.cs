@@ -75,7 +75,7 @@ public class Scp02IntegrationTests
         TestContext.Out.WriteLine("Card Cryptogram: " + Convert.ToHexString(cardCryptogram));
 
         // Test SCP02 key derivation using Gp4Net implementation
-        var encKeyResult = CryptoService.KeyDerivation.DeriveScp02SessionKey(
+        var encKeyResult = CryptoOperations.KeyDerivation.DeriveScp02SessionKey(
             masterKey,
             sequenceCounter,
             Constants.Constants.Scp.Scp02.KeyDerivationConstants.SEnc
@@ -83,7 +83,7 @@ public class Scp02IntegrationTests
         Assert.That(encKeyResult.IsSuccess, Is.True, "ENC key derivation failed");
         var encKey = encKeyResult.Value;
 
-        var cmacKeyResult = CryptoService.KeyDerivation.DeriveScp02SessionKey(
+        var cmacKeyResult = CryptoOperations.KeyDerivation.DeriveScp02SessionKey(
             masterKey,
             sequenceCounter,
             Constants.Constants.Scp.Scp02.KeyDerivationConstants.SMac
@@ -91,7 +91,7 @@ public class Scp02IntegrationTests
         Assert.That(cmacKeyResult.IsSuccess, Is.True, "MAC key derivation failed");
         var cmacKey = cmacKeyResult.Value;
 
-        var rmacKeyResult = CryptoService.KeyDerivation.DeriveScp02SessionKey(
+        var rmacKeyResult = CryptoOperations.KeyDerivation.DeriveScp02SessionKey(
             masterKey,
             sequenceCounter,
             Constants.Constants.Scp.Scp02.KeyDerivationConstants.SrMac
@@ -99,7 +99,7 @@ public class Scp02IntegrationTests
         Assert.That(rmacKeyResult.IsSuccess, Is.True, "RMAC key derivation failed");
         var rmacKey = rmacKeyResult.Value;
 
-        var dekKeyResult = CryptoService.KeyDerivation.DeriveScp02SessionKey(
+        var dekKeyResult = CryptoOperations.KeyDerivation.DeriveScp02SessionKey(
             masterKey,
             sequenceCounter,
             Constants.Constants.Scp.Scp02.KeyDerivationConstants.SDek
@@ -135,7 +135,7 @@ public class Scp02IntegrationTests
 
         // The CalculateScp02Cryptogram method uses PaddedBufferedBlockCipher which handles padding
         // So we pass the unpadded data directly (matching ScpVerification approach)
-        var cardCryptogramResult = CryptoService.Cryptogram.CalculateScp02Cryptogram(
+        var cardCryptogramResult = CryptoOperations.Cryptogram.CalculateScp02Cryptogram(
             encKey, // Use S-ENC session key for cryptogram
             cardCryptogramData // Pass unpadded data - cipher will handle padding
         );
@@ -164,7 +164,7 @@ public class Scp02IntegrationTests
 
         // The CalculateScp02Cryptogram method uses PaddedBufferedBlockCipher which handles padding
         // So we pass the unpadded data directly (matching ScpVerification approach)
-        var hostCryptogramResult = CryptoService.Cryptogram.CalculateScp02Cryptogram(
+        var hostCryptogramResult = CryptoOperations.Cryptogram.CalculateScp02Cryptogram(
             encKey, // Use S-ENC session key for cryptogram
             hostCryptogramData // Pass unpadded data - cipher will handle padding
         );
@@ -219,7 +219,7 @@ public class Scp02IntegrationTests
         var macInput = hostResponseBytes[..takeBytes];
         TestContext.Out.WriteLine("MAC Input: " + Convert.ToHexString(macInput));
 
-        var calculatedMacResult = CryptoService.Mac.CalculateScp02CommandMac(
+        var calculatedMacResult = CryptoOperations.Mac.CalculateScp02CommandMac(
             cmacKey,
             macInput,
             macIcv
@@ -255,7 +255,7 @@ public class Scp02IntegrationTests
         TestContext.Out.Write("\n\nTesting ICV Chaining:\n");
 
         // Test ICV encryption for chaining
-        var encryptedIcvResult = CryptoService.Mac.EncryptScp02Icv(macIcv, cmacKey);
+        var encryptedIcvResult = CryptoOperations.Mac.EncryptScp02Icv(macIcv, cmacKey);
         Assert.That(encryptedIcvResult.IsSuccess, Is.True, "ICV encryption failed");
         TestContext.Out.WriteLine(
             "Encrypted ICV: " + Convert.ToHexString(encryptedIcvResult.Value)
@@ -268,7 +268,7 @@ public class Scp02IntegrationTests
         TestContext.Out.WriteLine("MAC Input: " + Convert.ToHexString(nextMacInput));
         Assert.That(Convert.ToHexString(nextMacInput), Is.EqualTo("84F280020A4F00"));
 
-        var nextMacResult = CryptoService.Mac.CalculateScp02CommandMac(
+        var nextMacResult = CryptoOperations.Mac.CalculateScp02CommandMac(
             cmacKey,
             nextMacInput,
             encryptedIcvResult.Value
@@ -292,17 +292,17 @@ public class Scp02IntegrationTests
         var sequenceCounter = Convert.FromHexString("0001");
 
         // Derive all session keys
-        var encKeyResult = CryptoService.KeyDerivation.DeriveScp02SessionKey(
+        var encKeyResult = CryptoOperations.KeyDerivation.DeriveScp02SessionKey(
             masterKey,
             sequenceCounter,
             Constants.Constants.Scp.Scp02.KeyDerivationConstants.SEnc
         );
-        var macKeyResult = CryptoService.KeyDerivation.DeriveScp02SessionKey(
+        var macKeyResult = CryptoOperations.KeyDerivation.DeriveScp02SessionKey(
             masterKey,
             sequenceCounter,
             Constants.Constants.Scp.Scp02.KeyDerivationConstants.SMac
         );
-        var dekKeyResult = CryptoService.KeyDerivation.DeriveScp02SessionKey(
+        var dekKeyResult = CryptoOperations.KeyDerivation.DeriveScp02SessionKey(
             masterKey,
             sequenceCounter,
             Constants.Constants.Scp.Scp02.KeyDerivationConstants.SDek
@@ -345,7 +345,7 @@ public class Scp02IntegrationTests
         Assert.That(data.Length, Is.EqualTo(16));
 
         // Calculate cryptogram - padding is handled internally
-        var result = CryptoService.Cryptogram.CalculateScp02Cryptogram(sEncKey, data);
+        var result = CryptoOperations.Cryptogram.CalculateScp02Cryptogram(sEncKey, data);
         Assert.That(result.IsSuccess, Is.True);
         Assert.That(result.Value.Length, Is.EqualTo(8));
     }
@@ -356,18 +356,18 @@ public class Scp02IntegrationTests
         var sMacKey = Convert.FromHexString("404142434445464748494A4B4C4D4E4F");
         var icv = Convert.FromHexString("0102030405060708");
 
-        var result = CryptoService.Mac.EncryptScp02Icv(icv, sMacKey);
+        var result = CryptoOperations.Mac.EncryptScp02Icv(icv, sMacKey);
         Assert.That(result.IsSuccess, Is.True);
         Assert.That(result.Value.Length, Is.EqualTo(8));
 
         // Verify encryption is deterministic
-        var result2 = CryptoService.Mac.EncryptScp02Icv(icv, sMacKey);
+        var result2 = CryptoOperations.Mac.EncryptScp02Icv(icv, sMacKey);
         Assert.That(result2.IsSuccess, Is.True);
         Assert.That(result2.Value, Is.EqualTo(result.Value));
 
         // Verify different input produces different output
         var differentIcv = Convert.FromHexString("0807060504030201");
-        var result3 = CryptoService.Mac.EncryptScp02Icv(differentIcv, sMacKey);
+        var result3 = CryptoOperations.Mac.EncryptScp02Icv(differentIcv, sMacKey);
         Assert.That(result3.IsSuccess, Is.True);
         Assert.That(result3.Value, Is.Not.EqualTo(result.Value));
     }

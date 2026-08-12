@@ -34,7 +34,7 @@ public class Scp02CryptogramTests
         var cryptogramData = HostChallenge.Concat(SequenceCounter).Concat(CardChallenge).ToArray();
 
         // Act - CalculateScp02Cryptogram now handles padding internally
-        var result = CryptoService.Cryptogram.CalculateScp02Cryptogram(SEncKey, cryptogramData);
+        var result = CryptoOperations.Cryptogram.CalculateScp02Cryptogram(SEncKey, cryptogramData);
 
         // Assert
         if (!result.IsSuccess)
@@ -84,10 +84,10 @@ public class Scp02CryptogramTests
         var response = parseResult.Value;
 
         // Act
-        var finalResult = CryptoService
+        var finalResult = CryptoOperations
             .Cryptogram.BuildScp02CardCryptogramData(response, HostChallenge)
             .Bind(paddedData =>
-                CryptoService.Cryptogram.CalculateScp02Cryptogram(SEncKey, paddedData)
+                CryptoOperations.Cryptogram.CalculateScp02Cryptogram(SEncKey, paddedData)
             );
 
         Assert.That(finalResult.IsSuccess, Is.True);

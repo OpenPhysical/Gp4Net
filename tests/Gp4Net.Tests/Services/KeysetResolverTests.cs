@@ -10,12 +10,12 @@ namespace Gp4Net.Tests.Services;
 
 public class KeysetResolverTests
 {
-    private KeysetResolver _resolver = default!;
+    private KeysetResolution _resolver = default!;
 
     [SetUp]
     public void Setup()
     {
-        _resolver = new KeysetResolver();
+        _resolver = new KeysetResolution();
     }
 
     [Test]

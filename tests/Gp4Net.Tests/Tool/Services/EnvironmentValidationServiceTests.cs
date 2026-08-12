@@ -8,14 +8,12 @@ namespace Gp4Net.Tests.Tool.Services;
 
 public class EnvironmentValidationServiceTests
 {
-    private EnvironmentValidationService _service = default!;
+    private EnvironmentValidation _service = default!;
 
     [SetUp]
     public void Setup()
     {
-        _service = new EnvironmentValidationService(
-            NullLogger<EnvironmentValidationService>.Instance
-        );
+        _service = new EnvironmentValidation(NullLogger<EnvironmentValidation>.Instance);
     }
 
     [Test]

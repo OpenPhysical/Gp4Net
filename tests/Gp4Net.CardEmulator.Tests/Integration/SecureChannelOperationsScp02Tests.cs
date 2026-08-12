@@ -39,8 +39,8 @@ public class SecureChannelOperationsScp02Tests
         );
         Assert.That(rawKeyset.IsSuccess, Is.True, () => rawKeyset.Error.ToString());
 
-        var result = await ScpService.Establishment.EstablishAsync(
-            service,
+        var result = await ScpOperations.Establishment.EstablishAsync(
+            service.SendCommandAsync,
             rawKeyset.Value,
             SecurityLevel.CMac,
             CancellationToken.None
@@ -68,11 +68,11 @@ public class SecureChannelOperationsScp02Tests
         );
         Assert.That(keyset.IsSuccess, Is.True, () => keyset.Error.ToString());
 
-        var result = await ScpService.Establishment.EstablishAsync(
-            service,
+        var result = await ScpOperations.Establishment.EstablishAsync(
+            service.SendCommandAsync,
             keyset.Value,
-            new ScpService.Types.ScpOption(
-                Cryptography.CryptoService.ScpVersion.Scp02,
+            new ScpOperations.Types.ScpOption(
+                Cryptography.CryptoOperations.ScpVersion.Scp02,
                 (byte)ScpImplementation.Scp02I15
             ),
             SecurityLevel.CMac,
@@ -88,11 +88,11 @@ public class SecureChannelOperationsScp02Tests
         );
     }
 
-    private static async Task<ISmartCardService> CreateService()
+    private static async Task<ICardSessionCommands> CreateService()
     {
-        var result = await VirtualCardConnectionService.CreateServiceAsync(
+        var result = await VirtualCardConnections.CreateServiceAsync(
             $"virtual:{Scp02ProfilePath.Value}",
-            NullLogger<SmartCardService>.Instance,
+            NullLogger<CardSessionCommands>.Instance,
             CancellationToken.None
         );
         Assert.That(result.IsSuccess, Is.True, () => result.Error.ToString());

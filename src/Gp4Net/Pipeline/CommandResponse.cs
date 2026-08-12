@@ -10,7 +10,7 @@ namespace Gp4Net.Pipeline;
 public record CommandResponse(
     byte[] Data,
     StatusWord StatusWord,
-    IPipelineContext UpdatedContext,
+    ImmutablePipelineContext UpdatedContext,
     IReadOnlyDictionary<string, object> Metadata
 )
 {
@@ -51,7 +51,7 @@ public record CommandResponse(
     /// <summary>
     /// Creates a successful response with explicit data and context.
     /// </summary>
-    public static CommandResponse Success(byte[] data, IPipelineContext context)
+    public static CommandResponse Success(byte[] data, ImmutablePipelineContext context)
     {
         return new(
             data,
@@ -66,7 +66,7 @@ public record CommandResponse(
     /// </summary>
     public static CommandResponse Success(
         byte[] data,
-        IPipelineContext context,
+        ImmutablePipelineContext context,
         IReadOnlyDictionary<string, object> metadata
     )
     {
@@ -89,7 +89,7 @@ public record CommandResponse(
     /// <summary>
     /// Creates a failed response with explicit context and default metadata.
     /// </summary>
-    public static CommandResponse Failure(StatusWord statusWord, IPipelineContext context)
+    public static CommandResponse Failure(StatusWord statusWord, ImmutablePipelineContext context)
     {
         return new([], statusWord, context, new Dictionary<string, object>());
     }
@@ -99,7 +99,7 @@ public record CommandResponse(
     /// </summary>
     public static CommandResponse Failure(
         StatusWord statusWord,
-        IPipelineContext context,
+        ImmutablePipelineContext context,
         IReadOnlyDictionary<string, object> metadata
     )
     {
@@ -130,7 +130,7 @@ public record CommandResponse(
     /// <summary>
     /// Creates a new response with updated context.
     /// </summary>
-    public CommandResponse WithContext(IPipelineContext context)
+    public CommandResponse WithContext(ImmutablePipelineContext context)
     {
         return this with { UpdatedContext = context };
     }

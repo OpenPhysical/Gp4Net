@@ -30,7 +30,7 @@ public static class Scp02CommandProcessors
         CardState state,
         CardConfiguration config,
         IRngContext rngContext,
-        LoggingService logging
+        CardLogging logging
     )
     {
         logging.LogDebug("=== Starting ProcessScp02InitializeUpdate ===");
@@ -118,7 +118,7 @@ public static class Scp02CommandProcessors
         CardState state,
         CardConfiguration config,
         IRngContext rngContext,
-        LoggingService logging
+        CardLogging logging
     )
     {
         logging.LogDebug("Processing SCP02 EXTERNAL AUTHENTICATE command");
@@ -211,7 +211,7 @@ public static class Scp02CommandProcessors
         InitializeUpdateRequest request,
         CardState state,
         CardConfiguration config,
-        LoggingService logger
+        CardLogging logger
     )
     {
         logger.LogDebug(
@@ -245,7 +245,7 @@ public static class Scp02CommandProcessors
         CardState state,
         CardConfiguration config,
         IRngContext rngContext,
-        LoggingService logger
+        CardLogging logger
     )
     {
         logger.LogDebug("=== GenerateScp02CardChallenge ===");
@@ -297,7 +297,7 @@ public static class Scp02CommandProcessors
         CardState state,
         CardConfiguration config,
         IRngContext rngContext,
-        LoggingService logger
+        CardLogging logger
     )
     {
         logger.LogDebug("=== CalculateScp02CardCryptogram ===");
@@ -354,7 +354,7 @@ public static class Scp02CommandProcessors
         byte effectiveKeyVersion,
         CardState state,
         IRngContext rngContext,
-        LoggingService logger
+        CardLogging logger
     )
     {
         // Build SCP02 card cryptogram data
@@ -390,7 +390,7 @@ public static class Scp02CommandProcessors
 
         // Calculate card cryptogram using unified crypto service
         // Per GP Card Spec v2.3.1 Section E.4.2
-        var cryptogramResult = CryptoService.Cryptogram.CalculateCardCryptogram(
+        var cryptogramResult = CryptoOperations.Cryptogram.CalculateCardCryptogram(
             data.Request.HostChallenge,
             data.CardChallenge,
             keys,
@@ -432,7 +432,7 @@ public static class Scp02CommandProcessors
         Scp02CryptogramData data,
         CardState state,
         CardConfiguration config,
-        LoggingService logger
+        CardLogging logger
     )
     {
         logger.LogDebug("=== CreateScp02InitializeUpdateResponse ===");
@@ -647,7 +647,7 @@ public static class Scp02CommandProcessors
 
         // Calculate expected host cryptogram using unified crypto service
         // Per GP Card Spec v2.3.1 Section E.4.2 - host cryptogram has different order
-        return CryptoService
+        return CryptoOperations
             .Cryptogram.CalculateHostCryptogram(
                 hostChallenge,
                 cardChallengeRandom,
@@ -675,7 +675,7 @@ public static class Scp02CommandProcessors
         IRngContext rngContext
     )
     {
-        if (!CryptoService.Utils.CompareBytes(request.HostCryptogram, expectedCryptogram))
+        if (!CryptoOperations.Utils.CompareBytes(request.HostCryptogram, expectedCryptogram))
             return Result.Failure<ExternalAuthenticateRequest, SmartCardError>(
                 SmartCardError.SecurityStatusNotSatisfied()
             );
@@ -714,7 +714,7 @@ public static class Scp02CommandProcessors
                         validatedData.sequenceCounter,
                         ScpImplementation.Scp02I15
                     )
-                    .Bind(context => CryptoService.KeyDerivation.DeriveSessionKeys(context))
+                    .Bind(context => CryptoOperations.KeyDerivation.DeriveSessionKeys(context))
             )
             .Bind(sessionKeys =>
             {
@@ -729,10 +729,10 @@ public static class Scp02CommandProcessors
                 ];
                 byte[] macInput = commandHeader.Concat(request.HostCryptogram).ToArray();
                 byte[] icv = new byte[8];
-                return CryptoService
+                return CryptoOperations
                     .Mac.CalculateScp02CommandMac(sessionKeys.SMac, macInput, icv)
                     .Bind(expectedMac =>
-                        CryptoService.Utils.CompareBytes(request.HostMac, expectedMac)
+                        CryptoOperations.Utils.CompareBytes(request.HostMac, expectedMac)
                             ? Result.Success<ExternalAuthenticateRequest, SmartCardError>(request)
                             : Result.Failure<ExternalAuthenticateRequest, SmartCardError>(
                                 SmartCardError.SecurityStatusNotSatisfied()
@@ -770,7 +770,7 @@ public static class Scp02CommandProcessors
                         validatedData.sequenceCounter,
                         ScpImplementation.Scp02I15
                     )
-                    .Bind(context => CryptoService.KeyDerivation.DeriveSessionKeys(context));
+                    .Bind(context => CryptoOperations.KeyDerivation.DeriveSessionKeys(context));
             });
     }
 
@@ -841,7 +841,7 @@ public static class Scp02CommandProcessors
         var secureChannelStateResult = SecureChannelState.Create(
             sessionKeys: sessionKeys,
             securityLevel: securityLevel,
-            protocolVersion: (CryptoService.ScpVersion)GlobalPlatform.Protocols.SCP02,
+            protocolVersion: (CryptoOperations.ScpVersion)GlobalPlatform.Protocols.SCP02,
             initialMacChainingValue: new byte[8], // Initialize with zeros for SCP02
             implementationParameter: (byte)state.ScpImplementation
         );
@@ -875,7 +875,7 @@ public static class Scp02CommandProcessors
         byte keyVersion,
         CardState state,
         CardConfiguration config,
-        LoggingService logger
+        CardLogging logger
     )
     {
         // Log available keys

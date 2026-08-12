@@ -239,7 +239,7 @@ public static class InstallProcessor
     private static byte[] ComputeSimulatedLfdbh(byte[] loadFileAid)
     {
         // Simple deterministic hash based on Load File AID for emulation
-        return CryptoService
+        return CryptoOperations
             .Hash.Sha256(loadFileAid)
             .Match(
                 onSuccess: hash => hash[..20], // Take first 20 bytes

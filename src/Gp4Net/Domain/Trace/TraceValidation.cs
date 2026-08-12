@@ -14,12 +14,13 @@ using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using WSCT.ISO7816;
-using static Gp4Net.Cryptography.CryptoService;
+using static Gp4Net.Cryptography.CryptoOperations;
+using ProtocolOperations = Gp4Net.Services.ScpOperations;
 
 namespace Gp4Net.Domain.Trace;
 
 /// <summary>
-/// Pure functional trace validation using existing ScpService.Security functions.
+/// Pure functional trace validation using existing Gp4Net.Services.ProtocolOperations.Security functions.
 /// Validates cryptographic operations in GlobalPlatform traces.
 /// </summary>
 [PublicAPI]
@@ -68,7 +69,7 @@ public static class TraceValidation
                     );
                 }
 
-                return KeyDiversificationService
+                return KeyDiversification
                     .DiversifyScp03KeySet(masterScp03, spec, components.KeyDiversificationData)
                     .Map(diversified =>
                     {
@@ -288,7 +289,7 @@ public static class TraceValidation
                                 {
                                     var securedCmd = new CommandAPDU(command);
 
-                                    return ScpService
+                                    return ProtocolOperations
                                         .Security.RemoveCommandSecurity(securedCmd, channelState)
                                         .Map(result =>
                                         {
@@ -354,7 +355,7 @@ public static class TraceValidation
                                     // Verify MAC on EXTERNAL AUTHENTICATE command
                                     var securedCmd = new CommandAPDU(command);
 
-                                    return ScpService
+                                    return ProtocolOperations
                                         .Security.RemoveCommandSecurity(securedCmd, channelState)
                                         .Map(result =>
                                         {
@@ -456,7 +457,7 @@ public static class TraceValidation
             );
         }
 
-        // Validate secure command and response using ScpService.Security
+        // Validate secure command and response using Gp4Net.Services.ProtocolOperations.Security
         return state.SessionKeys.Match(
             Some: sessionKeys =>
             {
@@ -465,7 +466,7 @@ public static class TraceValidation
                     {
                         var securedCmd = new CommandAPDU(command);
 
-                        return ScpService
+                        return ProtocolOperations
                             .Security.RemoveCommandSecurity(securedCmd, channelState)
                             .Bind(cmdResult =>
                             {
@@ -473,7 +474,7 @@ public static class TraceValidation
 
                                 var resp = new ResponseAPDU(response);
 
-                                return ScpService
+                                return ProtocolOperations
                                     .Security.RemoveResponseSecurity(resp, stateAfterCmd)
                                     .Map(respResult =>
                                     {
@@ -744,19 +745,19 @@ public static class TraceValidation
     )
     {
         // Derive all three session keys
-        var sEncResult = CryptoService.KeyDerivation.DeriveScp02SessionKey(
+        var sEncResult = CryptoOperations.KeyDerivation.DeriveScp02SessionKey(
             baseKeys.EncKey,
             sequenceCounter,
             new byte[] { 0x01, 0x82 }
         );
 
-        var sMacResult = CryptoService.KeyDerivation.DeriveScp02SessionKey(
+        var sMacResult = CryptoOperations.KeyDerivation.DeriveScp02SessionKey(
             baseKeys.MacKey,
             sequenceCounter,
             new byte[] { 0x01, 0x01 }
         );
 
-        var sDekResult = CryptoService.KeyDerivation.DeriveScp02SessionKey(
+        var sDekResult = CryptoOperations.KeyDerivation.DeriveScp02SessionKey(
             baseKeys.DekKey,
             sequenceCounter,
             new byte[] { 0x01, 0x81 }
@@ -785,21 +786,21 @@ public static class TraceValidation
     )
     {
         // Derive all session keys using SCP03 key derivation
-        var sEncResult = CryptoService.KeyDerivation.DeriveScp03SessionKey(
+        var sEncResult = CryptoOperations.KeyDerivation.DeriveScp03SessionKey(
             baseKeys.EncKey,
             hostChallenge,
             cardChallenge,
             0x04
         );
 
-        var sMacResult = CryptoService.KeyDerivation.DeriveScp03SessionKey(
+        var sMacResult = CryptoOperations.KeyDerivation.DeriveScp03SessionKey(
             baseKeys.MacKey,
             hostChallenge,
             cardChallenge,
             0x06
         );
 
-        var sRmacResult = CryptoService.KeyDerivation.DeriveScp03ReceiptKey(
+        var sRmacResult = CryptoOperations.KeyDerivation.DeriveScp03ReceiptKey(
             baseKeys.MacKey,
             hostChallenge,
             cardChallenge
@@ -850,16 +851,16 @@ public static class TraceValidation
             .Parse(response)
             .Bind(iuResponse =>
                 // Build cryptogram data for SCP02
-                CryptoService
+                CryptoOperations
                     .Cryptogram.BuildScp02CardCryptogramData(iuResponse, hostChallenge)
                     .Bind(cryptogramData =>
-                        CryptoService.Cryptogram.CalculateScp02Cryptogram(
+                        CryptoOperations.Cryptogram.CalculateScp02Cryptogram(
                             sessionKeys.SEnc,
                             cryptogramData
                         )
                     )
                     .Map(calculatedCryptogram =>
-                        CryptoService.Utils.CompareBytes(calculatedCryptogram, cardCryptogram)
+                        CryptoOperations.Utils.CompareBytes(calculatedCryptogram, cardCryptogram)
                     )
             );
     }
@@ -876,17 +877,17 @@ public static class TraceValidation
             .Parse(response)
             .Bind(iuResponse =>
                 // Build cryptogram data for SCP03
-                CryptoService
+                CryptoOperations
                     .Cryptogram.BuildScp03CardCryptogramData(iuResponse, hostChallenge)
                     .Bind(context =>
-                        CryptoService.ScpOperations.Scp03.CalculateCryptogram(
+                        CryptoOperations.ScpOperations.Scp03.CalculateCryptogram(
                             sessionKeys.SMac,
                             Constants.Constants.Scp.Scp03.CryptogramDerivation.CardCryptogram,
                             context
                         )
                     )
                     .Map(calculatedCryptogram =>
-                        CryptoService.Utils.CompareBytes(
+                        CryptoOperations.Utils.CompareBytes(
                             calculatedCryptogram.Take(8).ToArray(),
                             cardCryptogram
                         )

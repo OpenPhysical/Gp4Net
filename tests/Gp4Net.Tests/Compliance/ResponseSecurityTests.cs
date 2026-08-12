@@ -29,17 +29,17 @@ public class ResponseSecurityTests
         SecureChannelState state = CreateScp02State(authenticationMac);
         var command = new CommandAPDU(Convert.FromHexString("80CA9F7F00"));
 
-        var protectedCommand = ScpService.Security.ApplyCommandSecurity(command, state).Value;
+        var protectedCommand = ScpOperations.Security.ApplyCommandSecurity(command, state).Value;
 
         byte[] responseData = Convert.FromHexString("0102");
         byte[] status = Convert.FromHexString("9000");
         byte[] rMacInput = Convert.FromHexString("80CA9F7F000201029000");
-        byte[] rMac = CryptoService
+        byte[] rMac = CryptoOperations
             .Mac.CalculateScp02ResponseMac(SRMac, rMacInput, authenticationMac)
             .Value;
         var securedResponse = new ResponseAPDU([.. responseData, .. rMac, .. status]);
 
-        var result = ScpService.Security.RemoveResponseSecurity(
+        var result = ScpOperations.Security.RemoveResponseSecurity(
             securedResponse,
             protectedCommand.newState
         );
@@ -59,16 +59,16 @@ public class ResponseSecurityTests
         byte[] authenticationMac = Convert.FromHexString("1122334455667788");
         SecureChannelState state = CreateScp02State(authenticationMac);
         var command = new CommandAPDU(Convert.FromHexString("80CA9F7F00"));
-        SecureChannelState commandState = ScpService
+        SecureChannelState commandState = ScpOperations
             .Security.ApplyCommandSecurity(command, state)
             .Value.newState;
         byte[] rMacInput = Convert.FromHexString("80CA9F7F00006A80");
-        byte[] rMac = CryptoService
+        byte[] rMac = CryptoOperations
             .Mac.CalculateScp02ResponseMac(SRMac, rMacInput, authenticationMac)
             .Value;
         var securedResponse = new ResponseAPDU([.. rMac, 0x6A, 0x80]);
 
-        var result = ScpService.Security.RemoveResponseSecurity(securedResponse, commandState);
+        var result = ScpOperations.Security.RemoveResponseSecurity(securedResponse, commandState);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.plaintextResponse.ToBytes().Should().Equal(0x6A, 0x80);
@@ -84,18 +84,18 @@ public class ResponseSecurityTests
             .Create(
                 new SessionKeys(SEnc, SMac, SRMac),
                 SecurityLevel.RMac,
-                CryptoService.ScpVersion.Scp03,
+                CryptoOperations.ScpVersion.Scp03,
                 chaining,
                 (byte)ScpImplementation.Scp03I20
             )
             .Value;
         byte[] responseWithoutMac = Convert.FromHexString("01029000");
-        byte[] fullMac = CryptoService
+        byte[] fullMac = CryptoOperations
             .ScpOperations.Scp03.CalculateResponseMac(responseWithoutMac, SRMac, chaining)
             .Value;
         var securedResponse = new ResponseAPDU([0x01, 0x02, .. fullMac[..8], 0x90, 0x00]);
 
-        var result = ScpService.Security.RemoveResponseSecurity(securedResponse, state);
+        var result = ScpOperations.Security.RemoveResponseSecurity(securedResponse, state);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.plaintextResponse.ToBytes().Should().Equal(responseWithoutMac);
@@ -112,20 +112,20 @@ public class ResponseSecurityTests
             .Create(
                 new SessionKeys(SEnc, SMac, SRMac),
                 SecurityLevel.RMac,
-                CryptoService.ScpVersion.Scp03,
+                CryptoOperations.ScpVersion.Scp03,
                 chaining,
                 (byte)ScpImplementation.Scp03I20
             )
             .Value;
         byte[] responseWithoutMac = Convert.FromHexString("01029000");
-        byte[] fullMac = CryptoService
+        byte[] fullMac = CryptoOperations
             .ScpOperations.Scp03.CalculateResponseMac(responseWithoutMac, SRMac, chaining)
             .Value;
         byte[] tamperedMac = [.. fullMac[..8]];
         tamperedMac[0] ^= 0x01;
         var securedResponse = new ResponseAPDU([0x01, 0x02, .. tamperedMac, 0x90, 0x00]);
 
-        var result = ScpService.Security.RemoveResponseSecurity(securedResponse, state);
+        var result = ScpOperations.Security.RemoveResponseSecurity(securedResponse, state);
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Message.Should().NotContain(Convert.ToHexString(fullMac[..8]));
@@ -141,7 +141,7 @@ public class ResponseSecurityTests
             .Create(
                 new SessionKeys(SEnc, SMac, SRMac),
                 SecurityLevel.CDecryption | SecurityLevel.RMac | SecurityLevel.REncryption,
-                CryptoService.ScpVersion.Scp03,
+                CryptoOperations.ScpVersion.Scp03,
                 chaining,
                 (byte)ScpImplementation.Scp03I70
             )
@@ -151,11 +151,11 @@ public class ResponseSecurityTests
         };
         var plaintext = new ResponseAPDU(Convert.FromHexString("0102039000"));
 
-        var protectedResult = ScpService.Security.ApplyResponseSecurity(plaintext, state);
+        var protectedResult = ScpOperations.Security.ApplyResponseSecurity(plaintext, state);
 
         _ = protectedResult.IsSuccess.Should().BeTrue();
         _ = protectedResult.Value.securedResponse.ToBytes().Should().NotEqual(plaintext.ToBytes());
-        var removed = ScpService.Security.RemoveResponseSecurity(
+        var removed = ScpOperations.Security.RemoveResponseSecurity(
             protectedResult.Value.securedResponse,
             state
         );
@@ -172,14 +172,14 @@ public class ResponseSecurityTests
             .Create(
                 new SessionKeys(SEnc, SMac, SRMac),
                 SecurityLevel.CMac | SecurityLevel.RMac,
-                CryptoService.ScpVersion.Scp03,
+                CryptoOperations.ScpVersion.Scp03,
                 new byte[16],
                 (byte)ScpImplementation.Scp03I20
             )
             .Value;
         var response = new ResponseAPDU(Convert.FromHexString("01026A80"));
 
-        var result = ScpService.Security.ApplyResponseSecurity(response, state);
+        var result = ScpOperations.Security.ApplyResponseSecurity(response, state);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.securedResponse.ToBytes().Should().Equal(0x6A, 0x80);
@@ -193,13 +193,13 @@ public class ResponseSecurityTests
             .Create(
                 new SessionKeys(SEnc, SMac, SRMac),
                 SecurityLevel.REncryption,
-                CryptoService.ScpVersion.Scp03,
+                CryptoOperations.ScpVersion.Scp03,
                 new byte[16],
                 (byte)ScpImplementation.Scp03I20
             )
             .Value;
 
-        var result = ScpService.Security.ApplyResponseSecurity(
+        var result = ScpOperations.Security.ApplyResponseSecurity(
             new ResponseAPDU(Convert.FromHexString("019000")),
             state
         );
@@ -214,15 +214,15 @@ public class ResponseSecurityTests
         byte[] authenticationMac = Convert.FromHexString("1122334455667788");
         SecureChannelState state = CreateScp02State(authenticationMac);
         var command = new CommandAPDU(Convert.FromHexString("80CA9F7F00"));
-        SecureChannelState commandState = ScpService
+        SecureChannelState commandState = ScpOperations
             .Security.ApplyCommandSecurity(command, state)
             .Value.newState;
         var plaintext = new ResponseAPDU(Convert.FromHexString("01029000"));
 
-        var protectedResult = ScpService.Security.ApplyResponseSecurity(plaintext, commandState);
+        var protectedResult = ScpOperations.Security.ApplyResponseSecurity(plaintext, commandState);
 
         _ = protectedResult.IsSuccess.Should().BeTrue();
-        var removed = ScpService.Security.RemoveResponseSecurity(
+        var removed = ScpOperations.Security.RemoveResponseSecurity(
             protectedResult.Value.securedResponse,
             commandState
         );
@@ -238,7 +238,7 @@ public class ResponseSecurityTests
             .Create(
                 new SessionKeys(SEnc, SMac, SRMac),
                 SecurityLevel.CMac | SecurityLevel.RMac,
-                CryptoService.ScpVersion.Scp02,
+                CryptoOperations.ScpVersion.Scp02,
                 chaining,
                 (byte)ScpImplementation.Scp02I15
             )

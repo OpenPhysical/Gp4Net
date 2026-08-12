@@ -16,7 +16,7 @@ using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using WSCT.ISO7816;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
-using static Gp4Net.Services.TlvService;
+using static Gp4Net.Services.TlvCodec;
 using ExecutableModule = Gp4Net.CardEmulator.Functional.ExecutableModule;
 
 namespace Gp4Net.CardEmulator.Core;
@@ -24,7 +24,7 @@ namespace Gp4Net.CardEmulator.Core;
 /// <summary>
 /// Virtual smart card implementation using functional programming patterns and immutable state.
 /// Processes commands through composable, testable command processors with proper cryptographic validation.
-/// Uses ICardStateService for all state transitions to ensure immutability.
+/// Uses  for all state transitions to ensure immutability.
 /// </summary>
 [PublicAPI]
 public partial class VirtualCard : IVirtualCard
@@ -33,9 +33,9 @@ public partial class VirtualCard : IVirtualCard
     private readonly CardState _initialState;
     private readonly CardConfiguration _config;
     private readonly IRngContext _rngContext;
-    private readonly LoggingService _logging;
-    private readonly CapFileServiceAdapter _capFileService;
-    private readonly ICardStateService _stateService;
+    private readonly CardLogging _logging;
+    private readonly EmulatorCapFiles _capFileService;
+    private readonly CardStateTransitions _stateService;
 
     /// <summary>
     /// Initializes a new virtual card with the specified configuration, services, and state.
@@ -51,9 +51,9 @@ public partial class VirtualCard : IVirtualCard
         CardConfiguration config,
         IRngContext rngContext,
         CardState currentState,
-        LoggingService logger,
-        CapFileServiceAdapter capFileService,
-        ICardStateService stateService,
+        CardLogging logger,
+        EmulatorCapFiles capFileService,
+        CardStateTransitions stateService,
         Maybe<CardState> initialState = default
     )
     {
@@ -75,7 +75,7 @@ public partial class VirtualCard : IVirtualCard
 
     /// <summary>
     /// Creates a new virtual card instance using immutable state management.
-    /// Uses CardStateService to ensure proper functional state handling.
+    /// Uses CardStateTransitions to ensure proper functional state handling.
     /// </summary>
     /// <param name="config">The card configuration defining capabilities and data.</param>
     /// <param name="rngContext">The RNG context to use for random number generation.</param>
@@ -87,11 +87,11 @@ public partial class VirtualCard : IVirtualCard
         CardConfiguration config,
         IRngContext rngContext,
         Maybe<ILogger> logger = default,
-        Maybe<CapFileServiceAdapter> capFileService = default,
-        Maybe<ICardStateService> stateService = default
+        Maybe<EmulatorCapFiles> capFileService = default,
+        Maybe<CardStateTransitions> stateService = default
     )
     {
-        var cardStateService = stateService.GetValueOrDefault(new CardStateService(logger));
+        var cardStateService = stateService.GetValueOrDefault(new CardStateTransitions(logger));
 
         return CardState
             .Create()
@@ -106,7 +106,7 @@ public partial class VirtualCard : IVirtualCard
                 // Initialize with configuration's ISD AID and data objects
                 var isdAid = config.IsdAid.ToImmutableArray();
 
-                return CardStateService
+                return CardStateTransitions
                     .InitializeApplicationRegistryWithDataObjects(
                         stateWithConfig,
                         isdAid,
@@ -116,8 +116,8 @@ public partial class VirtualCard : IVirtualCard
                         config,
                         rngContext,
                         finalState,
-                        new LoggingService(logger),
-                        capFileService.GetValueOrDefault(new CapFileServiceAdapter()),
+                        new CardLogging(logger),
+                        capFileService.GetValueOrDefault(new EmulatorCapFiles()),
                         cardStateService,
                         Maybe<CardState>.From(finalState)
                     ));
@@ -141,7 +141,7 @@ public partial class VirtualCard : IVirtualCard
                 _config,
                 _rngContext,
                 _initialState,
-                new LoggingService(Maybe<ILogger>.None),
+                new CardLogging(Maybe<ILogger>.None),
                 _capFileService,
                 _stateService,
                 Maybe<CardState>.From(_initialState)
@@ -159,7 +159,7 @@ public partial class VirtualCard : IVirtualCard
                 _currentState,
                 _config,
                 _rngContext,
-                new LoggingService(Maybe<ILogger>.None)
+                new CardLogging(Maybe<ILogger>.None)
             )
             .Map(result =>
             {
@@ -169,7 +169,7 @@ public partial class VirtualCard : IVirtualCard
                     _config,
                     _rngContext,
                     updatedState,
-                    new LoggingService(Maybe<ILogger>.None),
+                    new CardLogging(Maybe<ILogger>.None),
                     _capFileService,
                     _stateService,
                     Maybe<CardState>.From(_initialState)
@@ -201,7 +201,7 @@ public partial class VirtualCard : IVirtualCard
         CardState state,
         CardConfiguration config,
         IRngContext rngContext,
-        LoggingService logging
+        CardLogging logging
     )
     {
         return EnsureApplicationRegistry(state, config)
@@ -230,7 +230,7 @@ public partial class VirtualCard : IVirtualCard
     private static Result<(ApduResponse, CardState), SmartCardError> HandleSecureChannelFailure(
         SmartCardError error,
         CardState state,
-        LoggingService logging
+        CardLogging logging
     )
     {
         if (!state.SecureChannel.HasValue)
@@ -249,7 +249,7 @@ public partial class VirtualCard : IVirtualCard
     private static Result<(ApduResponse, CardState), SmartCardError> ApplyResponseSecurity(
         (ApduResponse response, CardState state) result,
         IRngContext rngContext,
-        LoggingService logging
+        CardLogging logging
     )
     {
         (var response, var state) = result;
@@ -281,7 +281,7 @@ public partial class VirtualCard : IVirtualCard
         ApduResponse response,
         CardState state,
         SecureChannelState secureChannelState,
-        LoggingService logging
+        CardLogging logging
     )
     {
         if (secureChannelState is { HasResponseMac: false, HasResponseEncryption: false })
@@ -302,7 +302,7 @@ public partial class VirtualCard : IVirtualCard
         fullResponse[^1] = (byte)(response.StatusWord & 0xFF);
 
         return global::Gp4Net
-            .Services.ScpService.Security.ApplyResponseSecurity(
+            .Services.ScpOperations.Security.ApplyResponseSecurity(
                 new ResponseAPDU(fullResponse),
                 secureChannelState
             )
@@ -315,7 +315,7 @@ public partial class VirtualCard : IVirtualCard
     private static Result<(ApduResponse, CardState), SmartCardError> ProcessSecureResponseSuccess(
         (ResponseAPDU securedResponse, SecureChannelState newState) success,
         CardState state,
-        LoggingService logging
+        CardLogging logging
     )
     {
         byte[] processedResponse = success.securedResponse.ToBytes();
@@ -886,7 +886,7 @@ public partial class VirtualCard : IVirtualCard
     )
     {
         byte[] capBytes = capFileData.ToArray();
-        var capFileService = new CapFileServiceAdapter();
+        var capFileService = new EmulatorCapFiles();
         var expectedHashMaybe = ExtractExpectedLfdbhFromState(state)
             .Match(
                 success => Maybe<LoadFileDataBlockHash>.From(success),
@@ -1230,7 +1230,7 @@ public partial class VirtualCard : IVirtualCard
         byte[] command,
         CardState state,
         CardConfiguration config,
-        LoggingService logging
+        CardLogging logging
     )
     {
         // GlobalPlatform Card Specification v2.3.1 Section 11.2 DELETE Command
@@ -1492,8 +1492,8 @@ public partial class VirtualCard : IVirtualCard
                                     );
                             }
                             var protocol = blockIsAes
-                                ? Cryptography.CryptoService.ScpVersion.Scp03
-                                : Cryptography.CryptoService.ScpVersion.Scp02;
+                                ? Cryptography.CryptoOperations.ScpVersion.Scp03
+                                : Cryptography.CryptoOperations.ScpVersion.Scp02;
                             byte[] key = global::Gp4Net.Services.GlobalPlatform.KeyChange.Unwrap(
                                 componentBlock,
                                 clearLength,
@@ -1814,7 +1814,7 @@ public partial class VirtualCard : IVirtualCard
         CardState state,
         CardConfiguration config,
         IRngContext rngContext,
-        LoggingService logging
+        CardLogging logging
     )
     {
         // Use SCP-specific processors for GP compliance
@@ -1855,7 +1855,7 @@ public partial class VirtualCard : IVirtualCard
         CardState state,
         CardConfiguration config,
         IRngContext rngContext,
-        LoggingService logging
+        CardLogging logging
     )
     {
         // Use SCP-specific processors for better error handling and GP compliance
@@ -1945,7 +1945,7 @@ public partial class VirtualCard : IVirtualCard
     private static Result<(ApduResponse, CardState), SmartCardError> ProcessDeleteTlvData(
         ImmutableArray<TlvObject> tlvs,
         CardState state,
-        LoggingService logging
+        CardLogging logging
     )
     {
         logging.LogDebug("DELETE command parsed {Count} TLV objects", tlvs.Length);
@@ -1989,15 +1989,15 @@ public partial class VirtualCard : IVirtualCard
     /// <summary>
     /// Calculates AES Key Check Value (KCV) per GlobalPlatform specification.
     /// KCV is the first 3 bytes of AES-ECB encryption of 16 zero bytes.
-    /// Uses UnifiedCryptoService for consistent cryptographic operations.
+    /// Uses CryptoOperations for consistent cryptographic operations.
     /// </summary>
     private static Result<byte[], SmartCardError> CalculateAesKcv(byte[] key)
     {
         // Per GlobalPlatform: KCV = first 3 bytes of AES-ECB(key, 16 zero bytes)
         byte[] zeroBlock = new byte[16]; // All zeros
 
-        // Use UnifiedCryptoService for AES encryption per project architecture
-        return CryptoService
+        // Keep AES encryption aligned with the shared cryptographic operations.
+        return CryptoOperations
             .Cipher.EncryptAesEcb(key, zeroBlock)
             .Map(encrypted => encrypted.Take(3).ToArray());
     }
@@ -2076,7 +2076,7 @@ public partial class VirtualCard : IVirtualCard
         CardState state,
         CardConfiguration config,
         IRngContext rngContext,
-        LoggingService logging
+        CardLogging logging
     )
     {
         return state.ApplicationRegistry.Match(
@@ -2126,7 +2126,7 @@ public partial class VirtualCard : IVirtualCard
     private static Result<
         (ParsedCommand command, CardState state),
         SmartCardError
-    > ApplyScpSecurity(ParsedCommand cmd, CardState state, LoggingService logging)
+    > ApplyScpSecurity(ParsedCommand cmd, CardState state, CardLogging logging)
     {
         if (state.IsSecureChannelAborted)
         {
@@ -2176,7 +2176,7 @@ public partial class VirtualCard : IVirtualCard
         // GP Card Specification v2.3.1, E.3.3 and E.4.4-E.4.6; SCP03 Amendment D
         // v1.1.2, 6.2.4-6.2.6: verify C-MAC, remove it, then decrypt C-ENC command data.
         return global::Gp4Net
-            .Services.ScpService.Security.RemoveCommandSecurity(
+            .Services.ScpOperations.Security.RemoveCommandSecurity(
                 new CommandAPDU(cmd.FullCommand),
                 state.SecureChannel.Value
             )
@@ -2211,7 +2211,7 @@ public partial class VirtualCard : IVirtualCard
             return Result.Success<CardState, SmartCardError>(state);
         }
 
-        return CardStateService.InitializeApplicationRegistryWithDataObjects(
+        return CardStateTransitions.InitializeApplicationRegistryWithDataObjects(
             state,
             config.IsdAid.ToImmutableArray(),
             config.DefaultDataObjects

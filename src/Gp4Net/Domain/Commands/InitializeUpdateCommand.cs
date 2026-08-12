@@ -11,7 +11,7 @@ using Gp4Net.Transport;
 using JetBrains.Annotations;
 using WSCT.ISO7816;
 using static Gp4Net.Constants.Constants;
-using static Gp4Net.Cryptography.CryptoService;
+using static Gp4Net.Cryptography.CryptoOperations;
 
 namespace Gp4Net.Domain.Commands;
 

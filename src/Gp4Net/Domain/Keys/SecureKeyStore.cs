@@ -46,11 +46,11 @@ public sealed class SecureKeyStore
     /// </summary>
     public static Result<SecureKeyStore, SmartCardError> Create()
     {
-        // Generate cryptographically secure master key and salt using CryptoService.Rng
-        return CryptoService
+        // Generate cryptographically secure master key and salt using CryptoOperations.Rng
+        return CryptoOperations
             .Rng.GenerateBytes(32) // 256-bit key
             .Bind(masterKey =>
-                CryptoService
+                CryptoOperations
                     .Rng.GenerateBytes(16) // 128-bit salt
                     .Map(salt => new SecureKeyStore(
                         ImmutableDictionary<string, EncryptedKey>.Empty,
@@ -78,13 +78,13 @@ public sealed class SecureKeyStore
         Maybe<string>
             .From(keyId)
             .Where(id => !string.IsNullOrWhiteSpace(id))
-            .ToResult(ErrorFactory.EmptyArgument("Key ID"));
+            .ToResult(Errors.EmptyArgument("Key ID"));
 
     private static Result<byte[], SmartCardError> ValidateKeyData(byte[] keyData) =>
         Maybe<byte[]>
             .From(keyData)
             .Where(data => data.Length > 0)
-            .ToResult(ErrorFactory.EmptyArgument("Key data"));
+            .ToResult(Errors.EmptyArgument("Key data"));
 
     private Result<SecureKeyStore, SmartCardError> EncryptAndStore(string keyId, byte[] keyData) =>
         Result.Try(

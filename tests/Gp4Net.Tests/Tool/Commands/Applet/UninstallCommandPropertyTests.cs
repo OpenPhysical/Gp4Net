@@ -19,19 +19,19 @@ namespace Gp4Net.Tests.Tool.Commands.Applet;
 public sealed class UninstallCommandPropertyTests
 {
     private TestCliContext _testContext;
-    private ISmartCardService _smartCardService;
+    private ICardSessionCommands _smartCardService;
     private UninstallCommand _command;
     private string _testCapFilePath;
 
     [NUnit.Framework.SetUp]
     public void Setup()
     {
-        var virtualCardService = new VirtualCardService();
+        var virtualCardService = new VirtualCardOperations();
         virtualCardService.SetupTestEnvironment();
         _smartCardService = Create(virtualCardService).Value;
 
-        var displayService = new DisplayService();
-        var keysetResolver = new KeysetResolver();
+        var displayService = new ConsoleDisplay();
+        var keysetResolver = new KeysetResolution();
         var logger = NullLogger<CliContext>.Instance;
 
         _testContext = new TestCliContext(

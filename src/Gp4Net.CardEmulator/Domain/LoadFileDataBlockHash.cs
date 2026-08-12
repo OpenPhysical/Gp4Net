@@ -59,10 +59,10 @@ public sealed record LoadFileDataBlockHash
     {
         return hashLength switch
         {
-            20 => CryptoService.Hash.Sha1(data),
-            32 => CryptoService.Hash.Sha256(data),
-            48 => CryptoService.Hash.Sha384(data),
-            64 => CryptoService.Hash.Sha512(data),
+            20 => CryptoOperations.Hash.Sha1(data),
+            32 => CryptoOperations.Hash.Sha256(data),
+            48 => CryptoOperations.Hash.Sha384(data),
+            64 => CryptoOperations.Hash.Sha512(data),
             _
                 => Result.Failure<byte[], SmartCardError>(
                     SmartCardError.InvalidData($"Unsupported LFDBH length: {hashLength}")

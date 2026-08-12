@@ -10,16 +10,16 @@ namespace Gp4Net.CardEmulator.Services;
 
 /// <summary>
 /// Adapter for CAP file processing operations specific to VirtualCard needs.
-/// Wraps the core CapFileService to provide CardEmulator-specific functionality
+/// Wraps the core CapFileOperations to provide CardEmulator-specific functionality
 /// including ExecutableModule creation and LoadFileDataBlockHash handling.
 /// </summary>
-public sealed class CapFileServiceAdapter
+public sealed class EmulatorCapFiles
 {
-    private readonly CapFileService _coreService;
+    private readonly CapFileOperations _coreService;
 
-    public CapFileServiceAdapter()
+    public EmulatorCapFiles()
     {
-        _coreService = new CapFileService();
+        _coreService = new CapFileOperations();
     }
 
     /// <summary>

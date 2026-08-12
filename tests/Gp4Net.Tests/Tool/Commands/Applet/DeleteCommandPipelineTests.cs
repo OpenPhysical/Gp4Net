@@ -51,7 +51,7 @@ namespace Gp4Net.Tests.Tool.Commands.Applet;
 public class DeleteCommandPipelineTests
 {
     private TestCliContext _testContext;
-    private ISmartCardService _smartCardService;
+    private ICardSessionCommands _smartCardService;
     private DeleteCommand _command;
     private string _testCapFilePath;
 
@@ -59,15 +59,15 @@ public class DeleteCommandPipelineTests
     public void Setup()
     {
         // Use real virtual card implementation - no mocks needed
-        var virtualCardService = new VirtualCardService();
+        var virtualCardService = new VirtualCardOperations();
         virtualCardService.SetupTestEnvironment();
         _smartCardService = Create(virtualCardService).Value;
 
         // Skip domain service factory setup for DeleteCommand tests - use card service directly
 
         // Create real CLI context with virtual card
-        var displayService = new DisplayService();
-        var keysetResolver = new KeysetResolver();
+        var displayService = new ConsoleDisplay();
+        var keysetResolver = new KeysetResolution();
         var logger = NullLogger<CliContext>.Instance;
 
         _testContext = new TestCliContext(
@@ -210,21 +210,21 @@ public class DeleteCommandPipelineTests
 /// </summary>
 public class TestCliContext : ICliExecutionContext
 {
-    public IDisplayService Display { get; }
-    public ISmartCardService CardService { get; }
-    public IKeysetResolver KeysetResolver { get; }
+    public IDisplay Display { get; }
+    public ICardSessionCommands CardService { get; }
+    public KeysetResolution KeysetResolution { get; }
     public ILogger Logger { get; }
 
     public TestCliContext(
-        IDisplayService display,
-        ISmartCardService smartCardService,
-        IKeysetResolver keysetResolver,
+        IDisplay display,
+        ICardSessionCommands smartCardService,
+        KeysetResolution keysetResolver,
         ILogger logger
     )
     {
         Display = display;
         CardService = smartCardService;
-        KeysetResolver = keysetResolver;
+        KeysetResolution = keysetResolver;
         Logger = logger;
     }
 
@@ -270,7 +270,7 @@ public class TestCliContext : ICliExecutionContext
         return SecureChannelState.Create(
             mockKeys,
             SecurityLevel.None,
-            CryptoService.ScpVersion.Scp02,
+            CryptoOperations.ScpVersion.Scp02,
             new byte[8], // Zero-initialized MAC chaining value
             0x00 // Implementation parameter
         );

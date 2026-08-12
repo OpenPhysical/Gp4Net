@@ -31,18 +31,18 @@ namespace Gp4Net.Tool.Commands.Card;
 [Description("Display detailed card information")]
 public class InfoCommand : AsyncCommand<InfoCommand.Settings>
 {
-    private readonly ISmartCardServiceFactory _serviceFactory;
-    private readonly IReaderResolutionService _resolutionService;
-    private readonly IDisplayService _displayService;
+    private readonly CardSessionConnections _serviceFactory;
+    private readonly ReaderSelectionOperations _resolutionService;
+    private readonly IDisplay _displayService;
     private readonly ILoggerFactory _loggerFactory;
 
     /// <summary>
     /// Initializes a new instance of the InfoCommand class.
     /// </summary>
     public InfoCommand(
-        ISmartCardServiceFactory serviceFactory,
-        IReaderResolutionService resolutionService,
-        IDisplayService displayService,
+        CardSessionConnections serviceFactory,
+        ReaderSelectionOperations resolutionService,
+        IDisplay displayService,
         ILoggerFactory loggerFactory
     )
     {
@@ -133,8 +133,8 @@ public class InfoCommand : AsyncCommand<InfoCommand.Settings>
     /// <summary>
     /// Establishes secure channel with the card.
     /// </summary>
-    private async Task<Result<ISmartCardService, SmartCardError>> EstablishSecureChannelAsync(
-        ISmartCardService service,
+    private async Task<Result<ICardSessionCommands, SmartCardError>> EstablishSecureChannelAsync(
+        ICardSessionCommands service,
         Settings settings
     )
     {
@@ -145,10 +145,10 @@ public class InfoCommand : AsyncCommand<InfoCommand.Settings>
         var rawKeysetResult = KeysetParser.ParseRawKeysetSpecification(keysetSpec);
 
         if (rawKeysetResult.IsFailure)
-            return Result.Failure<ISmartCardService, SmartCardError>(rawKeysetResult.Error);
+            return Result.Failure<ICardSessionCommands, SmartCardError>(rawKeysetResult.Error);
 
-        var sessionResult = await ScpService.Establishment.EstablishAsync(
-            service,
+        var sessionResult = await ScpOperations.Establishment.EstablishAsync(
+            service.SendCommandAsync,
             rawKeysetResult.Value,
             SecurityLevel.CMac,
             CancellationToken.None
@@ -165,7 +165,7 @@ public class InfoCommand : AsyncCommand<InfoCommand.Settings>
     /// Gets comprehensive card information using the CardInformationGatherer service.
     /// </summary>
     private async Task<Result<CardDisplayInfo, SmartCardError>> GetCardInformation(
-        ISmartCardService service,
+        ICardSessionCommands service,
         string readerName,
         Settings settings
     )
@@ -468,12 +468,12 @@ public class InfoCommand : AsyncCommand<InfoCommand.Settings>
     }
 
     /// <summary>
-    /// Handles errors with enhanced error translation using ErrorTranslationService.
+    /// Handles errors with enhanced error translation using ErrorTranslation.
     /// </summary>
     private static int HandleError(SmartCardError error)
     {
-        var humanReadableMessage = ErrorTranslationService.TranslateStatusWord(error);
-        var errorDetails = ErrorTranslationService.GetHumanReadableError(error);
+        var humanReadableMessage = ErrorTranslation.TranslateStatusWord(error);
+        var errorDetails = ErrorTranslation.GetHumanReadableError(error);
 
         AnsiConsole.MarkupLine($"[red]Failed to get card information: {humanReadableMessage}[/]");
 

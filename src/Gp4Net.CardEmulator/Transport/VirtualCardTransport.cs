@@ -16,8 +16,6 @@ namespace Gp4Net.CardEmulator.Transport;
 [PublicAPI]
 public sealed class VirtualCardTransport : IApduTransport
 {
-    private IVirtualCard _virtualCard;
-
     /// <summary>
     /// Gets the transport protocol type (always T=1 for virtual cards).
     /// </summary>
@@ -41,11 +39,7 @@ public sealed class VirtualCardTransport : IApduTransport
     /// <summary>
     /// Initializes a new instance of VirtualCardTransport.
     /// </summary>
-    /// <param name="virtualCard">The virtual card to communicate with.</param>
-    private VirtualCardTransport(IVirtualCard virtualCard)
-    {
-        _virtualCard = virtualCard;
-    }
+    private VirtualCardTransport() { }
 
     /// <summary>
     /// Creates a VirtualCardTransport instance.
@@ -57,7 +51,7 @@ public sealed class VirtualCardTransport : IApduTransport
         return Maybe
             .From(virtualCard)
             .ToResult(SmartCardError.InvalidArgument("Virtual card cannot be null"))
-            .Map(card => new VirtualCardTransport(card));
+            .Map(_ => new VirtualCardTransport());
     }
 
     /// <summary>
@@ -67,35 +61,25 @@ public sealed class VirtualCardTransport : IApduTransport
     /// <param name="channel">The card channel (ignored for virtual cards).</param>
     /// <param name="cancellationToken">Cancellation token (ignored for virtual cards).</param>
     /// <returns>The response from the virtual card.</returns>
-    public Task<Result<TransportApduResponse, SmartCardError>> TransmitAsync(
+    public async Task<Result<TransportExchange, SmartCardError>> TransmitAsync(
         IApduCommand command,
         ICardChannel channel,
         CancellationToken cancellationToken = default
     )
     {
-        return Task.FromResult(
-            Result.Success<TransportApduResponse, SmartCardError>(TransmitCommand(command))
-        );
-    }
-
-    /// <summary>
-    /// Synchronously transmits a command to the virtual card.
-    /// </summary>
-    private TransportApduResponse TransmitCommand(IApduCommand command)
-    {
         byte[] commandBytes = BuildApduBytes(command);
-        var result = _virtualCard.ProcessCommand(commandBytes);
-        return result.Match(
-            success =>
-            {
-                _virtualCard = success.UpdatedCard;
-                return new TransportApduResponse(
-                    success.Response.Data,
-                    success.Response.StatusWord
-                );
-            },
-            error => new TransportApduResponse([], VirtualCardErrorResponse.GetStatusWord(error))
-        );
+        var result = await channel.TransmitAsync(commandBytes, cancellationToken);
+        return result.Map(exchange =>
+        {
+            byte[] response = exchange.Response;
+            ushort statusWord =
+                response.Length >= 2 ? (ushort)(response[^2] << 8 | response[^1]) : (ushort)0x6F00;
+            byte[] data = response.Length > 2 ? response[..^2] : [];
+            return new TransportExchange(
+                new TransportApduResponse(data, statusWord),
+                exchange.Channel
+            );
+        });
     }
 
     /// <summary>

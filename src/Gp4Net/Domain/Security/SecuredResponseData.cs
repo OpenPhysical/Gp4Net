@@ -5,7 +5,7 @@ using Gp4Net.Core;
 using Gp4Net.Domain.Keys;
 using JetBrains.Annotations;
 using WSCT.ISO7816;
-using static Gp4Net.Cryptography.CryptoService;
+using static Gp4Net.Cryptography.CryptoOperations;
 
 namespace Gp4Net.Domain.Security;
 

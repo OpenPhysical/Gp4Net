@@ -1,3 +1,4 @@
+using System;
 using WSCT.Core.APDU;
 using WSCT.Wrapper;
 using WSCT.Wrapper.Desktop.Core;
@@ -5,9 +6,9 @@ using WSCT.Wrapper.Desktop.Core;
 namespace Gp4Net.Tool.Services.CardCommunication.Wsct;
 
 /// <summary>
-/// Concrete implementation of ICardChannelWrapper using WSCT.
+/// Concrete implementation of WsctCardChannelWrapper using WSCT.
 /// </summary>
-public class WsctCardChannelWrapper : ICardChannelWrapper
+public class WsctCardChannelWrapper : IDisposable
 {
     private readonly CardChannel _channel;
     private bool _disposed;

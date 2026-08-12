@@ -178,7 +178,7 @@ public class VirtualCardReader
 }
 
 /// <summary>
-/// Builder for constructing immutable VirtualReaderManager instances.
+/// Builder for constructing immutable VirtualReaders instances.
 /// Allows mutation during construction, produces immutable manager.
 /// </summary>
 [PublicAPI]
@@ -224,12 +224,12 @@ public class VirtualReaderManagerBuilder
     }
 
     /// <summary>
-    /// Builds an immutable VirtualReaderManager from the accumulated readers.
+    /// Builds an immutable VirtualReaders from the accumulated readers.
     /// </summary>
-    /// <returns>Immutable VirtualReaderManager instance.</returns>
-    public VirtualReaderManager Build()
+    /// <returns>Immutable VirtualReaders instance.</returns>
+    public VirtualReaders Build()
     {
-        return new VirtualReaderManager(_readers.ToImmutableDictionary());
+        return new VirtualReaders(_readers.ToImmutableDictionary());
     }
 }
 
@@ -238,21 +238,21 @@ public class VirtualReaderManagerBuilder
 /// Immutable once constructed - use VirtualReaderManagerBuilder to create instances.
 /// </summary>
 [PublicAPI]
-public class VirtualReaderManager
+public class VirtualReaders
 {
     private readonly ImmutableDictionary<string, VirtualCardReader> _readers;
 
     /// <summary>
     /// Initializes a new instance with an empty reader collection.
     /// </summary>
-    public VirtualReaderManager()
+    public VirtualReaders()
         : this(ImmutableDictionary<string, VirtualCardReader>.Empty) { }
 
     /// <summary>
     /// Internal constructor for builder use.
     /// </summary>
     /// <param name="readers">The immutable dictionary of readers.</param>
-    internal VirtualReaderManager(ImmutableDictionary<string, VirtualCardReader> readers)
+    internal VirtualReaders(ImmutableDictionary<string, VirtualCardReader> readers)
     {
         _readers = readers;
     }

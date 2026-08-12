@@ -26,11 +26,11 @@ public class Scp02CommandSecurityTests
         var command = new CommandAPDU(Convert.FromHexString("80E2000003010203"));
         SecureChannelState state = CreateState(ScpImplementation.Scp02I02, new byte[8]);
         byte[] expectedInput = Convert.FromHexString("80E2000003010203");
-        byte[] expectedMac = CryptoService
+        byte[] expectedMac = CryptoOperations
             .Mac.CalculateScp02CommandMac(SMac, expectedInput, new byte[8])
             .Value;
 
-        var result = ScpService.Security.ApplyCommandSecurity(command, state);
+        var result = ScpOperations.Security.ApplyCommandSecurity(command, state);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.securedCommand.Udc[^8..].Should().Equal(expectedMac);
@@ -44,11 +44,11 @@ public class Scp02CommandSecurityTests
         var command = new CommandAPDU(Convert.FromHexString("80E2000003010203"));
         SecureChannelState state = CreateState(ScpImplementation.Scp02I04, new byte[8]);
         byte[] expectedInput = Convert.FromHexString("84E200000B010203");
-        byte[] expectedMac = CryptoService
+        byte[] expectedMac = CryptoOperations
             .Mac.CalculateScp02CommandMac(SMac, expectedInput, new byte[8])
             .Value;
 
-        var result = ScpService.Security.ApplyCommandSecurity(command, state);
+        var result = ScpOperations.Security.ApplyCommandSecurity(command, state);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.securedCommand.Udc[^8..].Should().Equal(expectedMac);
@@ -66,13 +66,13 @@ public class Scp02CommandSecurityTests
         byte[] chaining = Convert.FromHexString("1122334455667788");
         var command = new CommandAPDU(Convert.FromHexString("80E2000003010203"));
         byte[] icv = encryptIcv
-            ? CryptoService.Mac.EncryptScp02Icv(chaining, SMac).Value
+            ? CryptoOperations.Mac.EncryptScp02Icv(chaining, SMac).Value
             : chaining;
-        byte[] expectedMac = CryptoService
+        byte[] expectedMac = CryptoOperations
             .Mac.CalculateScp02CommandMac(SMac, command.GetMacInput().Value.Bytes, icv)
             .Value;
 
-        var result = ScpService.Security.ApplyCommandSecurity(
+        var result = ScpOperations.Security.ApplyCommandSecurity(
             command,
             CreateState(implementation, chaining)
         );
@@ -87,7 +87,7 @@ public class Scp02CommandSecurityTests
         // GP Card Specification v2.3.1 §§11.1.5 and E.4.6 require short Lc and C-ENC.
         byte[] command = [0x84, 0xE2, 0x00, 0x00, 0x00, 0x00, 0x09, .. new byte[9]];
 
-        var result = CryptoService.ScpOperations.Scp02.ApplyCommandEncryption(command, SEnc);
+        var result = CryptoOperations.ScpOperations.Scp02.ApplyCommandEncryption(command, SEnc);
 
         _ = result.IsFailure.Should().BeTrue();
     }
@@ -98,7 +98,7 @@ public class Scp02CommandSecurityTests
         // GP Card Specification v2.3.1 §§11.1.5 and E.4.6 cap encrypted data plus C-MAC at 255.
         byte[] command = [0x84, 0xE2, 0x00, 0x00, 0xF8, .. new byte[248]];
 
-        var result = CryptoService.ScpOperations.Scp02.ApplyCommandEncryption(command, SEnc);
+        var result = CryptoOperations.ScpOperations.Scp02.ApplyCommandEncryption(command, SEnc);
 
         _ = result.IsFailure.Should().BeTrue();
     }
@@ -111,7 +111,7 @@ public class Scp02CommandSecurityTests
             .Create(
                 new SessionKeys(SEnc, SMac, SMac),
                 SecurityLevel.CMac,
-                CryptoService.ScpVersion.Scp02,
+                CryptoOperations.ScpVersion.Scp02,
                 chaining,
                 (byte)implementation
             )

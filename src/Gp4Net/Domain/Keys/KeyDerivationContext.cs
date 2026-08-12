@@ -2,7 +2,7 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
 using JetBrains.Annotations;
-using static Gp4Net.Cryptography.CryptoService;
+using static Gp4Net.Cryptography.CryptoOperations;
 
 namespace Gp4Net.Domain.Keys;
 
@@ -25,7 +25,7 @@ public sealed record KeyDerivationContext(
     byte[] CardChallenge,
     Maybe<byte[]> SequenceCounter,
     Maybe<ScpImplementation> Implementation
-) : IKeyDerivationContext
+)
 {
     /// <summary>
     /// Gets the base keyset as object to match interface.

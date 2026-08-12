@@ -31,9 +31,9 @@ public class PhysicalCardConnectionServiceIntegrationTests
     {
         string readerSpec = $"virtual:{ProfilePath.Value}";
 
-        var result = await PhysicalCardConnectionService.CreateServiceAsync(
+        var result = await PhysicalCardConnections.CreateServiceAsync(
             readerSpec,
-            NullLogger<SmartCardService>.Instance,
+            NullLogger<CardSessionCommands>.Instance,
             CancellationToken.None
         );
 
@@ -56,9 +56,9 @@ public class PhysicalCardConnectionServiceIntegrationTests
         string readerSpec =
             $"virtual:{Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))}.json";
 
-        var result = await PhysicalCardConnectionService.CreateServiceAsync(
+        var result = await PhysicalCardConnections.CreateServiceAsync(
             readerSpec,
-            NullLogger<SmartCardService>.Instance,
+            NullLogger<CardSessionCommands>.Instance,
             CancellationToken.None
         );
 

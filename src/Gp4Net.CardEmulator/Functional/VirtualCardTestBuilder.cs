@@ -26,7 +26,7 @@ public static class VirtualCardTestBuilder
         byte[] entropy
     )
     {
-        return CryptoService
+        return CryptoOperations
             .Rng.CreateDeterministicContext(entropy)
             .Bind(rng => VirtualCard.Create(config, rng));
     }
@@ -38,7 +38,7 @@ public static class VirtualCardTestBuilder
     /// <returns>A virtual card with secure RNG.</returns>
     public static VirtualCard CreateWithSecureRng(CardConfiguration config)
     {
-        var rng = CryptoService.Rng.CreateSecureContext();
+        var rng = CryptoOperations.Rng.CreateSecureContext();
         return VirtualCard.Create(config, rng).Value;
     }
 

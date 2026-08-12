@@ -35,9 +35,9 @@ public class SecureChannelOperationsScp03Tests
     public async Task Should_Establish_Scp03_Secure_Channel_With_Default_Test_Keys()
     {
         string readerSpec = $"virtual:{Scp03ProfilePath.Value}";
-        var serviceResult = await VirtualCardConnectionService.CreateServiceAsync(
+        var serviceResult = await VirtualCardConnections.CreateServiceAsync(
             readerSpec,
-            NullLogger<SmartCardService>.Instance,
+            NullLogger<CardSessionCommands>.Instance,
             CancellationToken.None
         );
 
@@ -52,8 +52,8 @@ public class SecureChannelOperationsScp03Tests
         );
         Assert.That(rawKeysetResult.IsSuccess, Is.True, () => rawKeysetResult.Error.ToString());
 
-        var establishResult = await ScpService.Establishment.EstablishAsync(
-            service,
+        var establishResult = await ScpOperations.Establishment.EstablishAsync(
+            service.SendCommandAsync,
             rawKeysetResult.Value,
             SecurityLevel.CMac,
             CancellationToken.None
@@ -63,12 +63,12 @@ public class SecureChannelOperationsScp03Tests
         var session = establishResult.Value;
         Assert.That(
             session.State.ProtocolVersion,
-            Is.EqualTo(Cryptography.CryptoService.ScpVersion.Scp03)
+            Is.EqualTo(Cryptography.CryptoOperations.ScpVersion.Scp03)
         );
         Assert.That(session.State.SecurityLevel.HasCMac(), Is.True);
 
         // SCP03 Amendment D v1.1.2, Sections 6.2.3 and 6.2.4.
-        var secured = ScpService.Security.ApplyCommandSecurity(
+        var secured = ScpOperations.Security.ApplyCommandSecurity(
             new WSCT.ISO7816.CommandAPDU(Convert.FromHexString("80F24000024F00")),
             session.State
         );
@@ -85,9 +85,9 @@ public class SecureChannelOperationsScp03Tests
     public async Task Should_Fail_When_Scp03_Keys_Are_Incorrect()
     {
         string readerSpec = $"virtual:{Scp03ProfilePath.Value}";
-        var serviceResult = await VirtualCardConnectionService.CreateServiceAsync(
+        var serviceResult = await VirtualCardConnections.CreateServiceAsync(
             readerSpec,
-            NullLogger<SmartCardService>.Instance,
+            NullLogger<CardSessionCommands>.Instance,
             CancellationToken.None
         );
 
@@ -102,8 +102,8 @@ public class SecureChannelOperationsScp03Tests
         );
         Assert.That(rawKeysetResult.IsSuccess, Is.True, () => rawKeysetResult.Error.ToString());
 
-        var establishResult = await ScpService.Establishment.EstablishAsync(
-            service,
+        var establishResult = await ScpOperations.Establishment.EstablishAsync(
+            service.SendCommandAsync,
             rawKeysetResult.Value,
             SecurityLevel.CMac,
             CancellationToken.None
@@ -130,7 +130,7 @@ public class SecureChannelOperationsScp03Tests
             ScpImplementation = ScpImplementation.Scp03I10,
         };
         byte[] command = Convert.FromHexString("8050000008000102030405060700");
-        var rng = CryptoService.Rng.CreateSecureContext();
+        var rng = CryptoOperations.Rng.CreateSecureContext();
 
         var first = Scp03CommandProcessors.ProcessScp03InitializeUpdate(
             command,
@@ -172,7 +172,7 @@ public class SecureChannelOperationsScp03Tests
             Convert.FromHexString("8050010008000102030405060700"),
             state,
             config,
-            CryptoService.Rng.CreateSecureContext()
+            CryptoOperations.Rng.CreateSecureContext()
         );
 
         Assert.That(result.IsSuccess, Is.True, () => result.Error.ToString());
@@ -197,7 +197,7 @@ public class SecureChannelOperationsScp03Tests
             Convert.FromHexString("8050010008000102030405060700"),
             state,
             config,
-            CryptoService.Rng.CreateSecureContext()
+            CryptoOperations.Rng.CreateSecureContext()
         );
 
         Assert.That(result.IsSuccess, Is.True, () => result.Error.ToString());
@@ -223,7 +223,7 @@ public class SecureChannelOperationsScp03Tests
             Convert.FromHexString("8050010008000102030405060700"),
             state,
             config,
-            CryptoService.Rng.CreateSecureContext()
+            CryptoOperations.Rng.CreateSecureContext()
         );
 
         Assert.That(result.IsFailure, Is.True);
@@ -235,9 +235,9 @@ public class SecureChannelOperationsScp03Tests
     public async Task Should_Reject_External_Authenticate_Without_CMac()
     {
         string readerSpec = $"virtual:{Scp03ProfilePath.Value}";
-        var serviceResult = await VirtualCardConnectionService.CreateServiceAsync(
+        var serviceResult = await VirtualCardConnections.CreateServiceAsync(
             readerSpec,
-            NullLogger<SmartCardService>.Instance,
+            NullLogger<CardSessionCommands>.Instance,
             CancellationToken.None
         );
         Assert.That(serviceResult.IsSuccess, Is.True, () => serviceResult.Error.ToString());

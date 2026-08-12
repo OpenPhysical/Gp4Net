@@ -10,7 +10,7 @@ using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
 using NUnit.Framework;
-using ScpVersion = Gp4Net.Cryptography.CryptoService.ScpVersion;
+using ScpVersion = Gp4Net.Cryptography.CryptoOperations.ScpVersion;
 
 namespace Gp4Net.Tests.Domain;
 

@@ -256,12 +256,12 @@ public static class Responses
         }
 
         // Try parsing with TlvParser for more complex structures
-        var parseResult = TlvService.TlvParser.ParseMultiple([.. data]);
+        var parseResult = TlvCodec.TlvParser.ParseMultiple([.. data]);
         if (parseResult.IsFailure)
         {
             return [];
         }
-        ImmutableList<TlvService.TlvObject> elements = [.. parseResult.Value.Objects];
+        ImmutableList<TlvCodec.TlvObject> elements = [.. parseResult.Value.Objects];
 
         // For single-byte tags
         if (expectedTag <= 0xFF)

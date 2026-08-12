@@ -33,8 +33,8 @@ public class CardCompatibilityServicePropertyTests
                     )
                 );
 
-                var serviceResult = CardCompatibilityService.Create(
-                    NullLogger<CardCompatibilityService>.Instance,
+                var serviceResult = CardCompatibility.Create(
+                    NullLogger<CardCompatibility>.Instance,
                     envValidation
                 );
 
@@ -98,8 +98,8 @@ public class CardCompatibilityServicePropertyTests
                     )
                 );
 
-                var serviceResult = CardCompatibilityService.Create(
-                    NullLogger<CardCompatibilityService>.Instance,
+                var serviceResult = CardCompatibility.Create(
+                    NullLogger<CardCompatibility>.Instance,
                     envValidation
                 );
 
@@ -146,8 +146,8 @@ public class CardCompatibilityServicePropertyTests
                     )
                 );
 
-                var serviceResult = CardCompatibilityService.Create(
-                    NullLogger<CardCompatibilityService>.Instance,
+                var serviceResult = CardCompatibility.Create(
+                    NullLogger<CardCompatibility>.Instance,
                     envValidation
                 );
 

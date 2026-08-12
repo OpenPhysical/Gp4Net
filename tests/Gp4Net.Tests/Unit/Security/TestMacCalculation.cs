@@ -39,7 +39,11 @@ public class TestMacCalculation
         var sMacKey = Convert.FromHexString(sMacKeyHex);
         var icv = Convert.FromHexString(icvHex);
 
-        var result = CryptoService.ScpOperations.Scp02.CalculateCommandMac(command, sMacKey, icv);
+        var result = CryptoOperations.ScpOperations.Scp02.CalculateCommandMac(
+            command,
+            sMacKey,
+            icv
+        );
 
         result.Match(
             calculatedMac =>
@@ -118,7 +122,7 @@ public class TestMacCalculation
         var command = Convert.FromHexString("84F2010000");
         var macChaining = new byte[15];
 
-        var result = CryptoService.ScpOperations.Scp03.CalculateCommandMac(
+        var result = CryptoOperations.ScpOperations.Scp03.CalculateCommandMac(
             command,
             GpTestKey,
             macChaining
@@ -137,7 +141,7 @@ public class TestMacCalculation
     public void Scp03_Should_Handle_Short_Commands(string commandHex)
     {
         var input = commandHex.Length > 0 ? Convert.FromHexString(commandHex) : Array.Empty<byte>();
-        var result = CryptoService.Mac.CalculateScp03CommandMac(GpTestKey, input);
+        var result = CryptoOperations.Mac.CalculateScp03CommandMac(GpTestKey, input);
 
         Assert.That(result.IsSuccess, Is.True);
         Assert.That(result.Value.Length, Is.EqualTo(GpConstants.Scp.Scp03.MAC_SIZE));

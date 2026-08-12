@@ -17,7 +17,7 @@ namespace Gp4Net.Tests.Integration;
 /// <summary>
 /// Spec restatement: Validate both sides of every cryptographic transaction between host and card.
 /// Invariants:
-/// - Card emulator and TraceApduDecryptorService use identical CryptoService
+/// - Card emulator and TraceApduDecryptor use identical CryptoOperations
 /// - All secure channel establishment steps are bidirectionally verified
 /// - MAC generation, verification, and chaining work identically on both sides
 /// - Session state progression is consistent between host and card
@@ -35,13 +35,13 @@ namespace Gp4Net.Tests.Integration;
 [Category("Cryptographic")]
 public class BidirectionalCryptographicRoundtripTests
 {
-    private TraceApduDecryptorService _decryptorService = null!;
+    private TraceApduDecryptor _decryptorService = null!;
 
     [OneTimeSetUp]
     public void OneTimeSetup()
     {
-        _decryptorService = new TraceApduDecryptorService(
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<TraceApduDecryptorService>.Instance
+        _decryptorService = new TraceApduDecryptor(
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<TraceApduDecryptor>.Instance
         );
     }
 
@@ -104,7 +104,7 @@ public class BidirectionalCryptographicRoundtripTests
     {
         // Get test keys for SCP03
         return GpTestKeys
-            .GetTestKeySet(CryptoService.ScpVersion.Scp03)
+            .GetTestKeySet(CryptoOperations.ScpVersion.Scp03)
             .Bind(keySet =>
                 keySet switch
                 {
@@ -191,7 +191,7 @@ public class BidirectionalCryptographicRoundtripTests
                     (ScpImplementation)initResponse.ImplementationParameter
                 )
             )
-            .Bind(context => CryptoService.KeyDerivation.DeriveSessionKeys(context))
+            .Bind(context => CryptoOperations.KeyDerivation.DeriveSessionKeys(context))
             .Bind(sessionKeys => VerifyCardCryptogram(initResponse, hostChallenge, sessionKeys))
             .Bind(sessionKeys =>
                 TestDecryptorServiceRoundtrip(sessionKeys, initResponse, commandBytes, response)
@@ -205,14 +205,14 @@ public class BidirectionalCryptographicRoundtripTests
     )
     {
         // Directly derive expected card cryptogram using S-MAC key per GP SCP03 (6.2.2.2)
-        return CryptoService
+        return CryptoOperations
             .Cryptogram.CalculateScp03CardCryptogram(
                 sessionKeys.SMac,
                 hostChallenge,
                 initResponse.CardChallenge
             )
             .Bind(expectedCryptogram =>
-                CryptoService.Utils.CompareBytes(expectedCryptogram, initResponse.CardCryptogram)
+                CryptoOperations.Utils.CompareBytes(expectedCryptogram, initResponse.CardCryptogram)
                     ? Result.Success<SessionKeys, SmartCardError>(sessionKeys)
                     : Result.Failure<SessionKeys, SmartCardError>(
                         SmartCardError.AuthenticationFailed("Card cryptogram mismatch")
@@ -231,7 +231,7 @@ public class BidirectionalCryptographicRoundtripTests
             .Create(
                 sessionKeys,
                 SecurityLevel.None,
-                CryptoService.ScpVersion.Scp03,
+                CryptoOperations.ScpVersion.Scp03,
                 new byte[16], // Zero MAC chaining for SCP03
                 initResponse.ImplementationParameter
             )
@@ -297,7 +297,7 @@ public class BidirectionalCryptographicRoundtripTests
     private Result<bool, SmartCardError> PerformExternalAuthenticateTest(IVirtualCard card)
     {
         return GpTestKeys
-            .GetTestKeySet(CryptoService.ScpVersion.Scp03)
+            .GetTestKeySet(CryptoOperations.ScpVersion.Scp03)
             .Bind(keySet =>
                 keySet switch
                 {
@@ -362,7 +362,7 @@ public class BidirectionalCryptographicRoundtripTests
                     (ScpImplementation)initUpdateResponse.ImplementationParameter
                 )
             )
-            .Bind(context => CryptoService.KeyDerivation.DeriveSessionKeys(context))
+            .Bind(context => CryptoOperations.KeyDerivation.DeriveSessionKeys(context))
             .Bind(sessionKeys =>
                 CreateAndExecuteExternalAuth(card, sessionKeys, initUpdateResponse, hostChallenge)
             );
@@ -376,7 +376,7 @@ public class BidirectionalCryptographicRoundtripTests
     )
     {
         // Derive host cryptogram (S-MAC key) per GP SCP03 (6.2.2.3)
-        return CryptoService
+        return CryptoOperations
             .Cryptogram.CalculateScp03HostCryptogram(
                 sessionKeys.SMac,
                 hostChallenge,
@@ -397,7 +397,7 @@ public class BidirectionalCryptographicRoundtripTests
         // SCP03 Amendment D v1.1.2, Sections 6.2.3 and 7.1.2.
         byte[] macInput = [0x84, 0x82, (byte)securityLevel, 0x00, 0x10, .. hostCryptogram,];
 
-        return CryptoService
+        return CryptoOperations
             .ScpOperations.Scp03.CalculateCommandMac(
                 macInput,
                 sessionKeys.SMac,
@@ -444,7 +444,7 @@ public class BidirectionalCryptographicRoundtripTests
             .Create(
                 sessionKeys,
                 SecurityLevel.CMac,
-                CryptoService.ScpVersion.Scp03,
+                CryptoOperations.ScpVersion.Scp03,
                 new byte[16], // Zero MAC chaining
                 initUpdateResponse.ImplementationParameter
             )
@@ -460,7 +460,7 @@ public class BidirectionalCryptographicRoundtripTests
     private Result<bool, SmartCardError> PerformDecryptorServiceTest(IVirtualCard card)
     {
         return GpTestKeys
-            .GetTestKeySet(CryptoService.ScpVersion.Scp03)
+            .GetTestKeySet(CryptoOperations.ScpVersion.Scp03)
             .Bind(keySet =>
                 keySet switch
                 {
@@ -483,7 +483,7 @@ public class BidirectionalCryptographicRoundtripTests
                 new byte[8], // Card challenge
                 Maybe<ScpImplementation>.From(ScpImplementation.Scp03I70)
             )
-            .Bind(context => CryptoService.KeyDerivation.DeriveSessionKeys(context))
+            .Bind(context => CryptoOperations.KeyDerivation.DeriveSessionKeys(context))
             .Bind(sessionKeys => TestPlaintextCommandDecryption(sessionKeys));
     }
 
@@ -493,7 +493,7 @@ public class BidirectionalCryptographicRoundtripTests
             .Create(
                 sessionKeys,
                 SecurityLevel.CMac,
-                CryptoService.ScpVersion.Scp03,
+                CryptoOperations.ScpVersion.Scp03,
                 new byte[16],
                 0x70 // SCP03 i=70
             )

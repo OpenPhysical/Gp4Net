@@ -27,17 +27,17 @@ namespace Gp4Net.Tool.Commands.Applet;
 [CliCommand("validate", "Validate a CAP file without installing it", "applet")]
 public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
 {
-    private readonly IDisplayService _displayService;
-    private readonly IKeysetResolver _keysetResolver;
-    private readonly PackageRegistry _packageRegistry;
+    private readonly IDisplay _displayService;
+    private readonly KeysetResolution _keysetResolver;
+    private readonly PackageCatalog _packageRegistry;
 
     /// <summary>
     /// Initializes a new instance of the ValidateCommand class.
     /// </summary>
     public ValidateCommand(
-        IDisplayService displayService,
-        IKeysetResolver keysetResolver,
-        PackageRegistry packageRegistry
+        IDisplay displayService,
+        KeysetResolution keysetResolver,
+        PackageCatalog packageRegistry
     )
     {
         _displayService = displayService;
@@ -891,7 +891,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
 
     private static void DisplayCapInternals(
         CapFileStructure capFile,
-        PackageRegistry packageRegistry,
+        PackageCatalog packageRegistry,
         bool detailed,
         bool verbose
     )
@@ -1342,7 +1342,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
 
     private static void DisplayManifestInformation(
         ManifestInfo manifest,
-        PackageRegistry packageRegistry
+        PackageCatalog packageRegistry
     )
     {
         try

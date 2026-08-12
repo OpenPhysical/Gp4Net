@@ -10,23 +10,23 @@ namespace Gp4Net.Tests.Tool.Infrastructure;
 
 /// <summary>
 /// Empty card service for testing error conditions.
-/// Preserves all original functionality while implementing ISmartCardService.
+/// Preserves all original functionality while implementing ICardSessionCommands.
 /// </summary>
-public class EmptyCardService : ISmartCardService
+public class EmptyCardService : ICardSessionCommands
 {
-    private readonly IPipelineContext _context;
+    private readonly ImmutablePipelineContext _context;
 
     public EmptyCardService()
     {
         _context = ImmutablePipelineContext.Empty;
     }
 
-    private EmptyCardService(IPipelineContext context)
+    private EmptyCardService(ImmutablePipelineContext context)
     {
         _context = context;
     }
 
-    public IPipelineContext Context => _context;
+    public ImmutablePipelineContext Context => _context;
 
     public async Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
         CommandAPDU command,
@@ -58,18 +58,22 @@ public class EmptyCardService : ISmartCardService
         return await ExecuteCommandAsync(command, cancellationToken);
     }
 
-    public Result<ISmartCardService, SmartCardError> WithContext(IPipelineContext context)
+    public Result<ICardSessionCommands, SmartCardError> WithContext(
+        ImmutablePipelineContext context
+    )
     {
-        return Maybe<IPipelineContext>
+        return Maybe<ImmutablePipelineContext>
             .From(context)
             .ToResult(SmartCardError.InvalidArgument("Context cannot be null"))
-            .Map(validContext => (ISmartCardService)new EmptyCardService(validContext));
+            .Map(validContext => (ICardSessionCommands)new EmptyCardService(validContext));
     }
 
-    public Result<ISmartCardService, SmartCardError> WithContextValue<T>(string key, T value)
+    public Result<ICardSessionCommands, SmartCardError> WithContextValue<T>(string key, T value)
     {
         var newContext = _context.With(key, value);
-        return Result.Success<ISmartCardService, SmartCardError>(new EmptyCardService(newContext));
+        return Result.Success<ICardSessionCommands, SmartCardError>(
+            new EmptyCardService(newContext)
+        );
     }
 
     public async Task<Result<bool, SmartCardError>> IsConnectedAsync(

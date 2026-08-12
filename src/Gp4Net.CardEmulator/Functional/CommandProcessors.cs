@@ -9,7 +9,7 @@ using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
 using JetBrains.Annotations;
 using static Gp4Net.CardEmulator.Domain.CommandRequests;
-using static Gp4Net.Cryptography.CryptoService;
+using static Gp4Net.Cryptography.CryptoOperations;
 
 namespace Gp4Net.CardEmulator.Functional;
 
@@ -27,7 +27,7 @@ public static class CommandProcessors
         byte[] command,
         CardState state,
         CardConfiguration config,
-        LoggingService logging
+        CardLogging logging
     )
     {
         logging.LogDebug("Processing SELECT command");
@@ -62,7 +62,7 @@ public static class CommandProcessors
         CardState state,
         CardConfiguration config,
         IRngContext rngContext,
-        LoggingService logging
+        CardLogging logging
     )
     {
         logging.LogDebug(
@@ -115,7 +115,7 @@ public static class CommandProcessors
         CardState state,
         CardConfiguration config,
         IRngContext rngContext,
-        LoggingService logging
+        CardLogging logging
     )
     {
         logging.LogDebug("Processing EXTERNAL AUTHENTICATE");
@@ -174,7 +174,7 @@ public static class CommandProcessors
         byte[] command,
         CardState state,
         CardConfiguration config,
-        LoggingService logging
+        CardLogging logging
     )
     {
         logging.LogDebug("Processing GET DATA command");
@@ -193,7 +193,7 @@ public static class CommandProcessors
         byte[] command,
         CardState state,
         CardConfiguration config,
-        LoggingService logging
+        CardLogging logging
     )
     {
         logging.LogDebug("Processing GET STATUS command");
@@ -441,7 +441,7 @@ public static class CommandProcessors
         // KDF context: sequence counter || ISD AID, derived using S-ENC and derivation constant 0x02
         byte[] context = sequenceCounter.Concat(aid).ToArray();
 
-        return CryptoService
+        return CryptoOperations
             .KeyDerivation.DeriveScp03Data(scp03Keys.EncKey, 0x02, context, 64)
             .Map(challenge => (request, challenge));
     }
@@ -785,7 +785,7 @@ public static class CommandProcessors
                 sequenceCounter
             )
             .Bind(expectedCryptogram =>
-                CryptoService.Utils.CompareBytes(request.HostCryptogram, expectedCryptogram)
+                CryptoOperations.Utils.CompareBytes(request.HostCryptogram, expectedCryptogram)
                     ? Result.Success<bool, SmartCardError>(true)
                     : Result.Failure<bool, SmartCardError>(
                         SmartCardError.AuthenticationFailed("Host cryptogram verification failed")
@@ -837,13 +837,13 @@ public static class CommandProcessors
                                         state.ScpVersion,
                                         state.ScpImplementation
                                     )
-                                    .Bind(CryptoService.KeyDerivation.DeriveSessionKeys)
+                                    .Bind(CryptoOperations.KeyDerivation.DeriveSessionKeys)
                             )
                     )
             );
     }
 
-    private static Result<IKeyDerivationContext, SmartCardError> CreateKeyDerivationContext(
+    private static Result<KeyDerivationContext, SmartCardError> CreateKeyDerivationContext(
         IKeySet keys,
         byte[] hostChallenge,
         byte[] cardChallenge,
@@ -860,10 +860,10 @@ public static class CommandProcessors
                     cardChallenge.Take(2).ToArray(), // sequence counter from card challenge
                     implementation
                 )
-                .Map(context => (IKeyDerivationContext)context)
+                .Map(context => (KeyDerivationContext)context)
             : KeyDerivationContext
                 .CreateForScp03(keys, hostChallenge, cardChallenge, implementation)
-                .Map(context => (IKeyDerivationContext)context);
+                .Map(context => (KeyDerivationContext)context);
     }
 
     private static (ApduResponse, CardState) CreateExternalAuthenticateResult(

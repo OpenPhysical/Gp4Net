@@ -31,9 +31,9 @@ public class SecureChannelOperationsIntegrationTests
         );
 
         var readerSpec = $"virtual:{profilePath}";
-        var serviceResult = await VirtualCardConnectionService.CreateServiceAsync(
+        var serviceResult = await VirtualCardConnections.CreateServiceAsync(
             readerSpec,
-            NullLogger<Gp4Net.Services.SmartCardService>.Instance,
+            NullLogger<Gp4Net.Services.CardSessionCommands>.Instance,
             CancellationToken.None
         );
 
@@ -58,7 +58,7 @@ public class SecureChannelOperationsIntegrationTests
         // Intentionally skip sending SELECT for diagnostic purposes
         // _ = await cardService.SendCommandAsync(selectCommand.Value, CancellationToken.None);
 
-        // Emulate QueryCardCapabilities from ScpService
+        // Emulate QueryCardCapabilities from ScpOperations
         var getDataCommand = GetDataCommand
             .Create(GetDataCommand.DataObjects.CardData)
             .Bind(cmd => cmd.ToCommandApdu())
@@ -115,38 +115,6 @@ public class SecureChannelOperationsIntegrationTests
             keySetResult.IsFailure ? keySetResult.Error.ToString() : string.Empty
         );
 
-        var cardDataResult =
-            Gp4Net.Cryptography.CryptoService.Cryptogram.BuildScp02CardCryptogramData(
-                parsed,
-                hostChallenge
-            );
-        Assert.That(
-            cardDataResult.IsSuccess,
-            Is.True,
-            cardDataResult.IsFailure ? cardDataResult.Error.ToString() : string.Empty
-        );
-
-        var computedCryptogramResult =
-            Gp4Net.Cryptography.CryptoService.ScpOperations.Scp02.CalculateCryptogram(
-                keySetResult.Value.EncKey,
-                cardDataResult.Value
-            );
-        Assert.That(
-            computedCryptogramResult.IsSuccess,
-            Is.True,
-            computedCryptogramResult.IsFailure
-                ? computedCryptogramResult.Error.ToString()
-                : string.Empty
-        );
-
-        var expectedCardCryptogram = computedCryptogramResult.Value;
-
-        Assert.That(
-            Convert.ToHexString(parsed.CardCryptogram),
-            Is.EqualTo(Convert.ToHexString(expectedCardCryptogram)),
-            "Card cryptogram should match host computation"
-        );
-
         var sessionContextResult = Gp4Net.Domain.Keys.KeyDerivationContext.CreateForScp02(
             keySetResult.Value,
             hostChallenge,
@@ -161,9 +129,10 @@ public class SecureChannelOperationsIntegrationTests
             sessionContextResult.IsFailure ? sessionContextResult.Error.ToString() : string.Empty
         );
 
-        var sessionKeysResult = Gp4Net.Cryptography.CryptoService.KeyDerivation.DeriveSessionKeys(
-            sessionContextResult.Value
-        );
+        var sessionKeysResult =
+            Gp4Net.Cryptography.CryptoOperations.KeyDerivation.DeriveSessionKeys(
+                sessionContextResult.Value
+            );
 
         Assert.That(
             sessionKeysResult.IsSuccess,
@@ -171,8 +140,38 @@ public class SecureChannelOperationsIntegrationTests
             sessionKeysResult.IsFailure ? sessionKeysResult.Error.ToString() : string.Empty
         );
 
+        var cardDataResult =
+            Gp4Net.Cryptography.CryptoOperations.Cryptogram.BuildScp02CardCryptogramData(
+                parsed,
+                hostChallenge
+            );
+        Assert.That(
+            cardDataResult.IsSuccess,
+            Is.True,
+            cardDataResult.IsFailure ? cardDataResult.Error.ToString() : string.Empty
+        );
+
+        var computedCryptogramResult =
+            Gp4Net.Cryptography.CryptoOperations.ScpOperations.Scp02.CalculateCryptogram(
+                sessionKeysResult.Value.SEnc,
+                cardDataResult.Value
+            );
+        Assert.That(
+            computedCryptogramResult.IsSuccess,
+            Is.True,
+            computedCryptogramResult.IsFailure
+                ? computedCryptogramResult.Error.ToString()
+                : string.Empty
+        );
+
+        Assert.That(
+            Convert.ToHexString(parsed.CardCryptogram),
+            Is.EqualTo(Convert.ToHexString(computedCryptogramResult.Value)),
+            "Card cryptogram should match host computation"
+        );
+
         var hostDataResult =
-            Gp4Net.Cryptography.CryptoService.Cryptogram.BuildScp02HostCryptogramData(
+            Gp4Net.Cryptography.CryptoOperations.Cryptogram.BuildScp02HostCryptogramData(
                 parsed,
                 hostChallenge
             );
@@ -183,7 +182,7 @@ public class SecureChannelOperationsIntegrationTests
         );
 
         var hostCryptogramResult =
-            Gp4Net.Cryptography.CryptoService.ScpOperations.Scp02.CalculateCryptogram(
+            Gp4Net.Cryptography.CryptoOperations.ScpOperations.Scp02.CalculateCryptogram(
                 sessionKeysResult.Value.SEnc,
                 hostDataResult.Value
             );
@@ -220,11 +219,12 @@ public class SecureChannelOperationsIntegrationTests
             preliminaryCommandData.Length
         );
 
-        var macResult = Gp4Net.Cryptography.CryptoService.ScpOperations.Scp02.CalculateCommandMac(
-            macBuffer,
-            sessionKeysResult.Value.SMac,
-            Gp4Net.Constants.Constants.Scp.Common.ZeroChaining8
-        );
+        var macResult =
+            Gp4Net.Cryptography.CryptoOperations.ScpOperations.Scp02.CalculateCommandMac(
+                macBuffer,
+                sessionKeysResult.Value.SMac,
+                Gp4Net.Constants.Constants.Scp.Common.ZeroChaining8
+            );
         Assert.That(
             macResult.IsSuccess,
             Is.True,
@@ -274,9 +274,9 @@ public class SecureChannelOperationsIntegrationTests
             rawKeysetResult.IsFailure ? rawKeysetResult.Error.ToString() : string.Empty
         );
 
-        var pipelineServiceResult = await VirtualCardConnectionService.CreateServiceAsync(
+        var pipelineServiceResult = await VirtualCardConnections.CreateServiceAsync(
             readerSpec,
-            NullLogger<Gp4Net.Services.SmartCardService>.Instance,
+            NullLogger<Gp4Net.Services.CardSessionCommands>.Instance,
             CancellationToken.None
         );
 
@@ -289,8 +289,8 @@ public class SecureChannelOperationsIntegrationTests
         using var recordingService = new RecordingSmartCardService(pipelineServiceResult.Value);
 
         var pipelineEstablishmentResult =
-            await Gp4Net.Services.ScpService.Establishment.EstablishAsync(
-                recordingService,
+            await Gp4Net.Services.ScpOperations.Establishment.EstablishAsync(
+                recordingService.SendCommandAsync,
                 rawKeysetResult.Value,
                 SecurityLevel.CMac,
                 CancellationToken.None
@@ -302,18 +302,18 @@ public class SecureChannelOperationsIntegrationTests
             {
                 var command = record.Command;
                 var result = record.Result;
-                TestContext.WriteLine(
+                TestContext.Out.WriteLine(
                     $"Recorded command CLA={command[0]:X2} INS={command[1]:X2} DATA={Convert.ToHexString(command[5..])}"
                 );
                 if (result.IsSuccess)
                 {
-                    TestContext.WriteLine(
+                    TestContext.Out.WriteLine(
                         $"Response SW={result.Value.StatusWord} DATA={Convert.ToHexString(result.Value.Data ?? Array.Empty<byte>())}"
                     );
                 }
                 else
                 {
-                    TestContext.WriteLine($"Response Error={result.Error}");
+                    TestContext.Out.WriteLine($"Response Error={result.Error}");
                 }
             }
 
@@ -339,10 +339,10 @@ public class SecureChannelOperationsIntegrationTests
             var initializeUpdateResponseBytes =
                 initializeUpdateRecord.Result.Value.Data ?? Array.Empty<byte>();
 
-            TestContext.WriteLine(
+            TestContext.Out.WriteLine(
                 $"Pipeline host challenge: {Convert.ToHexString(hostChallengeFromPipeline)}"
             );
-            TestContext.WriteLine(
+            TestContext.Out.WriteLine(
                 $"Pipeline response data: {Convert.ToHexString(initializeUpdateResponseBytes)}"
             );
 
@@ -359,7 +359,7 @@ public class SecureChannelOperationsIntegrationTests
             var parsedResponse = parsedResponseResult.Value;
 
             var cryptoDataResult =
-                Gp4Net.Cryptography.CryptoService.Cryptogram.BuildScp02CardCryptogramData(
+                Gp4Net.Cryptography.CryptoOperations.Cryptogram.BuildScp02CardCryptogramData(
                     parsedResponse,
                     hostChallengeFromPipeline
                 );
@@ -370,7 +370,7 @@ public class SecureChannelOperationsIntegrationTests
             );
 
             var expectedCryptogramResult =
-                Gp4Net.Cryptography.CryptoService.ScpOperations.Scp02.CalculateCryptogram(
+                Gp4Net.Cryptography.CryptoOperations.ScpOperations.Scp02.CalculateCryptogram(
                     GpTestKeys.GpTestKey,
                     cryptoDataResult.Value
                 );
@@ -403,7 +403,7 @@ public class SecureChannelOperationsIntegrationTests
             );
 
             var pipelineSessionKeysResult =
-                Gp4Net.Cryptography.CryptoService.KeyDerivation.DeriveSessionKeys(
+                Gp4Net.Cryptography.CryptoOperations.KeyDerivation.DeriveSessionKeys(
                     contextResult.Value
                 );
             Assert.That(
@@ -415,7 +415,7 @@ public class SecureChannelOperationsIntegrationTests
             );
 
             var sessionComputedResult =
-                Gp4Net.Cryptography.CryptoService.ScpOperations.Scp02.CalculateCryptogram(
+                Gp4Net.Cryptography.CryptoOperations.ScpOperations.Scp02.CalculateCryptogram(
                     pipelineSessionKeysResult.Value.SEnc,
                     cryptoDataResult.Value
                 );
@@ -427,13 +427,13 @@ public class SecureChannelOperationsIntegrationTests
                     : string.Empty
             );
 
-            TestContext.WriteLine(
+            TestContext.Out.WriteLine(
                 $"Card cryptogram: {Convert.ToHexString(parsedResponse.CardCryptogram)}"
             );
-            TestContext.WriteLine(
+            TestContext.Out.WriteLine(
                 $"Computed cryptogram: {Convert.ToHexString(expectedCryptogramResult.Value)}"
             );
-            TestContext.WriteLine(
+            TestContext.Out.WriteLine(
                 $"Session cryptogram: {Convert.ToHexString(sessionComputedResult.Value)}"
             );
 
@@ -452,7 +452,7 @@ public class SecureChannelOperationsIntegrationTests
                 var macSent = externalAuthenticateRecord.Command[13..21];
 
                 var hostDataForMac =
-                    Gp4Net.Cryptography.CryptoService.Cryptogram.BuildScp02HostCryptogramData(
+                    Gp4Net.Cryptography.CryptoOperations.Cryptogram.BuildScp02HostCryptogramData(
                         parsedResponse,
                         hostChallengeFromPipeline
                     );
@@ -460,14 +460,14 @@ public class SecureChannelOperationsIntegrationTests
                 if (hostDataForMac.IsSuccess)
                 {
                     var expectedHostCryptogram =
-                        Gp4Net.Cryptography.CryptoService.ScpOperations.Scp02.CalculateCryptogram(
+                        Gp4Net.Cryptography.CryptoOperations.ScpOperations.Scp02.CalculateCryptogram(
                             GpTestKeys.GpTestKey,
                             hostDataForMac.Value
                         );
 
                     if (expectedHostCryptogram.IsSuccess)
                     {
-                        TestContext.WriteLine(
+                        TestContext.Out.WriteLine(
                             $"Expected host cryptogram (static): {Convert.ToHexString(expectedHostCryptogram.Value)}"
                         );
                     }
@@ -482,7 +482,7 @@ public class SecureChannelOperationsIntegrationTests
                 Array.Copy(hostCryptogramSent, 0, macInput, 5, hostCryptogramSent.Length);
 
                 var expectedMacResult =
-                    Gp4Net.Cryptography.CryptoService.ScpOperations.Scp02.CalculateCommandMac(
+                    Gp4Net.Cryptography.CryptoOperations.ScpOperations.Scp02.CalculateCommandMac(
                         macInput,
                         pipelineSessionKeysResult.Value.SMac,
                         Gp4Net.Constants.Constants.Scp.Common.ZeroChaining8
@@ -490,15 +490,15 @@ public class SecureChannelOperationsIntegrationTests
 
                 if (expectedMacResult.IsSuccess)
                 {
-                    TestContext.WriteLine(
+                    TestContext.Out.WriteLine(
                         $"Expected MAC (session): {Convert.ToHexString(expectedMacResult.Value)}"
                     );
                 }
 
-                TestContext.WriteLine(
+                TestContext.Out.WriteLine(
                     $"Host cryptogram sent: {Convert.ToHexString(hostCryptogramSent)}"
                 );
-                TestContext.WriteLine($"MAC sent: {Convert.ToHexString(macSent)}");
+                TestContext.Out.WriteLine($"MAC sent: {Convert.ToHexString(macSent)}");
             }
         }
 

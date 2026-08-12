@@ -46,7 +46,7 @@ jobs:
 
     - name: Test and validate coverage
       if: env.ACT != 'true'
-      run: dotnet test --no-build --configuration Release --logger trx --results-directory TestResults /p:CollectCoverage=true /p:RunCoverageVerification=false
+      run: dotnet test --no-build --configuration Release --logger trx --results-directory TestResults /p:CollectCoverage=true
 
     - name: Upload test results
       uses: actions/upload-artifact@v4

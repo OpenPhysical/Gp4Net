@@ -12,7 +12,7 @@ public sealed record ImportComponentAnalysis(IReadOnlyList<ImportedPackageInfo> 
 {
     public static Result<ImportComponentAnalysis, SmartCardError> Parse(
         CapFileStructure capFile,
-        PackageRegistry packageRegistry
+        PackageCatalog packageRegistry
     )
     {
         var importComponent = capFile.Components.FirstOrDefault(c =>

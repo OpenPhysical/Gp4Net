@@ -60,7 +60,7 @@ public class Scp03ProtocolValidationTests
     [TestCase(0x71)]
     public void Scp03_Should_Reject_Rfu_Low_Bits(byte implementation)
     {
-        _ = CryptoService
+        _ = CryptoOperations
             .ScpOperations.Common.IsValidScp03Implementation(implementation)
             .Should()
             .BeFalse();
@@ -129,7 +129,7 @@ public class Scp03ProtocolValidationTests
                     {
                         _ = context
                             .Protocol.Should()
-                            .Be(CryptoService.ScpVersion.Scp03, "Protocol should be SCP03");
+                            .Be(CryptoOperations.ScpVersion.Scp03, "Protocol should be SCP03");
                         _ = context.HostChallenge.Should().BeEquivalentTo(hostChallenge);
                         _ = context.CardChallenge.Should().BeEquivalentTo(cardChallenge);
                         return UnitResult.Success<SmartCardError>();
@@ -209,7 +209,7 @@ public class Scp03ProtocolValidationTests
             .Create(
                 new SessionKeys(sEnc, sMac, sRMac),
                 SecurityLevel.CMac,
-                CryptoService.ScpVersion.Scp03,
+                CryptoOperations.ScpVersion.Scp03,
                 initialChaining,
                 0x70
             )
@@ -229,11 +229,11 @@ public class Scp03ProtocolValidationTests
             .Value;
 
         var macInput = command.GetMacInput().Value;
-        byte[] expectedFullMac = CryptoService
+        byte[] expectedFullMac = CryptoOperations
             .ScpOperations.Scp03.CalculateCommandMac(macInput.Bytes, sMac, initialChaining)
             .Value;
 
-        var secured = ScpService.Security.ApplyCommandSecurity(command, state).Value;
+        var secured = ScpOperations.Security.ApplyCommandSecurity(command, state).Value;
         var (securedCommand, updatedState) = secured;
         byte[] securedData = securedCommand.Udc;
 
@@ -252,7 +252,7 @@ public class Scp03ProtocolValidationTests
             .Create(
                 new SessionKeys(sEnc, sMac, new byte[16]),
                 SecurityLevel.CDecryption,
-                CryptoService.ScpVersion.Scp03,
+                CryptoOperations.ScpVersion.Scp03,
                 new byte[16],
                 0x70
             )
@@ -260,21 +260,21 @@ public class Scp03ProtocolValidationTests
         byte[] plaintext = Convert.FromHexString("0102030405060708");
         var command = new WSCT.ISO7816.CommandAPDU(0x80, 0xE2, 0x80, 0x00, 8, plaintext);
 
-        var result = ScpService.Security.ApplyCommandSecurity(command, state).Value;
+        var result = ScpOperations.Security.ApplyCommandSecurity(command, state).Value;
 
         _ = result.newState.EncryptionCounter.Should().Be(1);
         byte[] ciphertext = result.securedCommand.Udc[..^8];
         _ = ciphertext.Should().NotEqual(plaintext);
         byte[] macInput = [0x84, 0xE2, 0x80, 0x00, 0x18, .. ciphertext];
-        byte[] expectedMac = CryptoService
+        byte[] expectedMac = CryptoOperations
             .ScpOperations.Scp03.CalculateCommandMac(macInput, sMac, new byte[16])
             .Value[..8];
         _ = result.securedCommand.Udc[^8..].Should().Equal(expectedMac);
-        _ = ScpService
+        _ = ScpOperations
             .Security.RemoveCommandSecurity(result.securedCommand, state)
             .IsSuccess.Should()
             .BeTrue();
-        byte[] decrypted = CryptoService
+        byte[] decrypted = CryptoOperations
             .ScpOperations.Scp03.RemoveCommandEncryption(
                 new WSCT.ISO7816.CommandAPDU(
                     0x84,
@@ -300,11 +300,11 @@ public class Scp03ProtocolValidationTests
         var maximum = new WSCT.ISO7816.CommandAPDU(0x80, 0xE8, 0x00, 0x00, 239, new byte[239]);
         var overflow = new WSCT.ISO7816.CommandAPDU(0x80, 0xE8, 0x00, 0x00, 240, new byte[240]);
 
-        _ = CryptoService
+        _ = CryptoOperations
             .ScpOperations.Scp03.ApplyCommandEncryption(maximum.BinaryCommand, sEnc, 1)
             .IsSuccess.Should()
             .BeTrue();
-        _ = CryptoService
+        _ = CryptoOperations
             .ScpOperations.Scp03.ApplyCommandEncryption(overflow.BinaryCommand, sEnc, 1)
             .IsFailure.Should()
             .BeTrue();
@@ -319,7 +319,7 @@ public class Scp03ProtocolValidationTests
             .Create(
                 new SessionKeys(new byte[16], sMac, new byte[16]),
                 SecurityLevel.CMac,
-                CryptoService.ScpVersion.Scp03,
+                CryptoOperations.ScpVersion.Scp03,
                 new byte[16],
                 0x70
             )
@@ -333,10 +333,15 @@ public class Scp03ProtocolValidationTests
             Convert.FromHexString("A000000001")
         );
 
-        var secured = ScpService.Security.ApplyCommandSecurity(command, state).Value.securedCommand;
+        var secured = ScpOperations
+            .Security.ApplyCommandSecurity(command, state)
+            .Value.securedCommand;
 
         _ = secured.Cla.Should().Be(0x04);
-        _ = ScpService.Security.RemoveCommandSecurity(secured, state).IsSuccess.Should().BeTrue();
+        _ = ScpOperations
+            .Security.RemoveCommandSecurity(secured, state)
+            .IsSuccess.Should()
+            .BeTrue();
     }
 
     [Test]

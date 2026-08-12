@@ -15,7 +15,7 @@ using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using WSCT.ISO7816;
 using static Gp4Net.Constants.Constants;
-using static Gp4Net.Cryptography.CryptoService;
+using static Gp4Net.Cryptography.CryptoOperations;
 //using CSharpFunctionalExtensions.AwesomeAssertions;
 //using static CSharpFunctionalExtensions.Result;
 using ApduResponse = Gp4Net.CardEmulator.Core.ApduResponse;
@@ -623,9 +623,9 @@ public class VirtualCardTests
                 card.Configuration,
                 Rng.CreateSecureContext(),
                 newState,
-                new LoggingService(Maybe<ILogger>.None),
-                new CapFileServiceAdapter(),
-                new CardStateService(Maybe<ILogger>.None),
+                new CardLogging(Maybe<ILogger>.None),
+                new EmulatorCapFiles(),
+                new CardStateTransitions(Maybe<ILogger>.None),
                 Maybe<CardState>.From(currentState)
             );
         }
@@ -640,7 +640,7 @@ public class VirtualCardTests
         return card.CurrentState.SecureChannel.Match(
             channel =>
                 global::Gp4Net
-                    .Services.ScpService.Security.ApplyCommandSecurity(
+                    .Services.ScpOperations.Security.ApplyCommandSecurity(
                         new CommandAPDU(command),
                         channel
                     )
@@ -673,7 +673,7 @@ public class VirtualCardTests
         // Act
         var result = initialState.Bind(state =>
             VirtualCard
-                .ProcessCommandFunctionally(selectCommand, state, config, rng, LoggingService.None)
+                .ProcessCommandFunctionally(selectCommand, state, config, rng, CardLogging.None)
                 .Map(x => x.Item1)
         ); // Extract just the response
 

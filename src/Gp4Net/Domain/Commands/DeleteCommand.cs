@@ -210,7 +210,7 @@ public class DeleteCommand : IApduCommand
                 // Compute token using the DeleteTokenCalculator
                 var tokenResult = DeleteTokenKey.Match(
                     Some: key =>
-                        CryptoService.Keys.ComputeDeleteToken(
+                        CryptoOperations.Keys.ComputeDeleteToken(
                             key,
                             P1,
                             P2,
@@ -232,7 +232,7 @@ public class DeleteCommand : IApduCommand
             if (tokenToUse.HasValue && tokenToUse.Value.Length > 0)
             {
                 // GP Card Spec 2.3.1, Table 11-23: the Delete Token is data object 9E.
-                var encodedToken = TlvService.TlvEncoder.EncodeSimple(
+                var encodedToken = TlvCodec.TlvEncoder.EncodeSimple(
                     0x9E,
                     tokenToUse.Value.ToImmutableArray()
                 );
