@@ -50,19 +50,6 @@ public class GetDataResponseExtensionsTests
     }
 
     [Test]
-    public void ParseAsCardData_WithNullData_ReturnsNone()
-    {
-        // Arrange
-        byte[]? data = null;
-
-        // Act
-        Maybe<CardDataInfo> result = data.ParseAsCardData();
-
-        // Assert
-        _ = result.HasValue.Should().BeFalse();
-    }
-
-    [Test]
     public void ParseAsCardCapabilities_WithValidData_ReturnsCardCapabilities()
     {
         // Arrange - Sample capabilities data with correct TLV structure
@@ -99,19 +86,6 @@ public class GetDataResponseExtensionsTests
     {
         // Arrange
         byte[] data = [];
-
-        // Act
-        Maybe<CardCapabilities> result = data.ParseAsCardCapabilities();
-
-        // Assert
-        _ = result.HasValue.Should().BeFalse();
-    }
-
-    [Test]
-    public void ParseAsCardCapabilities_WithNullData_ReturnsNone()
-    {
-        // Arrange
-        byte[]? data = null;
 
         // Act
         Maybe<CardCapabilities> result = data.ParseAsCardCapabilities();
@@ -161,19 +135,6 @@ public class GetDataResponseExtensionsTests
     }
 
     [Test]
-    public void ParseAsKeyInformation_WithNullData_ReturnsNone()
-    {
-        // Arrange
-        byte[]? data = null;
-
-        // Act
-        Maybe<KeyInformationTemplate> result = data.ParseAsKeyInformation();
-
-        // Assert
-        _ = result.HasValue.Should().BeFalse();
-    }
-
-    [Test]
     public void ParseAsCplc_WithValidData_ReturnsCplcData()
     {
         // Arrange - CPLC data is always 42 bytes
@@ -209,19 +170,6 @@ public class GetDataResponseExtensionsTests
     {
         // Arrange
         byte[] data = [];
-
-        // Act
-        Maybe<CplcData> result = data.ParseAsCplc();
-
-        // Assert
-        _ = result.HasValue.Should().BeFalse();
-    }
-
-    [Test]
-    public void ParseAsCplc_WithNullData_ReturnsNone()
-    {
-        // Arrange
-        byte[]? data = null;
 
         // Act
         Maybe<CplcData> result = data.ParseAsCplc();

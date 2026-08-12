@@ -1,5 +1,7 @@
 # Research: Achieving High Test Coverage in C# .NET 9.0 with Functional Programming
 
+> Historical note: this research targeted the former .NET 9 build. The active projects now target .NET 10.
+
 **Project**: Gp4Net smart card library
 **Current Coverage**: 32.73%
 **Target**: >60% overall, 100% on security-critical paths

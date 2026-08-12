@@ -139,7 +139,9 @@ public static class FunctionComposition
         }
 
         return new CommandMetadata(
-            ExecutionTime: second.ExecutionTime.HasValue ? second.ExecutionTime : first.ExecutionTime,
+            ExecutionTime: second.ExecutionTime.HasValue
+                ? second.ExecutionTime
+                : first.ExecutionTime,
             TransmittedBytes: second.TransmittedBytes.HasValue
                 ? second.TransmittedBytes
                 : first.TransmittedBytes,

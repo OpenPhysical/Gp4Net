@@ -1,0 +1,117 @@
+# GP_TRACE=true
+# gp -d -l -v --mode CLR
+# GlobalPlatformPro f2af9ef
+# Running on Mac OS X 15.5 aarch64, Java 24.0.1 by Homebrew
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by com.sun.jna.Native in an unnamed module (file:/Users/mistial/Projects/JavaCard/gp.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+[DEBUG] TerminalManager - Processing 1 readers with null as preferred and null as ignored
+# SCardConnect("Identiv SCR3500 C Contact Reader", T=*) -> T=1, 3BD518FF8191FE1FC38073C821100A
+# SCardBeginTransaction("Identiv SCR3500 C Contact Reader")
+A>> T=1 (4+0000) 00A40400 00 
+A<< (0018+2) (19ms) 6F108408A000000151000000A5049F6501FF 9000
+[TRACE] GPSession - [6f]
+[TRACE] GPSession -      [84] a000000151000000
+[TRACE] GPSession -      [a5]
+[TRACE] GPSession -           [9f65] ff
+[DEBUG] GPSession - Auto-detected ISD: A000000151000000
+# Warning: no keys given, defaulting to 404142434445464748494A4B4C4D4E4F
+[INFO] GPSession - Using card master key(s) with version 0 for setting up session with CLR 
+[TRACE] GPSession - Generated host challenge: 719426F20E234840
+A>> T=1 (4+0008) 80500000 08 719426F20E234840 00
+A<< (0028+2) (45ms) 0000234555808320483901020011C284EC19415D17F4198ADCD5102D 9000
+[DEBUG] GPSession - KDD: 00002345558083204839
+[DEBUG] GPSession - SSC: 0011
+[DEBUG] GPSession - Host challenge: 719426F20E234840
+[DEBUG] GPSession - Card challenge: 0011C284EC19415D
+[DEBUG] GPSession - Card reports SCP02 with key version 1 (0x01)
+[INFO] GPSession - Diversified card keys: ENC=404142434445464748494A4B4C4D4E4F (KCV: 8BAF47) MAC=404142434445464748494A4B4C4D4E4F (KCV: 8BAF47) DEK=404142434445464748494A4B4C4D4E4F (KCV: 8BAF47) for SCP02
+[INFO] GPSession - Session keys: ENC=6DCE2A99BACB5207A7A96A92F114D66C MAC=0D446132B168F75CD6F0A780693A4DD3 RMAC=4C7FE3A6B0E4F3891B701C3DE654F9B7
+[DEBUG] GPSession - Verified card cryptogram: 17F4198ADCD5102D
+[DEBUG] GPSession - Calculated host cryptogram: 8E69F9E4D246FF36
+[TRACE] SCP02Wrapper - MAC input: 84820000108E69F9E4D246FF36
+A>> T=1 (4+0016) 84820000 10 8E69F9E4D246FF369F97E807B91F6318 00
+A<< (0000+2) (25ms) 9000
+A>> T=1 (4+0002) 80F28002 02 4F00 00
+A<< (0040+2) (19ms) E3264F08A0000001510000009F700101C5039EFE80C407A0000001515350CC08A000000151000000 9000
+[TRACE] GPRegistry - [e3]
+[TRACE] GPRegistry -      [4f] a000000151000000
+[TRACE] GPRegistry -      [9f70] 01
+[TRACE] GPRegistry -      [c5] 9efe80
+[TRACE] GPRegistry -      [c4] a0000001515350
+[TRACE] GPRegistry -      [cc] a000000151000000
+A>> T=1 (4+0002) 80F24002 02 4F00 00
+A<< (0000+2) (11ms) 6A88
+A>> T=1 (4+0002) 80F21002 02 4F00 00
+A<< (0148+2) (41ms) E3254F07A00000015153509F700101CE02FFFF8408A000000151535041CC08A000000151000000E3314F0DA00000016443446F634C6974659F700101CE020100840EA00000016443446F634C69746501CC08A000000151000000E31B4F07A00000006202049F700101CE020100CC08A000000151000000E31B4F07A00000006202029F700101CE020103CC08A000000151000000 9000
+[TRACE] GPRegistry - [e3]
+[TRACE] GPRegistry -      [4f] a0000001515350
+[TRACE] GPRegistry -      [9f70] 01
+[TRACE] GPRegistry -      [ce] ffff
+[TRACE] GPRegistry -      [84] a000000151535041
+[TRACE] GPRegistry -      [cc] a000000151000000
+[TRACE] GPRegistry - [e3]
+[TRACE] GPRegistry -      [4f] a00000016443446f634c697465
+[TRACE] GPRegistry -      [9f70] 01
+[TRACE] GPRegistry -      [ce] 0100
+[TRACE] GPRegistry -      [84] a00000016443446f634c69746501
+[TRACE] GPRegistry -      [cc] a000000151000000
+[TRACE] GPRegistry - [e3]
+[TRACE] GPRegistry -      [4f] a0000000620204
+[TRACE] GPRegistry -      [9f70] 01
+[TRACE] GPRegistry -      [ce] 0100
+[TRACE] GPRegistry -      [cc] a000000151000000
+[TRACE] GPRegistry - [e3]
+[TRACE] GPRegistry -      [4f] a0000000620202
+[TRACE] GPRegistry -      [9f70] 01
+[TRACE] GPRegistry -      [ce] 0103
+[TRACE] GPRegistry -      [cc] a000000151000000
+A>> T=1 (4+0002) 80F22002 02 4F00 00
+A<< (0122+2) (38ms) E31B4F07A00000015153509F700101CE02FFFFCC08A000000151000000E3214F0DA00000016443446F634C6974659F700101CE020100CC08A000000151000000E31B4F07A00000006202049F700101CE020100CC08A000000151000000E31B4F07A00000006202029F700101CE020103CC08A000000151000000 9000
+[TRACE] GPRegistry - [e3]
+[TRACE] GPRegistry -      [4f] a0000001515350
+[TRACE] GPRegistry -      [9f70] 01
+[TRACE] GPRegistry -      [ce] ffff
+[TRACE] GPRegistry -      [cc] a000000151000000
+[TRACE] GPRegistry - [e3]
+[TRACE] GPRegistry -      [4f] a00000016443446f634c697465
+[TRACE] GPRegistry -      [9f70] 01
+[TRACE] GPRegistry -      [ce] 0100
+[TRACE] GPRegistry -      [cc] a000000151000000
+[TRACE] GPRegistry - [e3]
+[TRACE] GPRegistry -      [4f] a0000000620204
+[TRACE] GPRegistry -      [9f70] 01
+[TRACE] GPRegistry -      [ce] 0100
+[TRACE] GPRegistry -      [cc] a000000151000000
+[TRACE] GPRegistry - [e3]
+[TRACE] GPRegistry -      [4f] a0000000620202
+[TRACE] GPRegistry -      [9f70] 01
+[TRACE] GPRegistry -      [ce] 0103
+[TRACE] GPRegistry -      [cc] a000000151000000
+ISD: A000000151000000 (OP_READY)
+     Parent:   A000000151000000
+     From:     A0000001515350
+     Privs:    SecurityDomain, CardLock, CardTerminate, CardReset, CVMManagement, TrustedPath, AuthorizedManagement, TokenVerification, GlobalDelete, GlobalLock, GlobalRegistry, FinalApplication, ReceiptGeneration
+
+PKG: A0000001515350 (LOADED) (SSD creation package)
+     Parent:   A000000151000000
+     Version:  255.255
+     Applet:   A000000151535041 (SSD creation applet)
+
+PKG: A00000016443446F634C697465 (LOADED) (|....dCDocLite|)
+     Parent:   A000000151000000
+     Version:  1.0
+     Applet:   A00000016443446F634C69746501 (|....dCDocLite.|)
+
+PKG: A0000000620204 (LOADED) (javacardx.biometry1toN)
+     Parent:   A000000151000000
+     Version:  1.0
+
+PKG: A0000000620202 (LOADED) (javacardx.biometry)
+     Parent:   A000000151000000
+     Version:  1.3
+
+# SCardEndTransaction("Identiv SCR3500 C Contact Reader")
+# SCardDisconnect("Identiv SCR3500 C Contact Reader", false) tx:73/rx:370 in 242ms

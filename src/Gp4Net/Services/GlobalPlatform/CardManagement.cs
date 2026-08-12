@@ -102,10 +102,7 @@ public static class CardManagement
     )
     {
         return await InstallCommand
-            .InstallForLoadCommand.Create(
-                packageAid,
-                securityDomainAid: securityDomainAid
-            )
+            .InstallForLoadCommand.Create(packageAid, securityDomainAid: securityDomainAid)
             .Bind(cmd => cmd.ToCommandApdu())
             .Bind(commandApdu => executeCommand(commandApdu, cancellationToken))
             .Bind(response =>

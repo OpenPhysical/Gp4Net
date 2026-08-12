@@ -160,7 +160,10 @@ public class SecureSessionKeysTests
             _ = legacyKeys.SMac.Should().BeEquivalentTo(_testSMac);
             _ = legacyKeys.SrMac.Should().BeEquivalentTo(_testSrMac);
             _ = legacyKeys.Dek.HasValue.Should().BeTrue();
-            _ = legacyKeys.Dek.GetValueOrDefault(Array.Empty<byte>()).Should().BeEquivalentTo(_testDek);
+            _ = legacyKeys
+                .Dek.GetValueOrDefault(Array.Empty<byte>())
+                .Should()
+                .BeEquivalentTo(_testDek);
         }
     }
 

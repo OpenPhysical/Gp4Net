@@ -322,9 +322,20 @@ public sealed class SecureSessionKeys : IDisposable
                     () => Result.Success<bool, SmartCardError>(true)
                 );
 
-                return dekResult.Map(_ => new { keys.sEnc, keys.sMac, keys.sRMac, dekKey });
+                return dekResult.Map(_ => new
+                {
+                    keys.sEnc,
+                    keys.sMac,
+                    keys.sRMac,
+                    dekKey
+                });
             })
-            .Map(payload => new SessionKeys(payload.sEnc, payload.sMac, payload.sRMac, payload.dekKey));
+            .Map(payload => new SessionKeys(
+                payload.sEnc,
+                payload.sMac,
+                payload.sRMac,
+                payload.dekKey
+            ));
     }
 
     /// <summary>

@@ -228,7 +228,10 @@ public class OpidValidationResult
     /// <returns>A failed validation result.</returns>
     public static OpidValidationResult Failure(string errorMessage)
     {
-        return new(false, string.IsNullOrWhiteSpace(errorMessage) ? "Unknown validation error" : errorMessage);
+        return new(
+            false,
+            string.IsNullOrWhiteSpace(errorMessage) ? "Unknown validation error" : errorMessage
+        );
     }
 
     /// <summary>

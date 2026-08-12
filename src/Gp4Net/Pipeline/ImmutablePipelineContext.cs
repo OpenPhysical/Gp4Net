@@ -47,7 +47,10 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     {
         if (value is null)
         {
-            throw new ArgumentNullException(nameof(value), "Pipeline context cannot store null values.");
+            throw new ArgumentNullException(
+                nameof(value),
+                "Pipeline context cannot store null values."
+            );
         }
 
         return new ImmutablePipelineContext(_values.SetItem(key, value!));

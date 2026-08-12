@@ -1,0 +1,121 @@
+# GP_TRACE=true
+# gp -d -l -v --mode ENC
+# GlobalPlatformPro f2af9ef
+# Running on Mac OS X 15.5 aarch64, Java 24.0.1 by Homebrew
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by com.sun.jna.Native in an unnamed module (file:/Users/mistial/Projects/JavaCard/gp.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+[DEBUG] TerminalManager - Processing 1 readers with null as preferred and null as ignored
+# SCardConnect("Identiv SCR3500 C Contact Reader", T=*) -> T=1, 3BD518FF8191FE1FC38073C821100A
+# SCardBeginTransaction("Identiv SCR3500 C Contact Reader")
+A>> T=1 (4+0000) 00A40400 00 
+A<< (0018+2) (13ms) 6F108408A000000151000000A5049F6501FF 9000
+[TRACE] GPSession - [6f]
+[TRACE] GPSession -      [84] a000000151000000
+[TRACE] GPSession -      [a5]
+[TRACE] GPSession -           [9f65] ff
+[DEBUG] GPSession - Auto-detected ISD: A000000151000000
+# Warning: no keys given, defaulting to 404142434445464748494A4B4C4D4E4F
+[INFO] GPSession - Using card master key(s) with version 0 for setting up session with MAC, ENC 
+[TRACE] GPSession - Generated host challenge: CE410ED7FACD71A1
+A>> T=1 (4+0008) 80500000 08 CE410ED7FACD71A1 00
+A<< (0028+2) (45ms) 0000234555808320483901020013884AB6A84A1819A72830637708FB 9000
+[DEBUG] GPSession - KDD: 00002345558083204839
+[DEBUG] GPSession - SSC: 0013
+[DEBUG] GPSession - Host challenge: CE410ED7FACD71A1
+[DEBUG] GPSession - Card challenge: 0013884AB6A84A18
+[DEBUG] GPSession - Card reports SCP02 with key version 1 (0x01)
+[INFO] GPSession - Diversified card keys: ENC=404142434445464748494A4B4C4D4E4F (KCV: 8BAF47) MAC=404142434445464748494A4B4C4D4E4F (KCV: 8BAF47) DEK=404142434445464748494A4B4C4D4E4F (KCV: 8BAF47) for SCP02
+[INFO] GPSession - Session keys: ENC=E94829A5FD577FB1512772AC2DD27024 MAC=A4C596637EBC545276CDDFB75194B01C RMAC=94EAE1F3661F5D308A7FE41BB45FBE67
+[DEBUG] GPSession - Verified card cryptogram: 19A72830637708FB
+[DEBUG] GPSession - Calculated host cryptogram: E214362A48999E2A
+[TRACE] SCP02Wrapper - MAC input: 8482030010E214362A48999E2A
+A>> T=1 (4+0016) 84820300 10 E214362A48999E2AD0C159C17E6D3F9A 00
+A<< (0000+2) (24ms) 9000
+[TRACE] SCP02Wrapper - MAC input: 84F280020A4F00
+A>> T=1 (4+0016) 84F28002 10 13A84162D6CF3D3EB2037DBFF3A4A091 00
+A<< (0040+2) (26ms) E3264F08A0000001510000009F700101C5039EFE80C407A0000001515350CC08A000000151000000 9000
+[TRACE] GPRegistry - [e3]
+[TRACE] GPRegistry -      [4f] a000000151000000
+[TRACE] GPRegistry -      [9f70] 01
+[TRACE] GPRegistry -      [c5] 9efe80
+[TRACE] GPRegistry -      [c4] a0000001515350
+[TRACE] GPRegistry -      [cc] a000000151000000
+[TRACE] SCP02Wrapper - MAC input: 84F240020A4F00
+A>> T=1 (4+0016) 84F24002 10 13A84162D6CF3D3E08DA8AFAC2252156 00
+A<< (0000+2) (19ms) 6A88
+[TRACE] SCP02Wrapper - MAC input: 84F210020A4F00
+A>> T=1 (4+0016) 84F21002 10 13A84162D6CF3D3EF41A03C0E768795E 00
+A<< (0148+2) (50ms) E3254F07A00000015153509F700101CE02FFFF8408A000000151535041CC08A000000151000000E3314F0DA00000016443446F634C6974659F700101CE020100840EA00000016443446F634C69746501CC08A000000151000000E31B4F07A00000006202049F700101CE020100CC08A000000151000000E31B4F07A00000006202029F700101CE020103CC08A000000151000000 9000
+[TRACE] GPRegistry - [e3]
+[TRACE] GPRegistry -      [4f] a0000001515350
+[TRACE] GPRegistry -      [9f70] 01
+[TRACE] GPRegistry -      [ce] ffff
+[TRACE] GPRegistry -      [84] a000000151535041
+[TRACE] GPRegistry -      [cc] a000000151000000
+[TRACE] GPRegistry - [e3]
+[TRACE] GPRegistry -      [4f] a00000016443446f634c697465
+[TRACE] GPRegistry -      [9f70] 01
+[TRACE] GPRegistry -      [ce] 0100
+[TRACE] GPRegistry -      [84] a00000016443446f634c69746501
+[TRACE] GPRegistry -      [cc] a000000151000000
+[TRACE] GPRegistry - [e3]
+[TRACE] GPRegistry -      [4f] a0000000620204
+[TRACE] GPRegistry -      [9f70] 01
+[TRACE] GPRegistry -      [ce] 0100
+[TRACE] GPRegistry -      [cc] a000000151000000
+[TRACE] GPRegistry - [e3]
+[TRACE] GPRegistry -      [4f] a0000000620202
+[TRACE] GPRegistry -      [9f70] 01
+[TRACE] GPRegistry -      [ce] 0103
+[TRACE] GPRegistry -      [cc] a000000151000000
+[TRACE] SCP02Wrapper - MAC input: 84F220020A4F00
+A>> T=1 (4+0016) 84F22002 10 13A84162D6CF3D3EAABEE0BC85749CD4 00
+A<< (0122+2) (46ms) E31B4F07A00000015153509F700101CE02FFFFCC08A000000151000000E3214F0DA00000016443446F634C6974659F700101CE020100CC08A000000151000000E31B4F07A00000006202049F700101CE020100CC08A000000151000000E31B4F07A00000006202029F700101CE020103CC08A000000151000000 9000
+[TRACE] GPRegistry - [e3]
+[TRACE] GPRegistry -      [4f] a0000001515350
+[TRACE] GPRegistry -      [9f70] 01
+[TRACE] GPRegistry -      [ce] ffff
+[TRACE] GPRegistry -      [cc] a000000151000000
+[TRACE] GPRegistry - [e3]
+[TRACE] GPRegistry -      [4f] a00000016443446f634c697465
+[TRACE] GPRegistry -      [9f70] 01
+[TRACE] GPRegistry -      [ce] 0100
+[TRACE] GPRegistry -      [cc] a000000151000000
+[TRACE] GPRegistry - [e3]
+[TRACE] GPRegistry -      [4f] a0000000620204
+[TRACE] GPRegistry -      [9f70] 01
+[TRACE] GPRegistry -      [ce] 0100
+[TRACE] GPRegistry -      [cc] a000000151000000
+[TRACE] GPRegistry - [e3]
+[TRACE] GPRegistry -      [4f] a0000000620202
+[TRACE] GPRegistry -      [9f70] 01
+[TRACE] GPRegistry -      [ce] 0103
+[TRACE] GPRegistry -      [cc] a000000151000000
+ISD: A000000151000000 (OP_READY)
+     Parent:   A000000151000000
+     From:     A0000001515350
+     Privs:    SecurityDomain, CardLock, CardTerminate, CardReset, CVMManagement, TrustedPath, AuthorizedManagement, TokenVerification, GlobalDelete, GlobalLock, GlobalRegistry, FinalApplication, ReceiptGeneration
+
+PKG: A0000001515350 (LOADED) (SSD creation package)
+     Parent:   A000000151000000
+     Version:  255.255
+     Applet:   A000000151535041 (SSD creation applet)
+
+PKG: A00000016443446F634C697465 (LOADED) (|....dCDocLite|)
+     Parent:   A000000151000000
+     Version:  1.0
+     Applet:   A00000016443446F634C69746501 (|....dCDocLite.|)
+
+PKG: A0000000620204 (LOADED) (javacardx.biometry1toN)
+     Parent:   A000000151000000
+     Version:  1.0
+
+PKG: A0000000620202 (LOADED) (javacardx.biometry)
+     Parent:   A000000151000000
+     Version:  1.3
+
+# SCardEndTransaction("Identiv SCR3500 C Contact Reader")
+# SCardDisconnect("Identiv SCR3500 C Contact Reader", false) tx:129/rx:370 in 270ms

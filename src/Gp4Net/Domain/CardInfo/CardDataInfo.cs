@@ -213,8 +213,7 @@ public record CardDataInfo(
     /// </summary>
     private static Maybe<string> ExtractGpVersionFromOids(IReadOnlyList<string> oids)
     {
-        string? result = oids
-            .Where(oid => !string.IsNullOrWhiteSpace(oid))
+        string? result = oids.Where(oid => !string.IsNullOrWhiteSpace(oid))
             .Select(oid => oid!)
             .Where(oid => oid.StartsWith("1.2.840.114283.2.") && oid != "1.2.840.114283.2")
             .Select(oid => oid.Split('.'))

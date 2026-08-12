@@ -17,7 +17,8 @@ internal sealed class RecordingSmartCardService : ISmartCardService
 {
     private readonly ISmartCardService inner;
 
-    public List<(byte[] Command, Result<CommandResponse, SmartCardError> Result)> Records { get; } = new();
+    public List<(byte[] Command, Result<CommandResponse, SmartCardError> Result)> Records { get; } =
+        new();
 
     public RecordingSmartCardService(ISmartCardService inner)
     {
@@ -28,30 +29,57 @@ internal sealed class RecordingSmartCardService : ISmartCardService
 
     public void Dispose() => inner.Dispose();
 
-    public Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(CommandAPDU command, CancellationToken cancellationToken = default) => inner.ExecuteCommandAsync(command, cancellationToken);
+    public Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
+        CommandAPDU command,
+        CancellationToken cancellationToken = default
+    ) => inner.ExecuteCommandAsync(command, cancellationToken);
 
-    public Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(CommandAPDU command, bool useSecureChannel, CancellationToken cancellationToken = default) => inner.ExecuteCommandAsync(command, useSecureChannel, cancellationToken);
+    public Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
+        CommandAPDU command,
+        bool useSecureChannel,
+        CancellationToken cancellationToken = default
+    ) => inner.ExecuteCommandAsync(command, useSecureChannel, cancellationToken);
 
-    public Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(CommandAPDU command, CommandOptions options, CancellationToken cancellationToken = default) => inner.ExecuteCommandAsync(command, options, cancellationToken);
+    public Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
+        CommandAPDU command,
+        CommandOptions options,
+        CancellationToken cancellationToken = default
+    ) => inner.ExecuteCommandAsync(command, options, cancellationToken);
 
-    public Result<ISmartCardService, SmartCardError> WithContext(IPipelineContext context) => inner.WithContext(context);
+    public Result<ISmartCardService, SmartCardError> WithContext(IPipelineContext context) =>
+        inner.WithContext(context);
 
-    public Result<ISmartCardService, SmartCardError> WithContextValue<T>(string key, T value) => inner.WithContextValue(key, value);
+    public Result<ISmartCardService, SmartCardError> WithContextValue<T>(string key, T value) =>
+        inner.WithContextValue(key, value);
 
-    public Task<Result<bool, SmartCardError>> IsConnectedAsync(CancellationToken cancellationToken = default) => inner.IsConnectedAsync(cancellationToken);
+    public Task<Result<bool, SmartCardError>> IsConnectedAsync(
+        CancellationToken cancellationToken = default
+    ) => inner.IsConnectedAsync(cancellationToken);
 
-    public Task<Result<byte[], SmartCardError>> GetAtrAsync(CancellationToken cancellationToken = default) => inner.GetAtrAsync(cancellationToken);
+    public Task<Result<byte[], SmartCardError>> GetAtrAsync(
+        CancellationToken cancellationToken = default
+    ) => inner.GetAtrAsync(cancellationToken);
 
-    public Task<Result<string[], SmartCardError>> GetReadersAsync(CancellationToken cancellationToken = default) => inner.GetReadersAsync(cancellationToken);
+    public Task<Result<string[], SmartCardError>> GetReadersAsync(
+        CancellationToken cancellationToken = default
+    ) => inner.GetReadersAsync(cancellationToken);
 
-    public Task<Result<bool, SmartCardError>> IsSecureChannelEstablishedAsync(CancellationToken cancellationToken = default) => inner.IsSecureChannelEstablishedAsync(cancellationToken);
+    public Task<Result<bool, SmartCardError>> IsSecureChannelEstablishedAsync(
+        CancellationToken cancellationToken = default
+    ) => inner.IsSecureChannelEstablishedAsync(cancellationToken);
 
-    public async Task<Result<CommandResponse, SmartCardError>> SendCommandAsync(byte[] command, CancellationToken cancellationToken = default)
+    public async Task<Result<CommandResponse, SmartCardError>> SendCommandAsync(
+        byte[] command,
+        CancellationToken cancellationToken = default
+    )
     {
         var result = await inner.SendCommandAsync(command, cancellationToken);
         Records.Add((command, result));
         return result;
     }
 
-    public Task<Result<CardTransportCapabilities, SmartCardError>> GetCardTransportCapabilitiesAsync(CancellationToken cancellationToken = default) => inner.GetCardTransportCapabilitiesAsync(cancellationToken);
+    public Task<
+        Result<CardTransportCapabilities, SmartCardError>
+    > GetCardTransportCapabilitiesAsync(CancellationToken cancellationToken = default) =>
+        inner.GetCardTransportCapabilitiesAsync(cancellationToken);
 }

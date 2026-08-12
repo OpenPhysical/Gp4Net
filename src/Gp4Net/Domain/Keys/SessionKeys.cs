@@ -79,7 +79,8 @@ public class SessionKeys : IDisposable
 
     private static Result<byte[], SmartCardError> ValidateKey(byte[] key, string name)
     {
-        return Maybe<byte[]>.From(key)
+        return Maybe<byte[]>
+            .From(key)
             .ToResult(SmartCardError.InvalidArgument($"{name} key cannot be null"))
             .Bind(bytes =>
                 bytes.Length > 0

@@ -93,6 +93,7 @@ __pycache__/
 # Logs
 logs/
 *.log
+!tests/Gp4Net.Tests/TestData/Traces/Raw/*.log
 
 # Runtime data
 pids/

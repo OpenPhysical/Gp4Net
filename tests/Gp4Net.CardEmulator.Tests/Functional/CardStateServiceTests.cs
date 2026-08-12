@@ -10,6 +10,7 @@ using Gp4Net.Cryptography;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
 using ScpVersion = Gp4Net.Cryptography.CryptoService.ScpVersion;
@@ -23,15 +24,7 @@ namespace Gp4Net.CardEmulator.Tests.Functional;
 [TestFixture]
 public class CardStateServiceTests
 {
-    private CardStateService _stateService;
-    private ILogger _logger;
-
-    [SetUp]
-    public void Setup()
-    {
-        _logger = new TestLogger();
-        _stateService = new CardStateService(Maybe<ILogger>.From(_logger));
-    }
+    private readonly CardStateService _stateService = new(Maybe<ILogger>.From(NullLogger.Instance));
 
     [Test]
     public void CreateInitialState_Success_ReturnsValidCardState()
@@ -530,21 +523,6 @@ public class CardStateServiceTests
                     implementationParameter: 0x15
                 )
             );
-    }
-
-    private class TestLogger : ILogger
-    {
-        public IDisposable BeginScope<TState>(TState state) => null!;
-
-        public bool IsEnabled(LogLevel logLevel) => true;
-
-        public void Log<TState>(
-            LogLevel logLevel,
-            EventId eventId,
-            TState state,
-            Exception exception,
-            Func<TState, Exception, string> formatter
-        ) { }
     }
 
     private class TestRngContext : IRngContext

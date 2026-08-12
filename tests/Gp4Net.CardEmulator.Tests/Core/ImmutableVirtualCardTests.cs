@@ -7,6 +7,7 @@ using Gp4Net.CardEmulator.Services;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 
 namespace Gp4Net.CardEmulator.Tests.Core;
@@ -18,27 +19,12 @@ namespace Gp4Net.CardEmulator.Tests.Core;
 [TestFixture]
 public class ImmutableVirtualCardTests
 {
-    private CardConfiguration _config;
-    private IRngContext _rngContext;
-    private ILogger _logger;
-    private ICardStateService _stateService;
-
-    [SetUp]
-    public void Setup()
-    {
-        _logger = new TestLogger();
-        var configResult = CardConfiguration.P71();
-        if (configResult.IsSuccess)
-        {
-            _config = configResult.Value;
-        }
-        else
-        {
-            Assert.Fail($"Failed to load P71 configuration: {configResult.Error}");
-        }
-        _rngContext = new TestRngContext();
-        _stateService = new CardStateService(Maybe<ILogger>.From(_logger));
-    }
+    private readonly CardConfiguration _config = CardConfiguration.P71().Value;
+    private readonly IRngContext _rngContext = new TestRngContext();
+    private readonly ILogger _logger = NullLogger.Instance;
+    private readonly ICardStateService _stateService = new CardStateService(
+        Maybe<ILogger>.From(NullLogger.Instance)
+    );
 
     [Test]
     public void Create_WithStateService_Success_ReturnsValidVirtualCard()
@@ -205,21 +191,6 @@ public class ImmutableVirtualCardTests
     }
 
     #region Test Helpers
-
-    private class TestLogger : ILogger
-    {
-        public IDisposable BeginScope<TState>(TState state) => null!;
-
-        public bool IsEnabled(LogLevel logLevel) => true;
-
-        public void Log<TState>(
-            LogLevel logLevel,
-            EventId eventId,
-            TState state,
-            Exception exception,
-            Func<TState, Exception, string> formatter
-        ) { }
-    }
 
     private class TestRngContext : IRngContext
     {

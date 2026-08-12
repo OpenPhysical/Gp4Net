@@ -104,13 +104,14 @@ public static partial class TlvService
                     );
             }
 
-            return ParseRemaining(0).Match(
-                () =>
-                    Result.Success<ParseResult, SmartCardError>(
-                        new ParseResult(builder.ToImmutable(), bytesConsumed)
-                    ),
-                error => Result.Failure<ParseResult, SmartCardError>(error)
-            );
+            return ParseRemaining(0)
+                .Match(
+                    () =>
+                        Result.Success<ParseResult, SmartCardError>(
+                            new ParseResult(builder.ToImmutable(), bytesConsumed)
+                        ),
+                    error => Result.Failure<ParseResult, SmartCardError>(error)
+                );
         }
 
         /// <summary>

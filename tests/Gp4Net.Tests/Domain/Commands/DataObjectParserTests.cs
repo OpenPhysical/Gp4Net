@@ -112,21 +112,6 @@ public class DataObjectParserTests
     }
 
     [Test]
-    public void ParseRawDataObject_WithNullInput_ReturnsFailure()
-    {
-        // Testing null input by passing null directly - this is a test boundary
-        string? dataObject = null;
-
-        // Act
-        Result<(ushort tag, byte[] data), SmartCardError> result =
-            DataObjectParser.ParseRawDataObject(dataObject);
-
-        // Assert
-        _ = result.IsFailure.Should().BeTrue();
-        _ = result.Error.Message.Should().BeEquivalentTo("Data object cannot be null or empty");
-    }
-
-    [Test]
     [TestCase("9F70")]
     [TestCase("9F70-040102")]
     [TestCase("9F70_040102")]

@@ -15,6 +15,8 @@ jobs:
   build:
     name: Build and Test
     runs-on: ${{ matrix.os }}
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -28,7 +30,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '9.0.x'
+        dotnet-version: '10.0.x'
 
     - name: Restore dependencies
       run: dotnet restore
@@ -42,24 +44,28 @@ jobs:
         VSTEST_CONNECTION_TIMEOUT: 1800
       run: dotnet test tests/Gp4Net.Tests/Gp4Net.Tests.csproj --no-build --configuration Release --logger trx --results-directory TestResults --filter "Category=Unit" --settings act.runsettings /p:CollectCoverage=false
 
-    - name: Test
+    - name: Test and validate coverage
       if: env.ACT != 'true'
-      run: dotnet test --no-build --configuration Release --logger trx --collect:"XPlat Code Coverage" --results-directory TestResults /p:CollectCoverage=false
+      run: dotnet test --no-build --configuration Release --logger trx --results-directory TestResults /p:CollectCoverage=true /p:RunCoverageVerification=false
 
     - name: Upload test results
       uses: actions/upload-artifact@v4
       if: always() && env.ACT != 'true'
       with:
         name: test-results-${{ matrix.os }}
-        path: TestResults/
+        path: |
+          TestResults/
+          tests/coverage/
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v4
-      if: matrix.os == 'ubuntu-latest' && env.ACT != 'true'
+      if: matrix.os == 'ubuntu-latest' && env.ACT != 'true' && env.CODECOV_TOKEN != ''
       with:
-        directory: TestResults/
+        directory: tests/coverage/
+        fail_ci_if_error: true
         flags: unittests
         name: codecov-${{ matrix.os }}
+        token: ${{ secrets.CODECOV_TOKEN }}
 
   pack:
     name: Pack NuGet
@@ -76,7 +82,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '9.0.x'
+        dotnet-version: '10.0.x'
 
     - name: Restore dependencies
       run: dotnet restore

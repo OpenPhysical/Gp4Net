@@ -169,11 +169,12 @@ public class PackageRegistry
             .GroupBy(pkg => pkg.Aid.ToUpperInvariant())
             .ToImmutableDictionary(
                 group => group.Key,
-                group => group
-                    .OrderByDescending(pkg => pkg.MajorVersion)
-                    .ThenByDescending(pkg => pkg.MinorVersion)
-                    .ThenByDescending(pkg => pkg.Version, StringComparer.OrdinalIgnoreCase)
-                    .First()
+                group =>
+                    group
+                        .OrderByDescending(pkg => pkg.MajorVersion)
+                        .ThenByDescending(pkg => pkg.MinorVersion)
+                        .ThenByDescending(pkg => pkg.Version, StringComparer.OrdinalIgnoreCase)
+                        .First()
             );
 
         return Result.Success<

@@ -24,7 +24,9 @@ public class EnvironmentValidationServiceTests
     [SetUp]
     public void SetUp()
     {
-        service = new EnvironmentValidationService(NullLogger<EnvironmentValidationService>.Instance);
+        service = new EnvironmentValidationService(
+            NullLogger<EnvironmentValidationService>.Instance
+        );
     }
 
     [Test]
@@ -33,7 +35,11 @@ public class EnvironmentValidationServiceTests
         foreach (var keyBytes in KnownTestKeys)
         {
             var keySet = CreateKeySet(keyBytes);
-            Assert.That(service.IsTestKeySet(keySet), Is.True, "Known test pattern should be detected");
+            Assert.That(
+                service.IsTestKeySet(keySet),
+                Is.True,
+                "Known test pattern should be detected"
+            );
         }
     }
 

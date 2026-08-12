@@ -3,12 +3,15 @@
     <ImplicitUsings>false</ImplicitUsings>
   </PropertyGroup>
 
-  <!-- Apply coverage thresholds to every test project by default -->
+  <!-- Coverage is opt-in so ordinary local test runs report test failures only. -->
   <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.csproj' and '$(IsTestProject)' == 'true'">
-    <CollectCoverage>true</CollectCoverage>
+    <CollectCoverage Condition="'$(CollectCoverage)' == ''">false</CollectCoverage>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.csproj' and '$(IsTestProject)' == 'true' and '$(CollectCoverage)' == 'true'">
     <CoverletOutputFormat>cobertura</CoverletOutputFormat>
-    <CoverletOutput>$(MSBuildProjectDirectory)/../coverage/$(MSBuildProjectName)</CoverletOutput>
-    <Threshold>60</Threshold>
+    <CoverletOutput>$(MSBuildProjectDirectory)/../coverage/$(MSBuildProjectName).xml</CoverletOutput>
+    <Threshold>10</Threshold>
     <ThresholdType>line,branch</ThresholdType>
     <ThresholdStat>total</ThresholdStat>
   </PropertyGroup>

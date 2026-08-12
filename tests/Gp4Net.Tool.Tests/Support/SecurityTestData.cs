@@ -9,18 +9,20 @@ namespace Gp4Net.Tool.Tests.Support;
 internal static class SecurityTestData
 {
     private static readonly Lazy<string> RepoRoot = new(LocateRepositoryRoot);
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        AllowTrailingCommas = true,
-        PropertyNameCaseInsensitive = true,
-        ReadCommentHandling = JsonCommentHandling.Skip,
-    };
+    private static readonly JsonSerializerOptions JsonOptions =
+        new(JsonSerializerDefaults.Web)
+        {
+            AllowTrailingCommas = true,
+            PropertyNameCaseInsensitive = true,
+            ReadCommentHandling = JsonCommentHandling.Skip,
+        };
 
     private static string TestDataRoot => Path.Combine(RepoRoot.Value, "tests", "TestData");
 
     public static string RepositoryRoot => RepoRoot.Value;
 
-    public static KeySetDocument LoadGpDefaultKeys() => LoadJson<KeySetDocument>("security/gp-default-keys.json");
+    public static KeySetDocument LoadGpDefaultKeys() =>
+        LoadJson<KeySetDocument>("security/gp-default-keys.json");
 
     public static Scp02KeyDerivationDocument LoadScp02KeyDerivationVectors() =>
         LoadJson<Scp02KeyDerivationDocument>("scp02/key-derivation-vectors.json");
@@ -71,7 +73,11 @@ internal static class SecurityTestData
     }
 }
 
-internal sealed record KeySetDocument(string Description, string Reference, IReadOnlyList<KeySetEntry> Keys);
+internal sealed record KeySetDocument(
+    string Description,
+    string Reference,
+    IReadOnlyList<KeySetEntry> Keys
+);
 
 internal sealed record KeySetEntry(
     string Name,

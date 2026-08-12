@@ -1,18 +1,18 @@
 <Project>
   <PropertyGroup>
     <!-- Package metadata -->
-    <Authors>Mistial Developer</Authors>
-    <Company>Mistial Developer</Company>
-    <Copyright>Copyright © 2025 Mistial Developer</Copyright>
+    <Authors>OpenPhysical</Authors>
+    <Company>OpenPhysical</Company>
+    <Copyright>Copyright © 2025-2026 Mistial Developer</Copyright>
     <PackageLicenseExpression>AGPL-3.0-only</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/mistial-dev/Gp4Net</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/mistial-dev/Gp4Net</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/OpenPhysical/Gp4Net</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/OpenPhysical/Gp4Net</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>GlobalPlatform;SCP02;SCP03;SmartCard;JavaCard;Cryptography;Functional;Security;GP</PackageTags>
     <Description>A purely functional .NET implementation of GlobalPlatform Secure Channel Protocols (SCP02 and SCP03) for smart card communication</Description>
     <PackageReleaseNotes>See CHANGELOG.md for detailed release notes.</PackageReleaseNotes>
     <PackageIcon>logo_64x64.png</PackageIcon>
-    <PackageReadmeFile>docs/README.md</PackageReadmeFile>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
 
 
     <!-- Build options -->
@@ -27,8 +27,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="$(SolutionDir)assets/logo_64x64.png" Pack="true" PackagePath="" />
-    <None Include="$(SolutionDir)docs/LICENSE" Pack="true" PackagePath="" />
-    <None Include="$(SolutionDir)README.md" Pack="true" PackagePath="" />
+    <None Include="$(MSBuildThisFileDirectory)assets/logo_64x64.png" Pack="true" PackagePath="" />
+    <None Include="$(MSBuildThisFileDirectory)LICENSE" Pack="true" PackagePath="" />
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="" />
+    <None Include="$(MSBuildThisFileDirectory)COMMERCIAL-LICENSING.md" Pack="true" PackagePath="" />
+    <None Include="$(MSBuildThisFileDirectory)THIRD_PARTY_NOTICES.md" Pack="true" PackagePath="" />
   </ItemGroup>
 </Project>
