@@ -26,8 +26,9 @@ public class GetStatusCommandTests
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.Subset.Should().Be(subset);
-        _ = result.Value.Format.Should().Be(GetStatusCommand.ResponseFormat.None);
-        _ = result.Value.SearchCriteria.HasNoValue.Should().BeTrue();
+        // GP Card Specification v2.3.1, Tables 11-34 and 11-35.
+        _ = result.Value.Format.Should().Be(GetStatusCommand.ResponseFormat.Tlv);
+        _ = result.Value.SearchCriteria.Value.Should().Equal(0x4F, 0x00);
     }
 
     [Test]
@@ -59,7 +60,8 @@ public class GetStatusCommandTests
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.SearchCriteria.HasValue.Should().BeTrue();
-        _ = result.Value.SearchCriteria.Value.Should().BeEquivalentTo(aid);
+        // GP Card Specification v2.3.1, Table 11-35.
+        _ = result.Value.SearchCriteria.Value.Should().Equal([0x4F, (byte)aid.Length, .. aid]);
     }
 
     [Test]
@@ -97,7 +99,7 @@ public class GetStatusCommandTests
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.SearchCriteria.HasValue.Should().BeTrue();
-        _ = result.Value.SearchCriteria.Value.Length.Should().Be(length);
+        _ = result.Value.SearchCriteria.Value.Length.Should().Be(length + 2);
     }
 
     [Test]
@@ -139,13 +141,13 @@ public class GetStatusCommandTests
         originalAid[0] = 0xFF;
 
         command.SearchCriteria.Match(
-            criteria => criteria[0].Should().Be(0xA0),
+            criteria => criteria[2].Should().Be(0xA0),
             () => Assert.Fail("Search criteria should be present")
         );
     }
 
     [Test]
-    public void ToApdu_WithoutSearchCriteria_ReturnsCase2Apdu()
+    public void ToApdu_WithoutAid_UsesMandatoryEmptyAidQualifier()
     {
         Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains
@@ -162,12 +164,15 @@ public class GetStatusCommandTests
         Assert.That(apduResult.IsSuccess, Is.True);
         byte[] apdu = apduResult.Value;
 
-        _ = apdu.Length.Should().Be(5); // CLA INS P1 P2 Le
+        // GP Card Specification v2.3.1, Tables 11-32, 11-34, and 11-35.
+        _ = apdu.Length.Should().Be(8);
         _ = apdu[0].Should().Be(0x80); // CLA
         _ = apdu[1].Should().Be(0xF2); // INS
         _ = apdu[2].Should().Be(0x40); // P1 - Applications subset
-        _ = apdu[3].Should().Be(0x00); // P2 - No format
-        _ = apdu[4].Should().Be(0x00); // Le
+        _ = apdu[3].Should().Be(0x02); // P2 - TLV format, first or all
+        _ = apdu[4].Should().Be(0x02); // Lc
+        _ = apdu[5..7].Should().Equal(0x4F, 0x00);
+        _ = apdu[7].Should().Be(0x00); // Le
     }
 
     [Test]
@@ -176,7 +181,7 @@ public class GetStatusCommandTests
         byte[] aid = Convert.FromHexString("A0000000031010");
         Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
-            GetStatusCommand.ResponseFormat.None,
+            GetStatusCommand.ResponseFormat.Tlv,
             Maybe<byte[]>.From(aid)
         );
 
@@ -191,14 +196,15 @@ public class GetStatusCommandTests
         Assert.That(apduResult.IsSuccess, Is.True);
         byte[] apdu = apduResult.Value;
 
-        _ = apdu.Length.Should().Be(5 + aid.Length + 1); // CLA INS P1 P2 Lc Data Le
+        byte[] searchTlv = [0x4F, (byte)aid.Length, .. aid];
+        _ = apdu.Length.Should().Be(5 + searchTlv.Length + 1);
         _ = apdu[0].Should().Be(0x80); // CLA
         _ = apdu[1].Should().Be(0xF2); // INS
         _ = apdu[2].Should().Be(0x40); // P1
-        _ = apdu[3].Should().Be(0x00); // P2
-        _ = apdu[4].Should().Be((byte)aid.Length); // Lc
-        _ = apdu[5..(5 + aid.Length)].Should().BeEquivalentTo(aid); // Data
-        _ = apdu[5 + aid.Length].Should().Be(0x00); // Le
+        _ = apdu[3].Should().Be(0x02); // P2
+        _ = apdu[4].Should().Be((byte)searchTlv.Length); // Lc
+        _ = apdu[5..(5 + searchTlv.Length)].Should().Equal(searchTlv); // Data
+        _ = apdu[5 + searchTlv.Length].Should().Be(0x00); // Le
     }
 
     [Test]
@@ -308,7 +314,7 @@ public class GetStatusCommandTests
         _ = iApduCommand.Ins.Should().Be(0xF2);
         _ = command.P1.Should().Be(0x40);
         _ = command.P2.Should().Be(0x02);
-        _ = command.Data.Should().BeEmpty();
+        _ = command.Data.Should().Equal(0x4F, 0x00);
         _ = command.ExpectedResponseLength.Should().Be(256);
         _ = command.IsExtendedLength.Should().BeFalse();
     }
@@ -324,7 +330,47 @@ public class GetStatusCommandTests
         );
         var command = result.Value;
 
-        _ = command.Data.Should().BeEquivalentTo(aid);
+        _ = command.Data.Should().Equal([0x4F, (byte)aid.Length, .. aid]);
+    }
+
+    [Test]
+    public void Create_WithNextOccurrence_SetsP2B1()
+    {
+        // GP Card Specification v2.3.1, Table 11-34.
+        var command = GetStatusCommand
+            .Create(
+                GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
+                occurrence: GetStatusCommand.OccurrenceMode.Next
+            )
+            .Value;
+
+        _ = command.P2.Should().Be(0x03);
+    }
+
+    [Test]
+    public void Create_WithTagList_Appends5CDataObject()
+    {
+        // GP Card Specification v2.3.1, Table 11-35.
+        var command = GetStatusCommand
+            .Create(
+                GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
+                tagList: new byte[] { 0x4F, 0x9F, 0x70, 0xC5 }
+            )
+            .Value;
+
+        _ = command.Data.Should().Equal(0x4F, 0x00, 0x5C, 0x04, 0x4F, 0x9F, 0x70, 0xC5);
+    }
+
+    [Test]
+    public void Create_WithIssuerDomainNextOccurrence_ReturnsFailure()
+    {
+        // GP Card Specification v2.3.1, section 11.4.2.2.
+        var result = GetStatusCommand.Create(
+            GetStatusCommand.StatusSubset.IssuerSecurityDomain,
+            occurrence: GetStatusCommand.OccurrenceMode.Next
+        );
+
+        _ = result.IsFailure.Should().BeTrue();
     }
 
     [Test]

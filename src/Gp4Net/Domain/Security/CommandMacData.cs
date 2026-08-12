@@ -183,11 +183,12 @@ public sealed record CommandMacData
         // Copy header and Lc
         Array.Copy(binaryCommand, 0, macInputBytes, 0, dataStartPos);
 
-        // Normalize CLA per GP E.4.4: remove logical channel bits
+        // GP Card Specification v2.3.1, section E.4.4; SCP03 Amendment D
+        // v1.1.2, section 6.2.4.
         bool isSecured = (command.Cla & 0x04) != 0;
         macInputBytes[0] = isSecured
-            ? Constants.Constants.Scp.Common.SECURE_CLA
-            : Constants.Constants.Scp.Common.STANDARD_CLA;
+            ? (byte)((command.Cla & 0xF0) | 0x04)
+            : (byte)(command.Cla & 0xF0);
 
         // Lc must include MAC length per GP spec (E.4.3, note 5).
         var secureLc = plaintextData.Length + macSize;

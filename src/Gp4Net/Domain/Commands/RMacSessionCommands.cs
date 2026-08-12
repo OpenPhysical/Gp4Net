@@ -103,10 +103,12 @@ public class BeginRMacSessionCommand
         Maybe<byte[]> mac = default
     )
     {
-        // GP Card Specification v2.3.1, Table E-14; SCP03 Amendment D v1.2, Table 7-9.
+        // GP Card Specification v2.3.1, Table E-14 permits 00 and 10;
+        // SCP03 Amendment D v1.1.2, Table 7-9 permits 10 and 30.
         if (
             securityLevel
-            is not SecurityLevel.RMac
+            is not SecurityLevel.None
+                and not SecurityLevel.RMac
                 and not (SecurityLevel.RMac | SecurityLevel.REncryption)
         )
         {
@@ -248,9 +250,12 @@ public class EndRMacSessionCommand
         Maybe<byte[]> mac = default
     )
     {
+        // GP Card Specification v2.3.1, Table E-18 and SCP03 Amendment D v1.1.2,
+        // Table 7-11 require P1=00; the active response level does not change P1.
         if (
             securityLevel
-            is not SecurityLevel.RMac
+            is not SecurityLevel.None
+                and not SecurityLevel.RMac
                 and not (SecurityLevel.RMac | SecurityLevel.REncryption)
         )
         {
@@ -300,7 +305,7 @@ public class EndRMacSessionCommand
     /// <returns>A result containing the CommandAPDU or an error.</returns>
     public Result<CommandAPDU, SmartCardError> ToCommandApdu()
     {
-        // GP Card Specification v2.3.1, Table E-18; SCP03 Amendment D v1.2, Table 7-11.
+        // GP Card Specification v2.3.1, Table E-18; SCP03 Amendment D v1.1.2, Table 7-11.
         return Result.Success<CommandAPDU, SmartCardError>(
             new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data, 0)
         );

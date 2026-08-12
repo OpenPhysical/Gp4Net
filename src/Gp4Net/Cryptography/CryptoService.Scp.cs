@@ -422,7 +422,7 @@ public static partial class CryptoService
 
             /// <summary>
             /// Applies command encryption for SCP03.
-            /// Per GP Card Specification v2.3.1 Section E.5.3.
+            /// SCP03 Amendment D v1.1.2, section 6.2.6.
             /// </summary>
             /// <param name="command">The command APDU to encrypt.</param>
             /// <param name="sEncKey">The S-ENC session key.</param>
@@ -434,38 +434,52 @@ public static partial class CryptoService
                 uint encryptionCounter
             )
             {
-                if (command.Length <= 5) // No data to encrypt
+                if (command.Length <= 5)
                     return Result.Success<byte[], SmartCardError>(command);
 
                 byte lc = command[4];
-                if (lc == 0 || command.Length < 5 + lc)
-                    return Result.Success<byte[], SmartCardError>(command);
+                if (lc == 0)
+                {
+                    return Result.Failure<byte[], SmartCardError>(
+                        SmartCardError.InvalidArgument(
+                            "SCP03 command encryption requires a short-Lc APDU."
+                        )
+                    );
+                }
 
-                // Extract data to encrypt
+                bool hasLe = command.Length == 6 + lc;
+                if (command.Length != 5 + lc && !hasLe)
+                {
+                    return Result.Failure<byte[], SmartCardError>(
+                        SmartCardError.InvalidData("Invalid short-Lc command structure.")
+                    );
+                }
+
                 byte[] dataToEncrypt = new byte[lc];
                 Array.Copy(command, 5, dataToEncrypt, 0, lc);
 
-                // For SCP03 C-ENC, derive IV from counter per GP 2.3.1 E.5.3
                 return BuildScp03Iv(sEncKey, encryptionCounter, isResponse: false)
                     .Bind(iv => Cipher.EncryptAesCbcWithPadding(sEncKey, iv, dataToEncrypt))
-                    .Map(encryptedData =>
+                    .Bind(encryptedData =>
                     {
-                        // Build new command with encrypted data
-                        byte[] newCommand = new byte[
-                            5 + encryptedData.Length + (command.Length > 5 + lc ? 1 : 0)
-                        ];
-                        Array.Copy(command, 0, newCommand, 0, 4); // CLA INS P1 P2
-                        newCommand[0] |= Scp.Common.SECURE_MESSAGING_CLA_BIT; // Set secure messaging bit
-                        // SCP03 1.1.2, 6.2.6: encryption precedes C-MAC. The MAC
-                        // wrapper adds the eight-byte MAC and adjusts Lc afterwards.
+                        if (encryptedData.Length + Scp.Scp03.MAC_SIZE > byte.MaxValue)
+                        {
+                            return Result.Failure<byte[], SmartCardError>(
+                                SmartCardError.InvalidArgument(
+                                    "SCP03 encrypted command data exceeds short-Lc capacity."
+                                )
+                            );
+                        }
+
+                        byte[] newCommand = new byte[5 + encryptedData.Length + (hasLe ? 1 : 0)];
+                        Array.Copy(command, 0, newCommand, 0, 4);
                         newCommand[4] = (byte)encryptedData.Length;
                         Array.Copy(encryptedData, 0, newCommand, 5, encryptedData.Length);
 
-                        // Copy Le if present
-                        if (command.Length > 5 + lc)
+                        if (hasLe)
                             newCommand[^1] = command[^1];
 
-                        return newCommand;
+                        return Result.Success<byte[], SmartCardError>(newCommand);
                     });
             }
 

@@ -546,14 +546,14 @@ public sealed record ApplicationRegistry
         // Per GP Card Specification Table 11-2
         return instruction switch
         {
-            GpIns.GET_STATUS => cardState.SecurityLevel >= 0x01,
-            GpIns.INSTALL => cardState.SecurityLevel >= 0x01,
-            GpIns.LOAD => cardState.SecurityLevel >= 0x01,
-            GpIns.DELETE => cardState.SecurityLevel >= 0x01,
-            GpIns.PUT_KEY => cardState.SecurityLevel >= 0x01,
-            GpIns.STORE_DATA => cardState.SecurityLevel >= 0x01,
-            GpIns.SET_STATUS => cardState.SecurityLevel >= 0x01,
-            _ => true, // Most commands don't require authenticated security level
+            GpIns.GET_STATUS => cardState.IsSecureChannelEstablished,
+            GpIns.INSTALL => cardState.IsSecureChannelEstablished,
+            GpIns.LOAD => cardState.IsSecureChannelEstablished,
+            GpIns.DELETE => cardState.IsSecureChannelEstablished,
+            GpIns.PUT_KEY => cardState.IsSecureChannelEstablished,
+            GpIns.STORE_DATA => cardState.IsSecureChannelEstablished,
+            GpIns.SET_STATUS => cardState.IsSecureChannelEstablished,
+            _ => true,
         };
     }
 

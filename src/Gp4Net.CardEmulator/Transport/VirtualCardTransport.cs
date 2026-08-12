@@ -94,7 +94,7 @@ public sealed class VirtualCardTransport : IApduTransport
                     success.Response.StatusWord
                 );
             },
-            error => new TransportApduResponse([], new StatusWord(0x6F, 0x00))
+            error => new TransportApduResponse([], VirtualCardErrorResponse.GetStatusWord(error))
         );
     }
 

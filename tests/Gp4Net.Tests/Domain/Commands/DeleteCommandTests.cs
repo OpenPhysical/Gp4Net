@@ -311,6 +311,22 @@ public class DeleteCommandTests
     }
 
     [Test]
+    public void ToApdu_WithLongDeletionToken_UsesBerLength()
+    {
+        byte[] aid = Convert.FromHexString("A000000003000000");
+        byte[] deletionToken = new byte[128];
+
+        var result = DeleteCommand
+            .CreateForApplication(aid, deleteRelated: true, deletionToken)
+            .Bind(command => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command)));
+
+        _ = result.IsSuccess.Should().BeTrue();
+        int tokenOffset = 7 + aid.Length;
+        // GP Card Spec 2.3.1, Table 11-23 and BER-TLV length encoding: tag 9E length 128 is 81 80.
+        _ = result.Value.Skip(tokenOffset).Take(3).Should().Equal(0x9E, 0x81, 0x80);
+    }
+
+    [Test]
     public void ToApdu_ForMultipleAids_ConcatenatesAllAids()
     {
         // Arrange

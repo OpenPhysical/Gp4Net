@@ -21,6 +21,7 @@ public class KeysetResolverTests
     [Test]
     public void Should_Resolve_Keyset_By_Name_For_Known_Keysets()
     {
+        InitializeUpdateResponse cardResponse = CreateInitializeUpdateResponse(0x02);
         var result = _resolver.ResolveKeyset(
             "gp_test",
             new Dictionary<string, string>(),
@@ -28,7 +29,7 @@ public class KeysetResolverTests
             Maybe<byte[]>.None,
             Maybe<byte[]>.None,
             0x00,
-            Maybe<InitializeUpdateResponse>.None
+            Maybe<InitializeUpdateResponse>.From(cardResponse)
         );
 
         Assert.That(result.IsSuccess, Is.True);
@@ -36,7 +37,9 @@ public class KeysetResolverTests
     }
 
     [Test]
-    public void Should_Return_Success_For_Unknown_Keyset_Name()
+    // GP Card Specification v2.3.1, Section 7.5.1: the off-card system must know the
+    // Security Domain's key-identification scheme.
+    public void Should_Fail_For_Unknown_Keyset_Name()
     {
         var result = _resolver.ResolveKeyset(
             "unknown_keyset",
@@ -48,7 +51,7 @@ public class KeysetResolverTests
             Maybe<InitializeUpdateResponse>.None
         );
 
-        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(result.IsFailure, Is.True);
     }
 
     [Test]
@@ -104,9 +107,11 @@ public class KeysetResolverTests
     }
 
     [Test]
-    public void Should_Use_Explicit_Keys_When_Provided()
+    // SCP03 Amendment D v1.1.2, Section 4.1, defines the AES Secure Channel base keys.
+    public void Should_Create_Scp03_Keyset_When_Card_Reports_Scp03()
     {
         var testKey = Convert.FromHexString("404142434445464748494A4B4C4D4E4F");
+        InitializeUpdateResponse cardResponse = CreateInitializeUpdateResponse(0x03);
 
         var result = _resolver.ResolveKeyset(
             "any_name",
@@ -115,15 +120,15 @@ public class KeysetResolverTests
             Maybe<byte[]>.From(testKey),
             Maybe<byte[]>.From(testKey),
             0x00,
-            Maybe<InitializeUpdateResponse>.None
+            Maybe<InitializeUpdateResponse>.From(cardResponse)
         );
 
         Assert.That(result.IsSuccess, Is.True);
-        Assert.That(result.Value, Is.Not.Null);
+        Assert.That(result.Value, Is.TypeOf<Scp03KeySet>());
     }
 
     [Test]
-    public void Should_Fallback_To_Test_Keys_When_No_Explicit_Keys()
+    public void Should_Require_Initialize_Update_Response_When_No_Explicit_Keys()
     {
         var result = _resolver.ResolveKeyset(
             "any_name",
@@ -135,8 +140,7 @@ public class KeysetResolverTests
             Maybe<InitializeUpdateResponse>.None
         );
 
-        Assert.That(result.IsSuccess, Is.True);
-        Assert.That(result.Value, Is.Not.Null);
+        Assert.That(result.IsFailure, Is.True);
     }
 
     [Test]
@@ -168,5 +172,47 @@ public class KeysetResolverTests
                 $"Should resolve keys for protocol {protocol:X2}"
             );
         }
+    }
+
+    [Test]
+    public void Should_Fail_For_Unsupported_Protocol_Instead_Of_Assuming_Scp02()
+    {
+        var result = _resolver.GetTestKeys(0x04, 0x00);
+
+        Assert.That(result.IsFailure, Is.True);
+    }
+
+    [Test]
+    public void Should_Require_All_Explicit_Key_Components()
+    {
+        var testKey = Convert.FromHexString("404142434445464748494A4B4C4D4E4F");
+
+        var result = _resolver.ResolveKeyset(
+            "gp_test",
+            new Dictionary<string, string>(),
+            Maybe<byte[]>.From(testKey),
+            Maybe<byte[]>.None,
+            Maybe<byte[]>.None,
+            0x00,
+            Maybe<InitializeUpdateResponse>.From(CreateInitializeUpdateResponse(0x02))
+        );
+
+        Assert.That(result.IsFailure, Is.True);
+    }
+
+    private static InitializeUpdateResponse CreateInitializeUpdateResponse(byte scpId)
+    {
+        int sequenceCounterLength = scpId == 0x02 ? 2 : 3;
+        int cardChallengeLength = scpId == 0x02 ? 6 : 8;
+        return InitializeUpdateResponse
+            .Create(
+                new byte[10],
+                0x00,
+                scpId,
+                new byte[sequenceCounterLength],
+                new byte[cardChallengeLength],
+                new byte[8]
+            )
+            .Value;
     }
 }

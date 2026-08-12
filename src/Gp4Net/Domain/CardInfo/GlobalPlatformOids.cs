@@ -108,6 +108,22 @@ public static class GlobalPlatformOids
     }
 
     /// <summary>
+    /// Extracts the SCP implementation parameter from {globalPlatform 4 scp i}.
+    /// GP Card Specification v2.3.1, Appendix H, Card Recognition Data.
+    /// </summary>
+    public static bool TryGetScpImplementation(string? oid, byte scpId, out byte implementation)
+    {
+        implementation = 0;
+        string prefix = $"{GLOBAL_PLATFORM_PREFIX}.4.{scpId}.";
+        if (string.IsNullOrWhiteSpace(oid) || !oid.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return byte.TryParse(oid[prefix.Length..], out implementation);
+    }
+
+    /// <summary>
     /// Formats an OID with its description if known.
     /// </summary>
     /// <param name="oid">The OID in dotted notation.</param>
@@ -165,7 +181,9 @@ public static class GlobalPlatformOids
             if (oid.StartsWith("1.2.840.114283.2."))
             {
                 string? description = GetDescription(oid);
-                if (!string.IsNullOrEmpty(description) && description.Contains("Card Specification"))
+                if (
+                    !string.IsNullOrEmpty(description) && description.Contains("Card Specification")
+                )
                 {
                     _ = summary.SpecificationVersions.Add(description);
                 }

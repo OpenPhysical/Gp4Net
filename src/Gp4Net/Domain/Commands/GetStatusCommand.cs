@@ -49,14 +49,31 @@ public class GetStatusCommand : IApduCommand
     public enum ResponseFormat : byte
     {
         /// <summary>
-        /// No format specified.
+        /// Deprecated response format.
         /// </summary>
-        None = 0x00,
+        Deprecated = 0x00,
+
+        /// <summary>
+        /// Deprecated response format.
+        /// </summary>
+        None = Deprecated,
 
         /// <summary>
         /// Return data in TLV format.
         /// </summary>
         Tlv = 0x02,
+    }
+
+    /// <summary>
+    /// Occurrence selection values for P2.b1.
+    /// </summary>
+    public enum OccurrenceMode : byte
+    {
+        /// <summary>Gets the first or all occurrences.</summary>
+        FirstOrAll = 0x00,
+
+        /// <summary>Gets the next occurrences.</summary>
+        Next = 0x01,
     }
 
     /// <summary>
@@ -68,6 +85,11 @@ public class GetStatusCommand : IApduCommand
     /// Gets the response format.
     /// </summary>
     public ResponseFormat Format { get; }
+
+    /// <summary>
+    /// Gets the occurrence selection.
+    /// </summary>
+    public OccurrenceMode Occurrence { get; }
 
     /// <summary>
     /// Gets the search criteria (optional AID).
@@ -88,7 +110,7 @@ public class GetStatusCommand : IApduCommand
     /// <summary>
     /// Gets the P2 parameter (response format).
     /// </summary>
-    public byte P2 => (byte)Format;
+    public byte P2 => (byte)((byte)Format | (byte)Occurrence);
 
     /// <summary>
     /// Gets the command data (search criteria).
@@ -111,15 +133,12 @@ public class GetStatusCommand : IApduCommand
     /// <returns>A Result containing the CommandAPDU or an error.</returns>
     public Result<CommandAPDU, SmartCardError> ToCommandApdu()
     {
-        // Only pass search criteria if it's non-empty
-        var data = SearchCriteria;
-
         return ApduBuilder.CreateCommand(
             GlobalPlatform.Cla.GP_STANDARD,
             GlobalPlatform.Ins.GET_STATUS,
             (byte)Subset,
-            (byte)Format,
-            data,
+            P2,
+            SearchCriteria,
             Maybe<int>.From(256)
         );
     }
@@ -129,16 +148,19 @@ public class GetStatusCommand : IApduCommand
     /// </summary>
     /// <param name="subset">The status subset to query.</param>
     /// <param name="format">The response format.</param>
+    /// <param name="occurrence">The occurrence selection.</param>
     /// <param name="searchCriteria">Optional search criteria (AID).</param>
     private GetStatusCommand(
         StatusSubset subset,
         ResponseFormat format,
-        Maybe<byte[]> searchCriteria
+        OccurrenceMode occurrence,
+        byte[] searchCriteria
     )
     {
         Subset = subset;
         Format = format;
-        SearchCriteria = searchCriteria.Map(criteria => (byte[])criteria.Clone());
+        Occurrence = occurrence;
+        SearchCriteria = Maybe<byte[]>.From((byte[])searchCriteria.Clone());
     }
 
     /// <summary>
@@ -147,35 +169,41 @@ public class GetStatusCommand : IApduCommand
     /// <param name="subset">The status subset to query.</param>
     /// <param name="format">The response format.</param>
     /// <param name="searchCriteria">Optional search criteria (AID).</param>
+    /// <param name="occurrence">The occurrence selection.</param>
+    /// <param name="tagList">Optional response tag list.</param>
     /// <returns>A Result containing either a new GetStatusCommand or an error.</returns>
     public static Result<GetStatusCommand, SmartCardError> Create(
         StatusSubset subset,
-        ResponseFormat format = ResponseFormat.None,
-        Maybe<byte[]> searchCriteria = default
+        ResponseFormat format = ResponseFormat.Tlv,
+        Maybe<byte[]> searchCriteria = default,
+        OccurrenceMode occurrence = OccurrenceMode.FirstOrAll,
+        Maybe<byte[]> tagList = default
     )
     {
-        // Validate StatusSubset enum
         if (!IsValidStatusSubset(subset))
         {
             return SmartCardError.InvalidArgument($"Invalid status subset: {subset}");
         }
 
-        // Validate ResponseFormat enum
         if (!IsValidResponseFormat(format))
         {
             return SmartCardError.InvalidArgument($"Invalid response format: {format}");
         }
 
-        // Validate search criteria if provided
-        // Note: Search criteria can be a TLV structure (e.g., 4F00 for empty search)
-        // or an AID (5-16 bytes). We allow both.
-        var validationResult = ValidateSearchCriteria(searchCriteria);
-        if (validationResult.HasValue)
+        if (!IsValidOccurrenceMode(occurrence))
         {
-            return validationResult.Value;
+            return SmartCardError.InvalidArgument($"Invalid occurrence mode: {occurrence}");
         }
 
-        return new GetStatusCommand(subset, format, searchCriteria);
+        if (subset == StatusSubset.IssuerSecurityDomain && occurrence == OccurrenceMode.Next)
+        {
+            return SmartCardError.InvalidArgument(
+                "GET STATUS next occurrence is not valid for the Issuer Security Domain."
+            );
+        }
+
+        var dataResult = BuildCommandData(searchCriteria, tagList);
+        return dataResult.Map(data => new GetStatusCommand(subset, format, occurrence, data));
     }
 
     /// <summary>
@@ -215,31 +243,59 @@ public class GetStatusCommand : IApduCommand
         };
     }
 
-    /// <summary>
-    /// Validates search criteria for AID format and length.
-    /// </summary>
-    /// <param name="searchCriteria">The search criteria to validate.</param>
-    /// <returns>Maybe containing SmartCardError if validation fails, or None if valid.</returns>
-    private static Maybe<SmartCardError> ValidateSearchCriteria(Maybe<byte[]> searchCriteria)
+    private static bool IsValidOccurrenceMode(OccurrenceMode occurrence) =>
+        occurrence is OccurrenceMode.FirstOrAll or OccurrenceMode.Next;
+
+    private static Result<byte[], SmartCardError> BuildCommandData(
+        Maybe<byte[]> searchCriteria,
+        Maybe<byte[]> tagList
+    )
     {
-        return searchCriteria.Bind(criteria =>
+        byte[] criteria = searchCriteria.GetValueOrDefault([]);
+        byte[] aidSearch;
+
+        if (criteria.Length == 0)
         {
-            if (criteria.Length == 0)
+            aidSearch = [0x4F, 0x00];
+        }
+        else if (criteria[0] == 0x4F)
+        {
+            if (criteria.Length < 2 || criteria[1] > 16 || criteria.Length < criteria[1] + 2)
             {
-                return Maybe<SmartCardError>.None;
+                return SmartCardError.InvalidArgument("Invalid GET STATUS AID search TLV.");
             }
 
-            if (criteria[0] != 0x4F && criteria.Length is < 5 or > 16)
+            aidSearch = (byte[])criteria.Clone();
+        }
+        else
+        {
+            if (criteria.Length is < 5 or > 16)
             {
-                return Maybe<SmartCardError>.From(
-                    SmartCardError.InvalidArgument(
-                        "Search criteria AID must be between 5 and 16 bytes."
-                    )
+                return SmartCardError.InvalidArgument(
+                    "Search criteria AID must be between 5 and 16 bytes."
                 );
             }
 
-            return Maybe<SmartCardError>.None;
-        });
+            aidSearch = [0x4F, (byte)criteria.Length, .. criteria];
+        }
+
+        return tagList.Match(
+            tags =>
+            {
+                if (tags.Length is < 1 or > 127)
+                {
+                    return SmartCardError.InvalidArgument(
+                        "GET STATUS tag list must contain between 1 and 127 bytes."
+                    );
+                }
+
+                // GP Card Specification v2.3.1, Table 11-35.
+                return Result.Success<byte[], SmartCardError>(
+                    [.. aidSearch, 0x5C, (byte)tags.Length, .. tags]
+                );
+            },
+            () => Result.Success<byte[], SmartCardError>(aidSearch)
+        );
     }
 
     /// <inheritdoc />
@@ -259,17 +315,13 @@ public class GetStatusCommand : IApduCommand
     /// <inheritdoc />
     public byte[] ToBytes()
     {
-        // Only pass search criteria if it's non-empty
-        var data = SearchCriteria;
-
-        // Build APDU bytes directly to avoid WSCT reconstruction issues
         return ApduBuilder
             .BuildApduBytes(
                 GlobalPlatform.Cla.GP_STANDARD,
                 GlobalPlatform.Ins.GET_STATUS,
                 (byte)Subset,
-                (byte)Format,
-                data,
+                P2,
+                SearchCriteria,
                 Maybe<int>.From(256)
             )
             .GetValueOrDefault([]);

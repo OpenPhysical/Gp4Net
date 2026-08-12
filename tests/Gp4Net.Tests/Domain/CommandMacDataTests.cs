@@ -13,7 +13,10 @@ namespace Gp4Net.Tests.Domain;
 [TestFixture]
 public class CommandMacDataTests
 {
-    private static SecureChannelState CreateScp02State(SecurityLevel level)
+    private static SecureChannelState CreateScp02State(
+        SecurityLevel level,
+        byte implementation = 0x00
+    )
     {
         var masterKey = Convert.FromHexString("404142434445464748494A4B4C4D4E4F");
         var sequenceCounter = Convert.FromHexString("0013");
@@ -42,7 +45,7 @@ public class CommandMacDataTests
 
         var sessionKeys = SessionKeys.Create(encKey, macKey, rmacKey).Value;
         var state = SecureChannelState
-            .Create(sessionKeys, level, CryptoService.ScpVersion.Scp02, new byte[8], 0x00)
+            .Create(sessionKeys, level, CryptoService.ScpVersion.Scp02, new byte[8], implementation)
             .Value;
         return state;
     }
@@ -80,7 +83,7 @@ public class CommandMacDataTests
     {
         var commandBytes = Convert.FromHexString("84F280021013A84162D6CF3D3EB2037DBFF3A4A09100");
         var command = new CommandAPDU(commandBytes);
-        var state = CreateScp02State(SecurityLevel.CDecryption);
+        var state = CreateScp02State(SecurityLevel.CDecryption, implementation: 0x10);
         TestContext.Out.WriteLine("S-ENC: " + Convert.ToHexString(state.SessionKeys.SEnc));
 
         var result = CommandMacData.Create(command, state);
@@ -114,7 +117,7 @@ public class CommandMacDataTests
     {
         var commandBytes = Convert.FromHexString("84F280021013A84162D6CF3D3EB2037DBFF3A4A09100");
         var command = new CommandAPDU(commandBytes);
-        var state = CreateScp02State(SecurityLevel.CDecryption);
+        var state = CreateScp02State(SecurityLevel.CDecryption, implementation: 0x10);
         var macChaining = MacChainingState
             .Create(Convert.FromHexString("D0C159C17E6D3F9A"), CryptoService.ScpVersion.Scp02, 0x00)
             .Value;
@@ -128,5 +131,47 @@ public class CommandMacDataTests
         }
 
         Assert.That(result.Value.Item1.Udc, Is.EqualTo(new byte[] { 0x4F, 0x00 }));
+    }
+
+    [Test]
+    public void Should_Not_Encrypt_Scp02_Icv_When_Implementation_B5_Is_Clear()
+    {
+        // GP Card Specification v2.3.1, Table E-1 and E.3.4: i.b5=0 leaves the
+        // preceding C-MAC unencrypted when it becomes the next command's ICV.
+        var command = new CommandAPDU(Convert.FromHexString("80CA9F7F00"));
+        var state = CreateScp02State(SecurityLevel.CMac, implementation: 0x00);
+        var chaining = MacChainingState
+            .Create(Convert.FromHexString("D0C159C17E6D3F9A"), CryptoService.ScpVersion.Scp02, 0x00)
+            .Value;
+        var seededState = state with { MacChaining = chaining };
+
+        var secured = ScpService.Security.ApplyCommandSecurity(command, seededState).Value;
+        var removed = ScpService.Security.RemoveCommandSecurity(
+            secured.securedCommand,
+            seededState
+        );
+
+        Assert.That(removed.IsSuccess, Is.True);
+        Assert.That(
+            removed.Value.plaintextCommand.BinaryCommand,
+            Is.EqualTo(command.BinaryCommand)
+        );
+    }
+
+    [Test]
+    public void Should_Reject_Tampered_Scp02_Command_Mac_Without_Disclosing_Expected_Mac()
+    {
+        // GP Card Specification v2.3.1, E.5.1.3: a failed C-MAC check returns
+        // security status not satisfied and does not expose the expected MAC.
+        var command = new CommandAPDU(Convert.FromHexString("80CA9F7F00"));
+        var state = CreateScp02State(SecurityLevel.CMac);
+        var secured = ScpService.Security.ApplyCommandSecurity(command, state).Value.securedCommand;
+        byte[] tampered = secured.BinaryCommand.ToArray();
+        tampered[^2] ^= 0x01;
+
+        var result = ScpService.Security.RemoveCommandSecurity(new CommandAPDU(tampered), state);
+
+        Assert.That(result.IsFailure, Is.True);
+        Assert.That(result.Error.Message, Does.Not.Contain("expected"));
     }
 }

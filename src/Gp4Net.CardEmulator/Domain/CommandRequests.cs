@@ -24,7 +24,8 @@ public static class CommandRequests
     public record ExternalAuthenticateRequest(
         byte SecurityLevel,
         byte[] HostCryptogram,
-        byte[] HostMac
+        byte[] HostMac,
+        byte Cla = 0x84
     );
 
     /// <summary>

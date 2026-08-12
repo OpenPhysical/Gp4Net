@@ -4,6 +4,7 @@
 // -----------------------------------------------------------------------------
 
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
@@ -22,14 +23,16 @@ namespace Gp4Net.Services.GlobalPlatform;
 /// <summary>
 /// Application and status operations.
 /// Handles GET STATUS, application queries, and lifecycle management.
-/// Reference: GlobalPlatform Card Specification v2.3.1 Section 11.5
+/// Reference: GlobalPlatform Card Specification v2.3.1 Section 11.4
 /// </summary>
 [PublicAPI]
 public static class Applications
 {
+    private const ushort GET_STATUS_MORE_DATA = 0x6310;
+
     /// <summary>
     /// Retrieves complete card content including ISD, applications, and load files.
-    /// Reference: GlobalPlatform Card Specification v2.3.1 Section 11.5
+    /// Reference: GlobalPlatform Card Specification v2.3.1 Section 11.4
     /// </summary>
     /// <param name="executeCommand">Function to execute APDU commands.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -74,7 +77,7 @@ public static class Applications
 
     /// <summary>
     /// Retrieves the Issuer Security Domain information.
-    /// Reference: GlobalPlatform Card Specification v2.3.1 Section 11.5.1
+    /// Reference: GlobalPlatform Card Specification v2.3.1 Section 11.4
     /// </summary>
     public static async Task<
         Result<ImmutableList<ApplicationInfo>, SmartCardError>
@@ -87,20 +90,18 @@ public static class Applications
         CancellationToken cancellationToken = default
     )
     {
-        var cmdResult = Commands.CreateGetStatusCommand(
+        var dataResult = await GetAllStatusDataAsync(
             GetStatusCommand.StatusSubset.IssuerSecurityDomain,
-            new byte[] { 0x4F, 0x00 }
-        ); // Tag 4F, length 0
+            executeCommand,
+            cancellationToken
+        );
 
-        return await cmdResult
-            .Bind(command => command.ToCommandApdu())
-            .Bind(async commandApdu => await executeCommand(commandApdu, cancellationToken))
-            .Bind(response => Responses.ParseGetStatusResponse(response));
+        return dataResult.Bind(TlvService.GlobalPlatformParsers.ParseApplicationsResponse);
     }
 
     /// <summary>
     /// Retrieves applications and supplementary security domains.
-    /// Reference: GlobalPlatform Card Specification v2.3.1 Section 11.5.2
+    /// Reference: GlobalPlatform Card Specification v2.3.1 Section 11.4
     /// </summary>
     public static async Task<
         Result<ImmutableList<ApplicationInfo>, SmartCardError>
@@ -113,20 +114,18 @@ public static class Applications
         CancellationToken cancellationToken = default
     )
     {
-        var cmdResult = Commands.CreateGetStatusCommand(
+        var dataResult = await GetAllStatusDataAsync(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
-            new byte[] { 0x4F, 0x00 }
+            executeCommand,
+            cancellationToken
         );
 
-        return await cmdResult
-            .Bind(command => command.ToCommandApdu())
-            .Bind(async commandApdu => await executeCommand(commandApdu, cancellationToken))
-            .Bind(response => Responses.ParseGetStatusResponse(response));
+        return dataResult.Bind(TlvService.GlobalPlatformParsers.ParseApplicationsResponse);
     }
 
     /// <summary>
     /// Retrieves executable load files.
-    /// Reference: GlobalPlatform Card Specification v2.3.1 Section 11.5.3
+    /// Reference: GlobalPlatform Card Specification v2.3.1 Section 11.4
     /// </summary>
     public static async Task<
         Result<ImmutableList<ExecutableLoadFile>, SmartCardError>
@@ -139,22 +138,18 @@ public static class Applications
         CancellationToken cancellationToken = default
     )
     {
-        var cmdResult = Commands.CreateGetStatusCommand(
+        var dataResult = await GetAllStatusDataAsync(
             GetStatusCommand.StatusSubset.ExecutableLoadFiles,
-            new byte[] { 0x4F, 0x00 }
+            executeCommand,
+            cancellationToken
         );
 
-        return await cmdResult
-            .Bind(command => command.ToCommandApdu())
-            .Bind(async commandApdu => await executeCommand(commandApdu, cancellationToken))
-            .Bind(response =>
-                TlvService.GlobalPlatformParsers.ParseLoadFilesResponse(response.Data)
-            );
+        return dataResult.Bind(TlvService.GlobalPlatformParsers.ParseLoadFilesResponse);
     }
 
     /// <summary>
     /// Retrieves executable load files and their executable modules.
-    /// Reference: GlobalPlatform Card Specification v2.3.1 Section 11.5.4
+    /// Reference: GlobalPlatform Card Specification v2.3.1 Section 11.4
     /// </summary>
     public static async Task<
         Result<ImmutableList<ExecutableLoadFile>, SmartCardError>
@@ -167,20 +162,64 @@ public static class Applications
         CancellationToken cancellationToken = default
     )
     {
-        var cmdResult = Commands.CreateGetStatusCommand(
+        var dataResult = await GetAllStatusDataAsync(
             GetStatusCommand.StatusSubset.ExecutableLoadFilesAndModules,
-            new byte[] { 0x4F, 0x00 }
+            executeCommand,
+            cancellationToken
         );
 
-        return await cmdResult
-            .Bind(command => command.ToCommandApdu())
-            .Bind(async commandApdu => await executeCommand(commandApdu, cancellationToken))
-            .Bind(response =>
-                TlvService.GlobalPlatformParsers.ParseLoadFilesResponse(response.Data)
-            );
+        return dataResult.Bind(TlvService.GlobalPlatformParsers.ParseLoadFilesResponse);
     }
 
     #region Private Helper Methods
+
+    private static async Task<Result<byte[], SmartCardError>> GetAllStatusDataAsync(
+        GetStatusCommand.StatusSubset subset,
+        Func<
+            CommandAPDU,
+            CancellationToken,
+            Task<Result<CommandResponse, SmartCardError>>
+        > executeCommand,
+        CancellationToken cancellationToken
+    )
+    {
+        var data = new List<byte>();
+        var occurrence = GetStatusCommand.OccurrenceMode.FirstOrAll;
+
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var commandResult = Commands
+                .CreateGetStatusCommand(subset, occurrence: occurrence)
+                .Bind(command => command.ToCommandApdu());
+            if (commandResult.IsFailure)
+            {
+                return commandResult.Error;
+            }
+
+            var responseResult = await executeCommand(commandResult.Value, cancellationToken);
+            if (responseResult.IsFailure)
+            {
+                return responseResult.Error;
+            }
+
+            var response = responseResult.Value;
+            if (response.StatusWord != GET_STATUS_MORE_DATA && !response.IsSuccess)
+            {
+                return SmartCardError.FromStatusWord(response.StatusWord);
+            }
+
+            data.AddRange(response.Data);
+            if (response.IsSuccess)
+            {
+                return data.ToArray();
+            }
+
+            // GP Card Specification v2.3.1, Table 11-38.
+            occurrence = GetStatusCommand.OccurrenceMode.Next;
+        }
+    }
 
     /// <summary>
     /// Combines the retrieved information into a CardContent structure.

@@ -41,7 +41,7 @@ public static class KeyChange
         IKeySet newKeys,
         SecureChannelState secureChannel,
         byte replacedKeyVersion,
-        byte firstKeyIdentifier = 0x01
+        byte? firstKeyIdentifier = null
     )
     {
         return secureChannel
@@ -53,7 +53,7 @@ public static class KeyChange
                 PutKeyCommand.CreateReplacement(
                     replacedKeyVersion,
                     newKeys.KeyVersion,
-                    firstKeyIdentifier,
+                    firstKeyIdentifier ?? newKeys.KeyId,
                     blocks
                 )
             );
@@ -63,7 +63,7 @@ public static class KeyChange
         ISmartCardService cardService,
         IKeySet newKeys,
         byte replacedKeyVersion,
-        byte firstKeyIdentifier = 0x01,
+        byte? firstKeyIdentifier = null,
         CancellationToken cancellationToken = default
     )
     {

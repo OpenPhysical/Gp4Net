@@ -50,7 +50,6 @@ public class Scp02ImplementationConverter : TypeConverter
             { "7A", ScpImplementation.Scp02I7A },
             // SCP03 hex values
             { "10", ScpImplementation.Scp03I10 },
-            { "11", ScpImplementation.Scp03I11 },
             { "20", ScpImplementation.Scp03I20 },
             { "30", ScpImplementation.Scp03I30 },
             { "60", ScpImplementation.Scp03I60 },

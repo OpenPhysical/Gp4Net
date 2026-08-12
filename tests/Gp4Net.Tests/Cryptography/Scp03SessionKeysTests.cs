@@ -266,7 +266,7 @@ public class Scp03SessionKeysTests
     [Test]
     public void Should_Derive_The_Same_Keys_For_Random_And_Pseudo_Random_Modes()
     {
-        // SCP03 Amendment D v1.2, Table 5-1: i=60 is random and i=70 is pseudo-random.
+        // SCP03 Amendment D v1.1.2, Table 5-1: i=60 is random and i=70 is pseudo-random.
         var keySetResult = Scp03KeySet.Create(MasterKey, MasterKey, MasterKey, 0x01);
         Assert.That(keySetResult.IsSuccess, Is.True);
         var keySet = keySetResult.Value;

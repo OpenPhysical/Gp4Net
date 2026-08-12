@@ -28,43 +28,17 @@ public static partial class ScpEnforcer
             Apdu.Instructions.GET_DATA // GET DATA per GP spec - no special security requirements
         );
 
-        /// <summary>Commands that require secure channel establishment but no additional security.</summary>
-        public static readonly ImmutableHashSet<byte> AuthenticatedCommands =
-            ImmutableHashSet.Create<byte>();
-
-        /// <summary>Commands that require C-MAC security level (command authentication).</summary>
+        // GP Card Specification v2.3.1, Table 11-2 defines AUTHENTICATED as the
+        // minimum for card-management commands. Secure-messaging services are set by
+        // the current Secure Channel security level, not by the command instruction.
         public static readonly ImmutableHashSet<byte> CommandMacRequiredCommands =
-            ImmutableHashSet.Create(
-                Ins.INSTALL, // INSTALL
-                Ins.LOAD, // LOAD
-                Ins.DELETE, // DELETE
-                Ins.PUT_KEY, // PUT KEY
-                Ins.STORE_DATA, // STORE DATA
-                Ins.GET_STATUS // GET STATUS (some variants)
-            );
-
-        /// <summary>Commands that require C-ENC security level (command encryption).</summary>
+            ImmutableHashSet<byte>.Empty;
         public static readonly ImmutableHashSet<byte> CommandEncryptionRequiredCommands =
-            ImmutableHashSet.Create(
-                Ins.PUT_KEY, // PUT KEY (key data must be encrypted)
-                Ins.STORE_DATA // STORE DATA (sensitive data)
-            );
-
-        /// <summary>Commands that require R-MAC security level (response authentication).</summary>
+            ImmutableHashSet<byte>.Empty;
         public static readonly ImmutableHashSet<byte> ResponseMacRequiredCommands =
-            ImmutableHashSet.Create(
-                Ins.INSTALL, // INSTALL
-                Ins.LOAD, // LOAD
-                Ins.DELETE, // DELETE
-                Ins.PUT_KEY, // PUT KEY
-                Ins.GET_STATUS // GET STATUS
-            );
-
-        /// <summary>Commands that require R-ENC security level (response encryption).</summary>
+            ImmutableHashSet<byte>.Empty;
         public static readonly ImmutableHashSet<byte> ResponseEncryptionRequiredCommands =
-            ImmutableHashSet.Create(
-                Ins.GET_STATUS // GET STATUS (sensitive status)
-            );
+            ImmutableHashSet<byte>.Empty;
     }
 
     /// <summary>
@@ -109,14 +83,7 @@ public static partial class ScpEnforcer
             )
         );
 
-        // Special cases based on command parameters per GP Appendix E.1.3
-        var enhancedRequirements = ApplyCommandSpecificRules(
-            instruction,
-            commandData,
-            requirements
-        );
-
-        return Result.Success<SecurityLevelRequirements, SmartCardError>(enhancedRequirements);
+        return Result.Success<SecurityLevelRequirements, SmartCardError>(requirements);
     }
 
     /// <summary>
@@ -147,39 +114,6 @@ public static partial class ScpEnforcer
     }
 
     /// <summary>
-    /// Applies command-specific security enhancement rules per GP Appendix E.1.3.
-    /// </summary>
-    private static SecurityLevelRequirements ApplyCommandSpecificRules(
-        byte instruction,
-        byte[] commandData,
-        SecurityLevelRequirements baseRequirements
-    )
-    {
-        return instruction switch
-        {
-            // INSTALL - All variants require C-MAC and R-MAC
-            Ins.INSTALL
-                => baseRequirements with
-                {
-                    RequiresCommandMac = true,
-                    RequiresResponseMac = true,
-                },
-
-            // PUT KEY - Always requires encryption for key data
-            Ins.PUT_KEY
-                => baseRequirements with
-                {
-                    RequiresCommandEncryption = true,
-                    RequiresCommandMac = true,
-                    RequiresResponseMac = true,
-                },
-
-            // Default: return base requirements
-            _ => baseRequirements,
-        };
-    }
-
-    /// <summary>
     /// Creates command security context for validation processing.
     /// </summary>
     private static Result<CommandSecurityContext, SmartCardError> CreateCommandSecurityContext(
@@ -189,6 +123,15 @@ public static partial class ScpEnforcer
     )
     {
         return GetRequiredSecurityLevels(instruction, fullCommand)
+            .Map(requirements =>
+                requirements with
+                {
+                    RequiresCommandMac = HasCommandMac(state.SecurityLevel),
+                    RequiresCommandEncryption = HasCommandEncryption(state.SecurityLevel),
+                    RequiresResponseMac = (state.SecurityLevel & 0x10) != 0,
+                    RequiresResponseEncryption = (state.SecurityLevel & 0x20) != 0,
+                }
+            )
             .Map(requirements => new CommandSecurityContext(
                 Instruction: instruction,
                 FullCommand: fullCommand,
@@ -303,7 +246,7 @@ public static partial class ScpEnforcer
 
     /// <summary>
     /// Validates command authentication (MAC verification) if required.
-    /// Implements proper MAC validation per GP Card Specification v2.3.1 and SCP03 v1.1.1 Section 6.2.4.
+    /// Implements MAC validation per GP Card Specification v2.3.1 and SCP03 Amendment D v1.1.2 Section 6.2.4.
     /// Performs structural validation and secure channel verification. Full cryptographic MAC
     /// verification is handled by the secure channel pipeline.
     /// </summary>
@@ -329,10 +272,15 @@ public static partial class ScpEnforcer
     {
         int expectedMacLength = scpVersion switch
         {
-            0x02 => 8, // SCP02 uses 8-byte MAC per GP Card Spec v2.3.1 Section E.4
-            0x03 => 16, // SCP03 uses 16-byte AES-CMAC per GP SCP03 v1.1.1 Section 6.2.4
-            _ => 8, // Default to SCP02 MAC length
+            0x02 => Gp4Net.Constants.Constants.Scp.Scp02.MAC_SIZE,
+            0x03 => Gp4Net.Constants.Constants.Scp.Scp03.MAC_SIZE,
+            _ => 0,
         };
+
+        if (expectedMacLength == 0)
+            return Result.Failure<bool, SmartCardError>(
+                SmartCardError.InvalidArgument($"Unsupported SCP version: {scpVersion:X2}")
+            );
 
         return command.Length >= 5 + expectedMacLength
             ? Result.Success<bool, SmartCardError>(true)

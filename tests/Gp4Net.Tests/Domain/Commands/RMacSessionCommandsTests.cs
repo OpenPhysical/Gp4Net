@@ -24,6 +24,16 @@ public class RMacSessionCommandsTests
     }
 
     [Test]
+    public void BeginRMacSessionCommand_Should_Encode_No_Response_Protection()
+    {
+        // GP Card Specification v2.3.1, Table E-14: P1=00 defers R-MAC to END R-MAC SESSION.
+        var result = BeginRMacSessionCommand.Create(SecurityLevel.None);
+
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.P1.Should().Be(0x00);
+    }
+
+    [Test]
     public void BeginRMacSessionCommand_Create_WithInvalidSecurityLevel_ReturnsFailure()
     {
         Result<BeginRMacSessionCommand, SmartCardError> result = BeginRMacSessionCommand.Create(
@@ -73,7 +83,7 @@ public class RMacSessionCommandsTests
     public void BeginRMacSessionCommand_Should_Encode_Lv_Data()
     {
         // GP Card Specification v2.3.1, Tables E-13 and E-16;
-        // SCP03 Amendment D v1.2, sections 7.1.3.2 and 7.1.3.5.
+        // SCP03 Amendment D v1.1.2, sections 7.1.3.2 and 7.1.3.5.
         var command = BeginRMacSessionCommand.Create(SecurityLevel.RMac, data: new byte[] { 1, 2 });
 
         CommandAPDU apdu = command.Value.ToCommandApdu().Value;
@@ -105,6 +115,16 @@ public class RMacSessionCommandsTests
     }
 
     [Test]
+    public void EndRMacSessionCommand_Should_Accept_No_Response_Protection()
+    {
+        // GP Card Specification v2.3.1, Table E-18: END R-MAC SESSION always uses P1=00.
+        var result = EndRMacSessionCommand.Create(SecurityLevel.None);
+
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.P1.Should().Be(0x00);
+    }
+
+    [Test]
     public void EndRMacSessionCommand_Create_WithInvalidSecurityLevel_ReturnsFailure()
     {
         Result<EndRMacSessionCommand, SmartCardError> result = EndRMacSessionCommand.Create(
@@ -129,7 +149,7 @@ public class RMacSessionCommandsTests
     public void EndRMacSessionCommand_Should_Include_Le()
     {
         // GP Card Specification v2.3.1, Table E-18;
-        // SCP03 Amendment D v1.2, Table 7-11.
+        // SCP03 Amendment D v1.1.2, Table 7-11.
         var command = EndRMacSessionCommand.Create(SecurityLevel.RMac);
 
         _ = command

@@ -62,6 +62,19 @@ public class SecureChannelOperationsScp03Tests
             Is.EqualTo(Cryptography.CryptoService.ScpVersion.Scp03)
         );
         Assert.That(session.State.SecurityLevel.HasCMac(), Is.True);
+
+        // SCP03 Amendment D v1.1.2, Sections 6.2.3 and 6.2.4.
+        var secured = ScpService.Security.ApplyCommandSecurity(
+            new WSCT.ISO7816.CommandAPDU(Convert.FromHexString("80F24000024F00")),
+            session.State
+        );
+        Assert.That(secured.IsSuccess, Is.True, () => secured.Error.ToString());
+        var response = await service.SendCommandAsync(
+            secured.Value.securedCommand.BinaryCommand,
+            CancellationToken.None
+        );
+        Assert.That(response.IsSuccess, Is.True, () => response.Error.ToString());
+        Assert.That(response.Value.StatusWord.Value, Is.EqualTo(0x9000));
     }
 
     [Test]
@@ -98,5 +111,25 @@ public class SecureChannelOperationsScp03Tests
             "Establishment should fail with unknown key version"
         );
         Assert.That(establishResult.Error.Code, Is.EqualTo("SECURITY_ERROR"));
+    }
+
+    // SCP03 Amendment D v1.1.2, Sections 6.2.3 and 7.1.2.
+    [Test]
+    public async Task Should_Reject_External_Authenticate_Without_CMac()
+    {
+        string readerSpec = $"virtual:{Scp03ProfilePath.Value}";
+        var serviceResult = await VirtualCardConnectionService.CreateServiceAsync(
+            readerSpec,
+            NullLogger<SmartCardService>.Instance,
+            CancellationToken.None
+        );
+        Assert.That(serviceResult.IsSuccess, Is.True, () => serviceResult.Error.ToString());
+        using var service = serviceResult.Value;
+
+        byte[] command = [0x00, 0x82, 0x01, 0x00, 0x08, 0, 0, 0, 0, 0, 0, 0, 0];
+        var response = await service.SendCommandAsync(command, CancellationToken.None);
+
+        Assert.That(response.IsSuccess, Is.True, () => response.Error.ToString());
+        Assert.That(response.Value.StatusWord.Value, Is.EqualTo(0x6E00));
     }
 }

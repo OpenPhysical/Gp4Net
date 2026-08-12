@@ -110,12 +110,22 @@ public static class Commands
     /// </summary>
     /// <param name="subset">The subset of entities to query.</param>
     /// <param name="searchCriteria">Optional search criteria.</param>
+    /// <param name="occurrence">The occurrence selection.</param>
+    /// <param name="tagList">Optional response tag list.</param>
     public static Result<GetStatusCommand, SmartCardError> CreateGetStatusCommand(
         GetStatusCommand.StatusSubset subset,
-        Maybe<byte[]> searchCriteria = default
+        Maybe<byte[]> searchCriteria = default,
+        GetStatusCommand.OccurrenceMode occurrence = GetStatusCommand.OccurrenceMode.FirstOrAll,
+        Maybe<byte[]> tagList = default
     )
     {
-        return GetStatusCommand.Create(subset, GetStatusCommand.ResponseFormat.Tlv, searchCriteria);
+        return GetStatusCommand.Create(
+            subset,
+            GetStatusCommand.ResponseFormat.Tlv,
+            searchCriteria,
+            occurrence,
+            tagList
+        );
     }
 
     /// <summary>
@@ -144,12 +154,14 @@ public static class Commands
 
     /// <summary>
     /// Creates a PUT KEY command.
-    /// Reference: GlobalPlatform Card Specification v2.3.1 Section 11.7
+    /// Reference: GlobalPlatform Card Specification v2.3.1 Section 11.8
     /// </summary>
     /// <param name="keyVersion">The key version number.</param>
+    /// <param name="firstKeyIdentifier">Identifier of the first supplied key.</param>
     /// <param name="keyDataBlocks">The key data blocks to install.</param>
     public static Result<PutKeyCommand, SmartCardError> CreatePutKeyCommand(
         byte keyVersion,
+        byte firstKeyIdentifier,
         KeyDataBlock[] keyDataBlocks
     )
     {
@@ -157,7 +169,7 @@ public static class Commands
             ? Result.Failure<PutKeyCommand, SmartCardError>(
                 SmartCardError.InvalidArgument("Key data blocks cannot be empty")
             )
-            : PutKeyCommand.Create(keyVersion, keyDataBlocks.ToList());
+            : PutKeyCommand.Create(keyVersion, keyDataBlocks.ToList(), firstKeyIdentifier);
     }
 
     /// <summary>

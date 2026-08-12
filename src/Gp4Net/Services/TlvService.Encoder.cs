@@ -160,12 +160,6 @@ public static partial class TlvService
         {
             var lengthValue = length.LengthValue;
 
-            // Check for GP-specific encoding: length 128 as 0x80
-            if (lengthValue == 128 && !useLongForm)
-            {
-                return Result.Success<ImmutableArray<byte>, SmartCardError>([0x80]);
-            }
-
             // Short form (if length <= 127 and not forcing long form)
             if (
                 lengthValue <= Constants.Constants.Tlv.Parsing.MAX_SHORT_FORM_LENGTH

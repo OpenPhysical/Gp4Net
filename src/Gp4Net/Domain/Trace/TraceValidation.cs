@@ -278,7 +278,7 @@ public static class TraceValidation
                                             SecurityLevel.CMac,
                                             ScpVersion.Scp02,
                                             new byte[8],
-                                            0x00
+                                            (byte)state.ScpImplementation
                                         )
                                         .Bind(initialState =>
                                             initialState.UpdateCounterAndMac(0, macState)
@@ -343,7 +343,7 @@ public static class TraceValidation
                                             (SecurityLevel)securityLevel,
                                             ScpVersion.Scp03,
                                             new byte[16],
-                                            0x00
+                                            (byte)state.ScpImplementation
                                         )
                                         .Bind(initialState =>
                                             initialState.UpdateCounterAndMac(0, macState)
@@ -365,10 +365,6 @@ public static class TraceValidation
                                                 .WithSecurityLevel(securityLevel)
                                                 .WithCommandIcv(newState.MacChainingValue)
                                                 .WithEncryptionCounter(newState.EncryptionCounter);
-
-                                            DebugLog(
-                                                $"Derived SCP03 session keys SEnc={Convert.ToHexString(sessionKeys.SEnc)} SMac={Convert.ToHexString(sessionKeys.SMac)} SRmac={Convert.ToHexString(sessionKeys.SrMac)}"
-                                            );
 
                                             return updatedState.AddResult(
                                                 ValidationResult.Success(
@@ -616,7 +612,9 @@ public static class TraceValidation
                         (SecurityLevel)traceState.SecurityLevel,
                         traceState.ScpVersion,
                         icv,
-                        0x00
+                        // GP Card Specification v2.3.1, Table E-1, and SCP03
+                        // Amendment D v1.1.2, Table 5-1 define protocol behavior in i.
+                        (byte)traceState.ScpImplementation
                     )
                     .Bind(state =>
                         state.UpdateCounterAndMac(traceState.EncryptionCounter, macState)
@@ -683,7 +681,9 @@ public static class TraceValidation
                     keyDiversificationData,
                     keyVersion,
                     detectedVersion,
-                    0x00,
+                    // GP Card Specification v2.3.1, E.1.1 lists i=15 as an SCP02
+                    // implementation profile; INITIALIZE UPDATE does not carry SCP02 i.
+                    (byte)ScpImplementation.Scp02I15,
                     cardChallenge,
                     cardCryptogram,
                     sequenceCounter
@@ -866,7 +866,9 @@ public static class TraceValidation
                             cryptogramData
                         )
                     )
-                    .Map(calculatedCryptogram => calculatedCryptogram.SequenceEqual(cardCryptogram))
+                    .Map(calculatedCryptogram =>
+                        CryptoService.Utils.CompareBytes(calculatedCryptogram, cardCryptogram)
+                    )
             );
     }
 
@@ -892,7 +894,10 @@ public static class TraceValidation
                         )
                     )
                     .Map(calculatedCryptogram =>
-                        calculatedCryptogram.Take(8).SequenceEqual(cardCryptogram)
+                        CryptoService.Utils.CompareBytes(
+                            calculatedCryptogram.Take(8).ToArray(),
+                            cardCryptogram
+                        )
                     )
             );
     }

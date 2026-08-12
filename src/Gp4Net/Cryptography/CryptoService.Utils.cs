@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Security;
@@ -207,14 +208,7 @@ public static partial class CryptoService
         /// <returns>True if arrays are equal, false otherwise.</returns>
         public static bool CompareBytes(byte[] a, byte[] b)
         {
-            if (a.Length != b.Length)
-            {
-                return false;
-            }
-
-            int result = a.Zip(b, (x, y) => x ^ y).Aggregate(0, (acc, xor) => acc | xor);
-
-            return result == 0;
+            return CryptographicOperations.FixedTimeEquals(a, b);
         }
 
         /// <summary>

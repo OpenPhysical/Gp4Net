@@ -13,6 +13,7 @@ using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain;
+using Gp4Net.Domain.CardInfo;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
@@ -177,6 +178,7 @@ public static partial class ScpService
                     => await EstablishScp02Async(
                         cardService,
                         scp02KeySet,
+                        (byte)ScpImplementation.Scp02I15,
                         securityLevel,
                         cancellationToken
                     ),
@@ -235,8 +237,10 @@ public static partial class ScpService
             CancellationToken cancellationToken = default
         )
         {
-            // Query card capabilities first (optional, may fail)
-            _ = await QueryCardCapabilities(cardService, cancellationToken);
+            var cardCapabilities = await QueryCardCapabilities(cardService, cancellationToken);
+            Maybe<byte> scp02Implementation = cardCapabilities.IsSuccess
+                ? FindScp02Implementation(cardCapabilities.Value)
+                : Maybe<byte>.None;
 
             // GP Card Spec 2.3.1, B.4.3 and SCP03 1.1.2, 5.2 require a fresh
             // unpredictable host challenge for each authentication attempt.
@@ -278,6 +282,7 @@ public static partial class ScpService
                     },
                     hostChallenge,
                     initializeUpdateResult.Value,
+                    scp02Implementation,
                     securityLevel,
                     cancellationToken
                 );
@@ -306,6 +311,7 @@ public static partial class ScpService
             RawKeyset rawKeyset,
             byte[] hostChallenge,
             InitializeUpdateResponse initUpdateResponse,
+            Maybe<byte> scp02Implementation,
             SecurityLevel securityLevel,
             CancellationToken cancellationToken
         )
@@ -327,7 +333,10 @@ public static partial class ScpService
                                     => await ProcessScp02InitializeUpdate(
                                             initUpdateResponse,
                                             hostChallenge,
-                                            (Scp02KeySet)typedKeyset
+                                            (Scp02KeySet)typedKeyset,
+                                            scp02Implementation.GetValueOrDefault(
+                                                (byte)ScpImplementation.Scp02I15
+                                            )
                                         )
                                         .Bind(async context =>
                                             await SendExternalAuthenticate(
@@ -467,6 +476,7 @@ public static partial class ScpService
                     => await EstablishScp02Async(
                         cardService,
                         scp02KeySet,
+                        scpOption.Implementation,
                         securityLevel,
                         cancellationToken
                     ),
@@ -491,6 +501,7 @@ public static partial class ScpService
         > EstablishScp02Async(
             ISmartCardService cardService,
             Scp02KeySet keySet,
+            byte implementationParameter,
             SecurityLevel securityLevel,
             CancellationToken cancellationToken
         )
@@ -510,7 +521,12 @@ public static partial class ScpService
                     cancellationToken
                 )
                 .Bind(async response =>
-                    await ProcessScp02InitializeUpdate(response, hostChallenge, keySet)
+                    await ProcessScp02InitializeUpdate(
+                        response,
+                        hostChallenge,
+                        keySet,
+                        implementationParameter
+                    )
                 )
                 .Bind(async context =>
                     await SendExternalAuthenticate(
@@ -635,6 +651,25 @@ public static partial class ScpService
                     _ => Result.Success<byte[], SmartCardError>([]) // Optional, can fail
                 );
 
+        private static Maybe<byte> FindScp02Implementation(byte[] cardData) =>
+            CardDataInfo
+                .Parse(cardData)
+                .Match(
+                    parsed =>
+                        parsed.Oids.FirstOrDefault(oid =>
+                            GlobalPlatformOids.TryGetScpImplementation(oid, 0x02, out _)
+                        )
+                            is string oid
+                        && GlobalPlatformOids.TryGetScpImplementation(
+                            oid,
+                            0x02,
+                            out byte implementation
+                        )
+                            ? Maybe<byte>.From(implementation)
+                            : Maybe<byte>.None,
+                    _ => Maybe<byte>.None
+                );
+
         private static async Task<
             Result<InitializeUpdateResponse, SmartCardError>
         > SendInitializeUpdate(
@@ -658,7 +693,8 @@ public static partial class ScpService
         > ProcessScp02InitializeUpdate(
             InitializeUpdateResponse response,
             byte[] hostChallenge,
-            Scp02KeySet keySet
+            Scp02KeySet keySet,
+            byte implementationParameter
         ) =>
             Task.FromResult(
                 KeyDerivationContext
@@ -667,7 +703,7 @@ public static partial class ScpService
                         hostChallenge,
                         response.CardChallenge,
                         response.SequenceCounter,
-                        (ScpImplementation)response.ImplementationParameter
+                        (ScpImplementation)implementationParameter
                     )
                     .Bind(context =>
                         CryptoService
@@ -683,7 +719,8 @@ public static partial class ScpService
                             response,
                             sessionKeys,
                             CryptoService.ScpVersion.Scp02,
-                            keySet
+                            keySet,
+                            implementationParameter
                         )
                     )
             );
@@ -718,7 +755,8 @@ public static partial class ScpService
                             response,
                             sessionKeys,
                             CryptoService.ScpVersion.Scp03,
-                            keySet
+                            keySet,
+                            response.ImplementationParameter
                         )
                     )
             );
@@ -945,7 +983,7 @@ public static partial class ScpService
                             securityLevel,
                             context.Protocol,
                             initialChaining,
-                            context.InitializeUpdateResponse.ImplementationParameter
+                            context.ImplementationParameter
                         )
                         .Map(state =>
                             state with
@@ -1000,7 +1038,7 @@ public static partial class ScpService
                 KeyDiversificationData: [.. response.KeyDiversificationData],
                 KeyVersion: response.KeyVersion,
                 ScpId: response.ScpId,
-                ImplementationParameter: response.ImplementationParameter,
+                ImplementationParameter: context.ImplementationParameter,
                 SequenceCounter: response.SequenceCounter,
                 CardChallenge: [.. response.CardChallenge],
                 CardCryptogram: [.. response.CardCryptogram],

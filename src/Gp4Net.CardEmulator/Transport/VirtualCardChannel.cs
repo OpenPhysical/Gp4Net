@@ -61,7 +61,7 @@ public sealed class VirtualCardChannel : ICardChannel
         var result = _virtualCard.ProcessCommand(command);
         return result.Match(
             success => Task.FromResult(BuildResponseBytes(success.Response)),
-            error => Task.FromResult(new byte[] { 0x6F, 0x00 })
+            error => Task.FromResult(VirtualCardErrorResponse.ToBytes(error))
         );
     }
 

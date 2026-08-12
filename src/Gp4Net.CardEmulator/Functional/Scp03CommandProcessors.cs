@@ -115,8 +115,17 @@ public static class Scp03CommandProcessors
                 logging.LogDebug("VerifyScp03HostCryptogram: FAILED - {Error}", error.Message)
             )
             .Bind(request => DeriveScp03SessionKeys(request, state, rngContext))
+            .Bind(result =>
+                VerifyScp03ExternalAuthenticateMac(result.request, result.sessionKeys)
+                    .Map(fullMac => (result.sessionKeys, result.request, fullMac))
+            )
             .Map(result =>
-                CreateScp03ExternalAuthResponse(result.sessionKeys, result.request, state)
+                CreateScp03ExternalAuthResponse(
+                    result.sessionKeys,
+                    result.request,
+                    result.fullMac,
+                    state
+                )
             );
     }
 
@@ -234,7 +243,7 @@ public static class Scp03CommandProcessors
     {
         // Generate SCP03 card challenge per GlobalPlatform Card Specification v2.3.1 Section 6.2.2.1
 
-        // SCP03 Amendment D v1.2, Table 5-1: b5 selects pseudo-random challenge generation.
+        // SCP03 Amendment D v1.1.2, Table 5-1: b5 selects pseudo-random challenge generation.
         if (state.ScpImplementation.UsesScp03PseudoRandomChallenge())
         {
             // Using pseudo-random challenge generation (i=70)
@@ -421,7 +430,11 @@ public static class Scp03CommandProcessors
             return SmartCardError.WrongLength();
         }
 
-        if (command[0] != 0x84 && command[0] != 0x00 || command[1] != 0x82)
+        // SCP03 Amendment D v1.1.2, Sections 6.2.3 and 7.1.2.
+        if (command[0] is < 0x84 or > 0x87)
+            return SmartCardError.FromStatusWord(0x6E00);
+
+        if (command[1] != 0x82)
         {
             logger.Match(
                 l =>
@@ -439,6 +452,9 @@ public static class Scp03CommandProcessors
         byte p2 = command[3];
         byte lc = command[4];
 
+        if (p2 != 0x00)
+            return SmartCardError.IncorrectP1P2("EXTERNAL AUTHENTICATE P2 must be 00");
+
         logger.Match(
             l =>
                 l.LogDebug(
@@ -454,81 +470,25 @@ public static class Scp03CommandProcessors
             () => { }
         );
 
-        // For SCP03, EXTERNAL AUTHENTICATE command format depends on secure messaging:
-        // - CLA=0x00 (no secure messaging): 5 bytes header + 8 bytes host cryptogram = 13 bytes total
-        // - CLA=0x84 (secure messaging): 5 bytes header + 8 bytes host cryptogram + 8 bytes MAC = 21 bytes total
-        if (command[0] == 0x84) // Secure messaging with MAC
+        if (lc != 16 || command.Length != 21)
         {
-            if (lc != 16 || command.Length != 21) // LC includes both host cryptogram (8) and MAC (8)
-            {
-                logger.Match(
-                    l =>
-                        l.LogError(
-                            "SCP03 EXTERNAL AUTHENTICATE: Wrong length for secure messaging - Lc={Lc}, command.Length={Length}",
-                            lc,
-                            command.Length
-                        ),
-                    () => { }
-                );
-                return SmartCardError.WrongLength();
-            }
-
-            byte[] hostCryptogram = command.Skip(5).Take(8).ToArray();
-            byte[] hostMac = command.Skip(13).Take(8).ToArray(); // MAC follows the host cryptogram
-
             logger.Match(
                 l =>
                     l.LogDebug(
-                        "SCP03 EXTERNAL AUTHENTICATE: Host Cryptogram={HostCryptogram}",
-                        Convert.ToHexString(hostCryptogram)
+                        "SCP03 EXTERNAL AUTHENTICATE: Wrong length - Lc={Lc}, command.Length={Length}",
+                        lc,
+                        command.Length
                     ),
                 () => { }
             );
-            logger.Match(
-                l =>
-                    l.LogDebug(
-                        "SCP03 EXTERNAL AUTHENTICATE: Host MAC={HostMac}",
-                        Convert.ToHexString(hostMac)
-                    ),
-                () => { }
-            );
-
-            return Result.Success<ExternalAuthenticateRequest, SmartCardError>(
-                new ExternalAuthenticateRequest(securityLevel, hostCryptogram, hostMac)
-            );
+            return SmartCardError.WrongLength();
         }
-        else // No secure messaging (CLA=0x00)
-        {
-            if (lc != 8 || command.Length != 13) // Only host cryptogram
-            {
-                logger.Match(
-                    l =>
-                        l.LogError(
-                            "SCP03 EXTERNAL AUTHENTICATE: Wrong length for non-secure messaging - Lc={Lc}, command.Length={Length}",
-                            lc,
-                            command.Length
-                        ),
-                    () => { }
-                );
-                return SmartCardError.WrongLength();
-            }
 
-            byte[] hostCryptogram = command.Skip(5).Take(8).ToArray();
-            byte[] hostMac = []; // No MAC for non-secure messaging
-
-            logger.Match(
-                l =>
-                    l.LogDebug(
-                        "SCP03 EXTERNAL AUTHENTICATE: Host Cryptogram={HostCryptogram} (no MAC)",
-                        Convert.ToHexString(hostCryptogram)
-                    ),
-                () => { }
-            );
-
-            return Result.Success<ExternalAuthenticateRequest, SmartCardError>(
-                new ExternalAuthenticateRequest(securityLevel, hostCryptogram, hostMac)
-            );
-        }
+        byte[] hostCryptogram = command.Skip(5).Take(8).ToArray();
+        byte[] hostMac = command.Skip(13).Take(8).ToArray();
+        return Result.Success<ExternalAuthenticateRequest, SmartCardError>(
+            new ExternalAuthenticateRequest(securityLevel, hostCryptogram, hostMac, command[0])
+        );
     }
 
     private static Result<
@@ -574,7 +534,8 @@ public static class Scp03CommandProcessors
 
         // Validate security level for SCP03
         // Valid levels: 0x01 (C-MAC), 0x03 (C-DECRYPTION), 0x10 (R-MAC), 0x11 (C-MAC + R-MAC), 0x30 (R-MAC + R-ENC), 0x33 (C-DECRYPTION + R-MAC + R-ENC)
-        int[] validLevels = [0x01, 0x03, 0x10, 0x11, 0x30, 0x33];
+        // SCP03 Amendment D v1.1.2, Section 7.1.2.3, Table 7-6.
+        int[] validLevels = [0x00, 0x01, 0x03, 0x11, 0x13, 0x33];
         if (!validLevels.Contains(request.SecurityLevel))
         {
             logger.Match(
@@ -680,9 +641,7 @@ public static class Scp03CommandProcessors
                                     );
                                 }
 
-                                // CRITICAL FIX: Derive session keys BEFORE verifying cryptogram
-                                // Per GP Card Spec v2.3.1 Amendment D Section 6.2.2.3:
-                                // "The host cryptogram is calculated using the session key S-MAC"
+                                // SCP03 Amendment D v1.1.2, Section 6.2.2.3.
                                 return KeyDerivationContext
                                     .CreateForScp03(
                                         scp03Keys,
@@ -703,27 +662,9 @@ public static class Scp03CommandProcessors
                                             )
                                             .Bind(expectedCryptogram =>
                                             {
-                                                logger.Match(
-                                                    l =>
-                                                        l.LogDebug(
-                                                            "Expected Host Cryptogram: {Expected}",
-                                                            Convert.ToHexString(expectedCryptogram)
-                                                        ),
-                                                    () => { }
-                                                );
-                                                logger.Match(
-                                                    l =>
-                                                        l.LogDebug(
-                                                            "Received Host Cryptogram: {Received}",
-                                                            Convert.ToHexString(
-                                                                request.HostCryptogram
-                                                            )
-                                                        ),
-                                                    () => { }
-                                                );
-
                                                 if (
-                                                    !request.HostCryptogram.SequenceEqual(
+                                                    !CryptoService.Utils.CompareBytes(
+                                                        request.HostCryptogram,
                                                         expectedCryptogram
                                                     )
                                                 )
@@ -850,38 +791,22 @@ public static class Scp03CommandProcessors
     private static (ApduResponse, CardState) CreateScp03ExternalAuthResponse(
         SessionKeys sessionKeys,
         ExternalAuthenticateRequest request,
+        byte[] fullMac,
         CardState state,
         Maybe<ILogger> logger = default
     )
     {
         logger.Match(l => l.LogDebug("SCP03 EXTERNAL AUTHENTICATE: Creating response"), () => { });
 
-        // Map requested security level to internal representation
-        byte securityLevelByte = request.SecurityLevel switch
-        {
-            0x01 => 0x01, // C-MAC
-            0x03 => 0x03, // C-DECRYPTION
-            0x10 => 0x10, // R-MAC only
-            0x11 => 0x11, // C-MAC + R-MAC
-            0x30 => 0x30, // R-MAC + R-ENC
-            0x33 => 0x33, // C-DECRYPTION + R-MAC + R-ENC
-            _ => 0x01, // Default C-MAC
-        };
+        var securityLevel = (SecurityLevel)request.SecurityLevel;
 
-        var securityLevel = (SecurityLevel)securityLevelByte;
-
-        // Calculate the MAC chaining value from the EXTERNAL AUTHENTICATE MAC
-        // Per SCP03 spec, this becomes the chaining value for subsequent operations
-        var initialMacChaining = CalculateExternalAuthenticateMacChaining(request, state);
-
-        // Create functional secure channel state
         var secureChannelStateResult = SecureChannelState.Create(
             sessionKeys: sessionKeys,
             securityLevel: securityLevel,
             protocolVersion: (CryptoService.ScpVersion)
                 Gp4Net.Constants.Constants.GlobalPlatform.Protocols.SCP03,
-            initialMacChainingValue: initialMacChaining.ToArray(),
-            implementationParameter: 0x00
+            initialMacChainingValue: fullMac,
+            implementationParameter: (byte)state.ScpImplementation
         );
 
         if (secureChannelStateResult.IsFailure)
@@ -910,14 +835,13 @@ public static class Scp03CommandProcessors
 
         var secureChannelState = secureChannelStateResult.Value;
 
-        // Update state with established secure channel
         var newState = state.WithSecureChannel(secureChannelState);
 
         logger.Match(
             l =>
                 l.LogDebug(
                     "SCP03 EXTERNAL AUTHENTICATE: Secure channel established with security level 0x{SecurityLevel:X2}",
-                    securityLevelByte
+                    request.SecurityLevel
                 ),
             () => { }
         );
@@ -931,58 +855,38 @@ public static class Scp03CommandProcessors
     /// Per SCP03 specification, the MAC chaining value for subsequent operations
     /// is the full 16-byte MAC of the EXTERNAL AUTHENTICATE command.
     /// </summary>
-    private static ImmutableArray<byte> CalculateExternalAuthenticateMacChaining(
+    // SCP03 Amendment D v1.1.2, Sections 6.2.3 and 6.2.4.
+    private static Result<byte[], SmartCardError> VerifyScp03ExternalAuthenticateMac(
         ExternalAuthenticateRequest request,
-        CardState state
+        SessionKeys sessionKeys
     )
     {
-        if (state.HostChallenge.HasNoValue || state.CurrentKeys.HasNoValue)
-        {
-            // Fallback to padded version if we can't calculate properly
-            byte[] fallbackMac = new byte[16];
-            Array.Copy(request.HostMac, 0, fallbackMac, 0, 8);
-            return [.. fallbackMac];
-        }
+        byte[] macInput =
+        [
+            request.Cla,
+            0x82,
+            request.SecurityLevel,
+            0x00,
+            0x10,
+            .. request.HostCryptogram,
+        ];
 
-        // Create EXTERNAL AUTHENTICATE command for MAC calculation
-        var externalAuthCommandResult = ExternalAuthenticateCommand.CreateWithoutMac(
-            (SecurityLevel)request.SecurityLevel,
-            request.HostCryptogram
-        );
-
-        if (externalAuthCommandResult.IsFailure)
-        {
-            // Fallback to padded version on error
-            byte[] fallbackMac = new byte[16];
-            Array.Copy(request.HostMac, 0, fallbackMac, 0, 8);
-            return [.. fallbackMac];
-        }
-
-        var externalAuthCommand = externalAuthCommandResult.Value;
-
-        // Use simple MAC chaining initialization for SCP03
-        return state.CurrentKeys.Match(
-            currentKeys =>
-            {
-                // For SCP03, use a simple 16-byte zero initialization
-                byte[] mac = new byte[16];
-                Array.Copy(request.HostMac, 0, mac, 0, Math.Min(request.HostMac.Length, 16));
-                return [.. mac];
-            },
-            () =>
-            {
-                // Fallback to padded version if no current keys
-                byte[] fallbackMac = new byte[16];
-                Array.Copy(
-                    request.HostMac,
-                    0,
-                    fallbackMac,
-                    0,
-                    Math.Min(request.HostMac.Length, 16)
-                );
-                return ImmutableArray.Create(fallbackMac);
-            }
-        );
+        return CryptoService
+            .ScpOperations.Scp03.CalculateCommandMac(
+                macInput,
+                sessionKeys.SMac,
+                Gp4Net.Constants.Constants.Scp.Common.ZeroChaining16
+            )
+            .Bind(fullMac =>
+                System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                    fullMac.AsSpan(0, 8),
+                    request.HostMac
+                )
+                    ? Result.Success<byte[], SmartCardError>(fullMac)
+                    : Result.Failure<byte[], SmartCardError>(
+                        SmartCardError.SecurityStatusNotSatisfied()
+                    )
+            );
     }
 
     // Utility methods

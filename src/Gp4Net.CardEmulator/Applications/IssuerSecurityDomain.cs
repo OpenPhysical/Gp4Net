@@ -267,23 +267,39 @@ public sealed record IssuerSecurityDomain : IApplication
         IRngContext rngContext
     )
     {
-        return CommandProcessors
-            .ProcessExternalAuthenticate(
-                command,
-                cardState,
-                config,
-                rngContext,
-                LoggingService.None
-            )
-            .Map(result =>
-            {
-                var (response, updatedState) = result;
-                return new ApplicationCommandResult(
-                    this,
-                    updatedState,
-                    ToApplicationResponse(response)
-                );
-            });
+        Result<(CoreApduResponse, CardState), SmartCardError> result = cardState.ScpVersion switch
+        {
+            0x02
+                => Scp02CommandProcessors.ProcessScp02ExternalAuthenticate(
+                    command,
+                    cardState,
+                    config,
+                    rngContext,
+                    LoggingService.None
+                ),
+            0x03
+                => Scp03CommandProcessors.ProcessScp03ExternalAuthenticate(
+                    command,
+                    cardState,
+                    config,
+                    rngContext,
+                    LoggingService.None
+                ),
+            _
+                => Result.Failure<(CoreApduResponse, CardState), SmartCardError>(
+                    SmartCardError.ConditionsNotSatisfied()
+                ),
+        };
+
+        return result.Map(result =>
+        {
+            var (response, updatedState) = result;
+            return new ApplicationCommandResult(
+                this,
+                updatedState,
+                ToApplicationResponse(response)
+            );
+        });
     }
 
     private Result<ApplicationCommandResult, SmartCardError> ProcessGetStatus(
@@ -439,19 +455,23 @@ public sealed record IssuerSecurityDomain : IApplication
         IRngContext rngContext
     )
     {
-        return ProcessPutKeyCommand(command, cardState, rngContext)
+        return global::Gp4Net
+            .CardEmulator.Core.VirtualCard.ProcessPutKeyCommand(command, cardState, config)
             .Match(
                 result =>
                     Result.Success<ApplicationCommandResult, SmartCardError>(
-                        new ApplicationCommandResult(result.Item1, cardState, result.Item2)
+                        new ApplicationCommandResult(
+                            this with
+                            {
+                                InstalledKeys = result.Item2.InstalledKeys
+                            },
+                            result.Item2,
+                            ToApplicationResponse(result.Item1)
+                        )
                     ),
                 error =>
                     Result.Success<ApplicationCommandResult, SmartCardError>(
-                        new ApplicationCommandResult(
-                            this,
-                            cardState,
-                            ApplicationApduResponse.ConditionsNotSatisfied()
-                        )
+                        new ApplicationCommandResult(this, cardState, ToApplicationResponse(error))
                     )
             );
     }
@@ -511,6 +531,14 @@ public sealed record IssuerSecurityDomain : IApplication
     private static ApplicationApduResponse ToApplicationResponse(CoreApduResponse response)
     {
         return ApplicationApduResponse.From(response.Data, response.StatusWord);
+    }
+
+    private static ApplicationApduResponse ToApplicationResponse(SmartCardError error)
+    {
+        return ApplicationApduResponse.From(
+            [],
+            error.StatusWord.GetValueOrDefault(GpConstants.StatusWords.Legacy.IncorrectData)
+        );
     }
 
     private Maybe<IKeySet> GetKeySet(byte keyVersion)
@@ -618,17 +646,6 @@ public sealed record IssuerSecurityDomain : IApplication
 
         return Result.Success<(IApplication, ApplicationApduResponse), SmartCardError>(
             (this, ApplicationApduResponse.Success(responseData))
-        );
-    }
-
-    private Result<(IApplication, ApplicationApduResponse), SmartCardError> ProcessPutKeyCommand(
-        byte[] command,
-        CardState cardState,
-        IRngContext rngContext
-    )
-    {
-        return Result.Success<(IApplication, ApplicationApduResponse), SmartCardError>(
-            (this, ApplicationApduResponse.ConditionsNotSatisfied())
         );
     }
 

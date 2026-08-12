@@ -29,18 +29,16 @@ public class Scp03ProtocolValidationTests
         "404142434445464748494A4B4C4D4E4F"
     );
 
-    /// <summary>SCP03 Amendment D v1.2, Table 5-1.</summary>
+    /// <summary>SCP03 Amendment D v1.1.2, Table 5-1.</summary>
     [Test]
-    [TestCase(0x00, false, false, false, false)]
-    [TestCase(0x01, true, false, false, false)]
-    [TestCase(0x10, false, true, false, false)]
-    [TestCase(0x20, false, false, true, false)]
-    [TestCase(0x31, true, true, true, false)]
-    [TestCase(0x60, false, false, true, true)]
-    [TestCase(0x71, true, true, true, true)]
+    [TestCase(0x00, false, false, false)]
+    [TestCase(0x10, true, false, false)]
+    [TestCase(0x20, false, true, false)]
+    [TestCase(0x30, true, true, false)]
+    [TestCase(0x60, false, true, true)]
+    [TestCase(0x70, true, true, true)]
     public void Scp03_Should_Decode_Implementation_Parameter_Bitmap(
         byte implParam,
-        bool s16,
         bool pseudoRandom,
         bool rMac,
         bool rEncryption
@@ -48,10 +46,24 @@ public class Scp03ProtocolValidationTests
     {
         var scpImpl = (ScpImplementation)implParam;
 
-        _ = scpImpl.UsesScp03S16Mode().Should().Be(s16);
         _ = scpImpl.UsesScp03PseudoRandomChallenge().Should().Be(pseudoRandom);
         _ = scpImpl.HasRMacSupport().Should().Be(rMac);
         _ = scpImpl.HasScp03ResponseEncryption().Should().Be(rEncryption);
+    }
+
+    /// <summary>SCP03 Amendment D v1.1.2, Table 5-1: b4 through b1 are RFU and set to zero.</summary>
+    [TestCase(0x01)]
+    [TestCase(0x11)]
+    [TestCase(0x21)]
+    [TestCase(0x31)]
+    [TestCase(0x61)]
+    [TestCase(0x71)]
+    public void Scp03_Should_Reject_Rfu_Low_Bits(byte implementation)
+    {
+        _ = CryptoService
+            .ScpOperations.Common.IsValidScp03Implementation(implementation)
+            .Should()
+            .BeFalse();
     }
 
     /// <summary>
@@ -253,6 +265,15 @@ public class Scp03ProtocolValidationTests
         _ = result.newState.EncryptionCounter.Should().Be(1);
         byte[] ciphertext = result.securedCommand.Udc[..^8];
         _ = ciphertext.Should().NotEqual(plaintext);
+        byte[] macInput = [0x84, 0xE2, 0x80, 0x00, 0x18, .. ciphertext];
+        byte[] expectedMac = CryptoService
+            .ScpOperations.Scp03.CalculateCommandMac(macInput, sMac, new byte[16])
+            .Value[..8];
+        _ = result.securedCommand.Udc[^8..].Should().Equal(expectedMac);
+        _ = ScpService
+            .Security.RemoveCommandSecurity(result.securedCommand, state)
+            .IsSuccess.Should()
+            .BeTrue();
         byte[] decrypted = CryptoService
             .ScpOperations.Scp03.RemoveCommandEncryption(
                 new WSCT.ISO7816.CommandAPDU(
@@ -268,6 +289,54 @@ public class Scp03ProtocolValidationTests
             )
             .Value[5..];
         _ = decrypted.Should().Equal(plaintext);
+    }
+
+    [Test]
+    public void Scp03_CEncryption_Should_Reject_Data_That_Cannot_Fit_ShortLc()
+    {
+        // SCP03 Amendment D v1.1.2, section 6.2.6; GP Card Specification v2.3.1,
+        // section 11.1.5.
+        byte[] sEnc = Convert.FromHexString("00112233445566778899AABBCCDDEEFF");
+        var maximum = new WSCT.ISO7816.CommandAPDU(0x80, 0xE8, 0x00, 0x00, 239, new byte[239]);
+        var overflow = new WSCT.ISO7816.CommandAPDU(0x80, 0xE8, 0x00, 0x00, 240, new byte[240]);
+
+        _ = CryptoService
+            .ScpOperations.Scp03.ApplyCommandEncryption(maximum.BinaryCommand, sEnc, 1)
+            .IsSuccess.Should()
+            .BeTrue();
+        _ = CryptoService
+            .ScpOperations.Scp03.ApplyCommandEncryption(overflow.BinaryCommand, sEnc, 1)
+            .IsFailure.Should()
+            .BeTrue();
+    }
+
+    [Test]
+    public void Scp03_CMac_Should_Verify_NonGpClass_Command()
+    {
+        // SCP03 Amendment D v1.1.2, section 6.2.4.
+        byte[] sMac = Convert.FromHexString("0102030405060708090A0B0C0D0E0F10");
+        var state = SecureChannelState
+            .Create(
+                new SessionKeys(new byte[16], sMac, new byte[16]),
+                SecurityLevel.CMac,
+                CryptoService.ScpVersion.Scp03,
+                new byte[16],
+                0x70
+            )
+            .Value;
+        var command = new WSCT.ISO7816.CommandAPDU(
+            0x00,
+            0xA4,
+            0x04,
+            0x00,
+            5,
+            Convert.FromHexString("A000000001")
+        );
+
+        var secured = ScpService.Security.ApplyCommandSecurity(command, state).Value.securedCommand;
+
+        _ = secured.Cla.Should().Be(0x04);
+        _ = ScpService.Security.RemoveCommandSecurity(secured, state).IsSuccess.Should().BeTrue();
     }
 
     [Test]

@@ -17,7 +17,7 @@ namespace Gp4Net.Domain.Commands;
 public class PutKeyCommand : IApduCommand
 {
     /// <summary>
-    /// Key usage qualifier values for P1.
+    /// Key usage qualifier values.
     /// </summary>
     public enum KeyUsageQualifier : byte
     {
@@ -38,7 +38,7 @@ public class PutKeyCommand : IApduCommand
     }
 
     /// <summary>
-    /// Key encryption key identifier values for P2.
+    /// Key encryption key identifier values.
     /// </summary>
     public enum KeyEncryptionKeyIdentifier : byte
     {
@@ -187,10 +187,12 @@ public class PutKeyCommand : IApduCommand
     /// </summary>
     /// <param name="keyVersion">The key version number.</param>
     /// <param name="keyDataBlocks">The key data blocks.</param>
+    /// <param name="firstKeyIdentifier">Identifier of the first supplied key.</param>
     /// <returns>A Result containing the PutKeyCommand or an error.</returns>
     public static Result<PutKeyCommand, SmartCardError> Create(
         byte keyVersion,
-        IList<KeyDataBlock> keyDataBlocks
+        IList<KeyDataBlock> keyDataBlocks,
+        byte firstKeyIdentifier
     )
     {
         if (keyDataBlocks == null)
@@ -207,7 +209,7 @@ public class PutKeyCommand : IApduCommand
         var usageQualifier =
             keyDataBlocks.Count == 1 ? KeyUsageQualifier.SingleKey : KeyUsageQualifier.MultipleKeys;
 
-        return CreateReplacement(0x00, keyVersion, 0x01, keyDataBlocks);
+        return CreateReplacement(0x00, keyVersion, firstKeyIdentifier, keyDataBlocks);
     }
 
     public static Result<PutKeyCommand, SmartCardError> CreateReplacement(

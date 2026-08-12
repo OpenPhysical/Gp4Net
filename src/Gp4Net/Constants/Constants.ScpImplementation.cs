@@ -169,38 +169,20 @@ public enum ScpImplementation : byte
     /// <summary>SCP03 i=00: S8, random challenge, no response protection.</summary>
     Scp03I00 = 0x00,
 
-    /// <summary>SCP03 i=01: S16, random challenge, no response protection.</summary>
-    Scp03I01 = 0x01,
-
     /// <summary>SCP03 i=10: S8, pseudo-random challenge, no response protection.</summary>
     Scp03I10 = 0x10,
-
-    /// <summary>SCP03 i=11: S16, pseudo-random challenge, no response protection.</summary>
-    Scp03I11 = 0x11,
 
     /// <summary>SCP03 i=20: S8, random challenge, R-MAC.</summary>
     Scp03I20 = 0x20,
 
-    /// <summary>SCP03 i=21: S16, random challenge, R-MAC.</summary>
-    Scp03I21 = 0x21,
-
     /// <summary>SCP03 i=30: S8, pseudo-random challenge, R-MAC.</summary>
     Scp03I30 = 0x30,
-
-    /// <summary>SCP03 i=31: S16, pseudo-random challenge, R-MAC.</summary>
-    Scp03I31 = 0x31,
 
     /// <summary>SCP03 i=60: S8, random challenge, R-MAC and R-ENC.</summary>
     Scp03I60 = 0x60,
 
-    /// <summary>SCP03 i=61: S16, random challenge, R-MAC and R-ENC.</summary>
-    Scp03I61 = 0x61,
-
     /// <summary>SCP03 i=70: S8, pseudo-random challenge, R-MAC and R-ENC.</summary>
     Scp03I70 = 0x70,
-
-    /// <summary>SCP03 i=71: S16, pseudo-random challenge, R-MAC and R-ENC.</summary>
-    Scp03I71 = 0x71,
 }
 
 /// <summary>
@@ -331,18 +313,15 @@ public static class ScpImplementationExtensions
         };
     }
 
-    /// <summary>SCP03 Amendment D v1.2, Table 5-1: b1 selects S16 mode.</summary>
-    public static bool UsesScp03S16Mode(this ScpImplementation impl) => ((byte)impl & 0x01) != 0;
-
-    /// <summary>SCP03 Amendment D v1.2, Table 5-1: b5 selects pseudo-random challenge generation.</summary>
+    /// <summary>SCP03 Amendment D v1.1.2, Table 5-1: b5 selects pseudo-random challenge generation.</summary>
     public static bool UsesScp03PseudoRandomChallenge(this ScpImplementation impl) =>
         ((byte)impl & 0x10) != 0;
 
-    /// <summary>SCP03 Amendment D v1.2, Table 5-1: b7 and b6 set together enable R-ENC.</summary>
+    /// <summary>SCP03 Amendment D v1.1.2, Table 5-1: b7 and b6 set together enable R-ENC.</summary>
     public static bool HasScp03ResponseEncryption(this ScpImplementation impl) =>
         ((byte)impl & 0x60) == 0x60;
 
-    /// <summary>SCP03 Amendment D v1.2, Table 5-1.</summary>
+    /// <summary>SCP03 Amendment D v1.1.2, Table 5-1.</summary>
     public static string GetScp03Description(this ScpImplementation impl)
     {
         string responseProtection = impl.HasScp03ResponseEncryption()
@@ -352,7 +331,7 @@ public static class ScpImplementationExtensions
                 : "No response protection";
         return string.Join(
             ", ",
-            impl.UsesScp03S16Mode() ? "S16" : "S8",
+            "S8",
             impl.UsesScp03PseudoRandomChallenge() ? "Pseudo-random challenge" : "Random challenge",
             responseProtection
         );

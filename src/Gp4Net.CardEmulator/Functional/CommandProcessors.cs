@@ -383,7 +383,7 @@ public static class CommandProcessors
 
         switch (state.ScpVersion)
         {
-            // SCP03 Amendment D v1.2, Table 5-1: b5 selects pseudo-random challenge generation.
+            // SCP03 Amendment D v1.1.2, Table 5-1: b5 selects pseudo-random challenge generation.
             case 0x03 when state.ScpImplementation.UsesScp03PseudoRandomChallenge():
                 return GeneratePseudoRandomChallenge(request, state, config, rngContext);
             case 0x02:
@@ -785,7 +785,7 @@ public static class CommandProcessors
                 sequenceCounter
             )
             .Bind(expectedCryptogram =>
-                request.HostCryptogram.SequenceEqual(expectedCryptogram)
+                CryptoService.Utils.CompareBytes(request.HostCryptogram, expectedCryptogram)
                     ? Result.Success<bool, SmartCardError>(true)
                     : Result.Failure<bool, SmartCardError>(
                         SmartCardError.AuthenticationFailed("Host cryptogram verification failed")

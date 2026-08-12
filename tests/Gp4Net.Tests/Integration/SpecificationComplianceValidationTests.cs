@@ -90,8 +90,13 @@ public class SpecificationComplianceValidationTests
     [Test]
     public void DeleteCommand_TokenFormat_MatchesTraceStructure()
     {
-        // Arrange: Based on real DELETE command from traces
-        // Command structure: 84E40080134F09A000000308000010007547C55C046E221C
+        // Arrange: AID taken from the real DELETE in
+        // TestData/Traces/Raw/install_uninstall.log:
+        //   84E40080 13 4F09A00000030800001000 20EEDD243F094FAD
+        // That capture carries no Delete Token. Its CLA is '84', so the trailing
+        // eight bytes are the SCP02 C-MAC over a data field of 4F || len || AID.
+        // The token below is therefore synthetic, exercising the Table 11-23
+        // encoding rather than reproducing captured bytes.
         byte[] aid = Convert.FromHexString("A00000030800001000");
         byte[] expectedToken = Convert.FromHexString("7547C55C046E221C");
 
@@ -119,15 +124,20 @@ public class SpecificationComplianceValidationTests
         _ = apduBytes[5].Should().Be(0x4F, "AID tag should be 0x4F");
         _ = apduBytes[6].Should().Be((byte)aid.Length, "AID length should match");
 
-        // Verify token is appended directly without length prefix per trace analysis
-        int tokenOffset = 7 + aid.Length;
-        byte[] tokenInApdu = [.. apduBytes.Skip(tokenOffset).Take(expectedToken.Length)];
+        // GP 2.3.1 Table 11-23 lists the Delete Token as tag '9E', length 1-n, and
+        // 11.2.2.3.1 requires: "The length fields for the Control Reference Template
+        // for Digital Signature and the Delete Token are coded according to ASN.1
+        // BER-TLV". The token is therefore a tagged data object, not raw bytes.
+        int tokenTagOffset = 7 + aid.Length;
+        _ = apduBytes[tokenTagOffset].Should().Be(0x9E, "Delete Token tag is '9E'");
+        _ = apduBytes[tokenTagOffset + 1]
+            .Should()
+            .Be((byte)expectedToken.Length, "token length precedes the token value");
+
+        byte[] tokenInApdu = [.. apduBytes.Skip(tokenTagOffset + 2).Take(expectedToken.Length),];
         _ = tokenInApdu
             .Should()
-            .BeEquivalentTo(
-                expectedToken,
-                "Deletion token should be appended directly without length prefix per GP Table 11-23"
-            );
+            .BeEquivalentTo(expectedToken, "the token value follows its tag and length");
     }
 
     [Test]

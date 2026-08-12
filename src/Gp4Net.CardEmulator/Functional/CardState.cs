@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Applications;
@@ -12,6 +13,20 @@ using static Gp4Net.CardEmulator.Functional.LoadProcessor;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
 
 namespace Gp4Net.CardEmulator.Functional;
+
+public readonly record struct KeyReference(byte Version, byte Identifier);
+
+public sealed record StoredKeyComponent(
+    byte Type,
+    ImmutableArray<byte> Value,
+    ImmutableArray<byte> CheckValue
+);
+
+public sealed record PendingPutKeyOperation(
+    byte ReplacedVersion,
+    byte NewVersion,
+    ImmutableDictionary<byte, StoredKeyComponent> Keys
+);
 
 /// <summary>
 /// Immutable card state representing the current state of a virtual card.
@@ -39,6 +54,17 @@ public partial record CardState(
     Maybe<ApplicationRegistry> ApplicationRegistry
 )
 {
+    public ImmutableDictionary<
+        KeyReference,
+        StoredKeyComponent
+    > InstalledKeyComponents { get; init; } =
+        ImmutableDictionary<KeyReference, StoredKeyComponent>.Empty;
+
+    public Maybe<PendingPutKeyOperation> PendingPutKey { get; init; } =
+        Maybe<PendingPutKeyOperation>.None;
+
+    public bool IsSecureChannelAborted { get; init; }
+
     /// <summary>
     /// Gets the application registry for the card.
     /// </summary>
@@ -109,7 +135,7 @@ public partial record CardState(
     /// </summary>
     public bool IsSecureChannelEstablished
     {
-        get { return SecureChannel.HasValue; }
+        get { return SecureChannel.HasValue && !IsSecureChannelAborted; }
     }
 
     /// <summary>
@@ -119,7 +145,7 @@ public partial record CardState(
     {
         get
         {
-            return SecureChannel.HasValue
+            return SecureChannel.HasValue && !IsSecureChannelAborted
                 ? (byte)SecureChannel.Value.SecurityLevel
                 : (byte)Gp4Net.Domain.SecurityLevel.None;
         }
@@ -167,7 +193,13 @@ public partial record CardState(
         this with
         {
             SecureChannel = Maybe<SecureChannelState>.From(secureChannelState),
+            IsSecureChannelAborted = false,
         };
+
+    /// <summary>
+    /// GP Card Specification v2.3.1, Section 10.2 and Appendix E.1.6.
+    /// </summary>
+    public CardState WithAbortedSecureChannel() => this with { IsSecureChannelAborted = true, };
 
     /// <summary>
     /// Creates a new state with secure channel cleared.
@@ -176,6 +208,7 @@ public partial record CardState(
         this with
         {
             SecureChannel = Maybe<SecureChannelState>.None,
+            IsSecureChannelAborted = false,
         };
 
     /// <summary>
@@ -186,6 +219,7 @@ public partial record CardState(
         this with
         {
             SecureChannel = Maybe<SecureChannelState>.From(newSecureChannelState),
+            IsSecureChannelAborted = false,
         };
 
     /// <summary>
@@ -300,6 +334,22 @@ public partial record CardState(
         this with
         {
             InstalledKeys = InstalledKeys.SetItem(keyVersion, keySet),
+        };
+
+    public CardState WithInstalledKeyComponents(
+        IEnumerable<KeyValuePair<KeyReference, StoredKeyComponent>> components
+    ) => this with { InstalledKeyComponents = InstalledKeyComponents.SetItems(components), };
+
+    public CardState WithPendingPutKey(PendingPutKeyOperation operation) =>
+        this with
+        {
+            PendingPutKey = Maybe<PendingPutKeyOperation>.From(operation),
+        };
+
+    public CardState WithoutPendingPutKey() =>
+        this with
+        {
+            PendingPutKey = Maybe<PendingPutKeyOperation>.None,
         };
 
     /// <summary>
@@ -446,6 +496,7 @@ public partial record CardState(
             ScpImplementation = ScpImplementation,
             DataObjects = DataObjects,
             InstalledKeys = InstalledKeys,
+            InstalledKeyComponents = InstalledKeyComponents,
             DefaultKeyVersion = DefaultKeyVersion,
             SequenceCounters = SequenceCounters, // Preserve sequence counters across resets
             ApplicationContext = ApplicationSelectionContext.WithIsd(), // Reset to ISD as implicitly selected

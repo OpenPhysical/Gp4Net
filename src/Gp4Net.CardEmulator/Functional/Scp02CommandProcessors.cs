@@ -145,18 +145,12 @@ public static class Scp02CommandProcessors
             .Bind(request => VerifyScp02HostCryptogram(request, state, rngContext, command))
             .Tap(request => logging.LogDebug("SCP02 VerifyScp02HostCryptogram: SUCCESS"))
             .TapError(error =>
-                logging.LogDebug(
-                    "SCP02 VerifyScp02HostCryptogram: FAILED - {Error}",
-                    error.Message
-                )
+                logging.LogDebug("SCP02 VerifyScp02HostCryptogram: FAILED - {Error}", error.Message)
             )
             .Bind(request => DeriveScp02SessionKeys(request, state, rngContext))
             .Tap(sessionKeys => logging.LogDebug("SCP02 DeriveScp02SessionKeys: SUCCESS"))
             .TapError(error =>
-                logging.LogDebug(
-                    "SCP02 DeriveScp02SessionKeys: FAILED - {Error}",
-                    error.Message
-                )
+                logging.LogDebug("SCP02 DeriveScp02SessionKeys: FAILED - {Error}", error.Message)
             )
             .Map(sessionKeys => CreateScp02ExternalAuthResponse(sessionKeys, state));
     }
@@ -681,12 +675,12 @@ public static class Scp02CommandProcessors
         IRngContext rngContext
     )
     {
-        if (!request.HostCryptogram.SequenceEqual(expectedCryptogram))
+        if (!CryptoService.Utils.CompareBytes(request.HostCryptogram, expectedCryptogram))
             return Result.Failure<ExternalAuthenticateRequest, SmartCardError>(
                 SmartCardError.SecurityStatusNotSatisfied()
             );
 
-        // Per GP Card Spec v2.3.1 Section E.3.2: Verify MAC on EXTERNAL AUTHENTICATE command if secure messaging (CLA=0x84)
+        // GP Card Specification v2.3.1, Appendix E.3.2.
         return originalCommand.Length > 0 && originalCommand[0] == GlobalPlatform.Cla.SECURED
             ? VerifyScp02CommandMac(request, state, rngContext)
             : Result.Success<ExternalAuthenticateRequest, SmartCardError>(request);
@@ -724,9 +718,7 @@ public static class Scp02CommandProcessors
             )
             .Bind(sessionKeys =>
             {
-                // Per GP Card Spec v2.3.1 Section E.3.2: Construct the command data that was MACed
-                // EXTERNAL AUTHENTICATE command format: CLA=84 INS=82 P1=SecurityLevel P2=00 LC=16 Data=HostCryptogram(8)
-                // Note: LC=16 because data contains host cryptogram (8) + MAC (8), but MAC calculation only covers header + cryptogram
+                // GP Card Specification v2.3.1, Appendix E.3.2 and Table E-9.
                 byte[] commandHeader =
                 [
                     GlobalPlatform.Cla.SECURED,
@@ -734,32 +726,18 @@ public static class Scp02CommandProcessors
                     request.SecurityLevel,
                     0x00,
                     0x10,
-                ]; // LC=0x10 (16) for secure messaging
+                ];
                 byte[] macInput = commandHeader.Concat(request.HostCryptogram).ToArray();
-
-                // GP Card Spec v2.3.1 Section E.3.2 - SCP02 EXTERNAL AUTHENTICATE MAC Verification
-                // Command header: [CLA INS P1 P2 LC] = 84 82 SecurityLevel 00 10
-                // Host cryptogram: 8-byte challenge response
-                // MAC input: Header + Cryptogram for MAC calculation
-                // Host sent MAC: 8-byte MAC from command
-
-                // FIXED: SCP02 uses 3DES MAC, not AES-CMAC per GP Card Spec v2.3.1 Section E.4.3
-                // For EXTERNAL_AUTHENTICATE, ICV is zero (first command after INITIALIZE UPDATE)
-                byte[] icv = new byte[8]; // Zero ICV
+                byte[] icv = new byte[8];
                 return CryptoService
                     .Mac.CalculateScp02CommandMac(sessionKeys.SMac, macInput, icv)
                     .Bind(expectedMac =>
-                    {
-                        // SCP02 3DES MAC is already 8 bytes, no truncation needed
-                        // Virtual card calculated SCP02 3DES MAC (8 bytes) for verification
-                        // MAC comparison performed per GP Card Specification v2.3.1
-
-                        return request.HostMac.SequenceEqual(expectedMac)
+                        CryptoService.Utils.CompareBytes(request.HostMac, expectedMac)
                             ? Result.Success<ExternalAuthenticateRequest, SmartCardError>(request)
                             : Result.Failure<ExternalAuthenticateRequest, SmartCardError>(
                                 SmartCardError.SecurityStatusNotSatisfied()
-                            );
-                    });
+                            )
+                    );
             });
     }
 
@@ -833,12 +811,14 @@ public static class Scp02CommandProcessors
                         }
                         else
                         {
-                            sequenceCounter = fullCardChallenge.Length >= 2
-                                ? fullCardChallenge[..2]
-                                : fullCardChallenge;
-                            cardChallengeRandom = fullCardChallenge.Length > 2
-                                ? fullCardChallenge[2..]
-                                : Array.Empty<byte>();
+                            sequenceCounter =
+                                fullCardChallenge.Length >= 2
+                                    ? fullCardChallenge[..2]
+                                    : fullCardChallenge;
+                            cardChallengeRandom =
+                                fullCardChallenge.Length > 2
+                                    ? fullCardChallenge[2..]
+                                    : Array.Empty<byte>();
                         }
 
                         return (

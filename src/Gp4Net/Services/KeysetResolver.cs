@@ -58,8 +58,9 @@ public sealed class KeysetResolver : IKeysetResolver
     /// </summary>
     public Result<Scp02KeySet, SmartCardError> ResolveScp02KeySet(string keyId, byte keyVersion)
     {
-        // For simplicity, delegate to test keys
-        return GpTestKeys.CreateScp02TestKeySet(keyVersion);
+        return IsTestKeyset(keyId)
+            ? GpTestKeys.CreateScp02TestKeySet(keyVersion)
+            : Result.Failure<Scp02KeySet, SmartCardError>(UnknownKeyset(keyId));
     }
 
     /// <summary>
@@ -67,8 +68,9 @@ public sealed class KeysetResolver : IKeysetResolver
     /// </summary>
     public Result<Scp03KeySet, SmartCardError> ResolveScp03KeySet(string keyId, byte keyVersion)
     {
-        // For simplicity, delegate to test keys
-        return GpTestKeys.CreateScp03TestKeySet(keyVersion);
+        return IsTestKeyset(keyId)
+            ? GpTestKeys.CreateScp03TestKeySet(keyVersion)
+            : Result.Failure<Scp03KeySet, SmartCardError>(UnknownKeyset(keyId));
     }
 
     /// <summary>
@@ -76,13 +78,15 @@ public sealed class KeysetResolver : IKeysetResolver
     /// </summary>
     public Result<IKeySet, SmartCardError> GetTestKeys(byte protocolVersion, byte keyVersion)
     {
-        var scpVersion = protocolVersion switch
+        return protocolVersion switch
         {
-            0x02 => CryptoService.ScpVersion.Scp02,
-            0x03 => CryptoService.ScpVersion.Scp03,
-            _ => CryptoService.ScpVersion.Scp02, // Default fallback
+            0x02 => GpTestKeys.GetTestKeySet(CryptoService.ScpVersion.Scp02, keyVersion),
+            0x03 => GpTestKeys.GetTestKeySet(CryptoService.ScpVersion.Scp03, keyVersion),
+            _
+                => Result.Failure<IKeySet, SmartCardError>(
+                    SmartCardError.Unsupported($"Unsupported SCP version: {protocolVersion:X2}")
+                ),
         };
-        return GpTestKeys.GetTestKeySet(scpVersion, keyVersion);
     }
 
     /// <summary>
@@ -99,7 +103,15 @@ public sealed class KeysetResolver : IKeysetResolver
         Maybe<InitializeUpdateResponse> cardResponse
     )
     {
-        // Check if all explicit keys are provided
+        // GP Card Specification v2.3.1, Section 7.5.1.
+        if (!encKey.HasValue && !macKey.HasValue && !dekKey.HasValue && !IsTestKeyset(keysetName))
+            return Result.Failure<IKeySet, SmartCardError>(UnknownKeyset(keysetName));
+
+        if (encKey.HasValue != macKey.HasValue || encKey.HasValue != dekKey.HasValue)
+            return Result.Failure<IKeySet, SmartCardError>(
+                SmartCardError.InvalidArgument("ENC, MAC, and DEK keys must be supplied together")
+            );
+
         var explicitKeysResult = encKey.Bind(enc =>
             macKey.Bind(mac => dekKey.Map(dek => (enc, mac, dek)))
         );
@@ -108,25 +120,64 @@ public sealed class KeysetResolver : IKeysetResolver
             keyTuple =>
             {
                 (byte[] enc, byte[] mac, byte[] dek) = keyTuple;
-                return ResolveFromHexKeys(
-                    Convert.ToHexString(enc),
-                    Convert.ToHexString(mac),
-                    Convert.ToHexString(dek),
-                    keyVersion
-                );
+                // GP Card Specification v2.3.1, Appendix E.2; SCP03 Amendment D v1.1.2, Section 4.1.
+                return cardResponse
+                    .Bind(response => response.ScpVersion)
+                    .ToResult(SmartCardError.InvalidArgument("SCP version is required"))
+                    .Bind(protocolVersion =>
+                        CreateKeyset(protocolVersion, enc, mac, dek, keyVersion)
+                    );
             },
             () =>
             {
-                // Use test keys based on card response if available
                 return cardResponse.Match(
                     response =>
                         response.ScpVersion.Match(
                             scpVersion => GetTestKeys((byte)scpVersion, keyVersion),
-                            () => GetTestKeys(0x02, keyVersion)
+                            () =>
+                                Result.Failure<IKeySet, SmartCardError>(
+                                    SmartCardError.InvalidArgument("SCP version is required")
+                                )
                         ),
-                    () => GetTestKeys(0x02, keyVersion) // Fallback to SCP02 test keys
+                    () =>
+                        Result.Failure<IKeySet, SmartCardError>(
+                            SmartCardError.InvalidArgument("INITIALIZE UPDATE response is required")
+                        )
                 );
             }
         );
     }
+
+    private static Result<IKeySet, SmartCardError> CreateKeyset(
+        CryptoService.ScpVersion protocolVersion,
+        byte[] encKey,
+        byte[] macKey,
+        byte[] dekKey,
+        byte keyVersion
+    )
+    {
+        return protocolVersion switch
+        {
+            CryptoService.ScpVersion.Scp02
+                => Scp02KeySet
+                    .Create(encKey, macKey, dekKey, keyVersion)
+                    .Map(keyset => (IKeySet)keyset),
+            CryptoService.ScpVersion.Scp03
+                => Scp03KeySet
+                    .Create(encKey, macKey, dekKey, keyVersion)
+                    .Map(keyset => (IKeySet)keyset),
+            _
+                => Result.Failure<IKeySet, SmartCardError>(
+                    SmartCardError.Unsupported(
+                        $"Unsupported SCP version: {(byte)protocolVersion:X2}"
+                    )
+                ),
+        };
+    }
+
+    private static bool IsTestKeyset(string keysetName) =>
+        string.Equals(keysetName, "gp_test", StringComparison.OrdinalIgnoreCase);
+
+    private static SmartCardError UnknownKeyset(string keysetName) =>
+        SmartCardError.InvalidArgument($"Unknown keyset: {keysetName}");
 }

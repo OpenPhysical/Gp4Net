@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
+using Gp4Net.Services;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 using WSCT.ISO7816;
@@ -230,9 +232,16 @@ public class DeleteCommand : IApduCommand
             if (tokenToUse.HasValue && tokenToUse.Value.Length > 0)
             {
                 // GP Card Spec 2.3.1, Table 11-23: the Delete Token is data object 9E.
-                data.Add(0x9E);
-                data.Add((byte)tokenToUse.Value.Length);
-                data.AddRange(tokenToUse.Value);
+                var encodedToken = TlvService.TlvEncoder.EncodeSimple(
+                    0x9E,
+                    tokenToUse.Value.ToImmutableArray()
+                );
+                if (encodedToken.IsFailure)
+                {
+                    return encodedToken.Error;
+                }
+
+                data.AddRange(encodedToken.Value);
             }
         }
         else

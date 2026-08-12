@@ -66,6 +66,20 @@ public class GlobalPlatformOidsTests
     }
 
     [Test]
+    public void TryGetScpImplementation_ShouldExtract_Implementation_Arc()
+    {
+        // GP Card Spec 2.3.1, Appendix H: {globalPlatform 4 scp i}.
+        bool parsed = GlobalPlatformOids.TryGetScpImplementation(
+            "1.2.840.114283.4.2.85",
+            0x02,
+            out byte implementation
+        );
+
+        _ = parsed.Should().BeTrue();
+        _ = implementation.Should().Be(0x55);
+    }
+
+    [Test]
     public void FormatOid_ShouldIncludeDescriptionForKnownOids()
     {
         // Act & Assert

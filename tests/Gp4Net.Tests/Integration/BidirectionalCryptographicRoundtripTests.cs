@@ -394,40 +394,21 @@ public class BidirectionalCryptographicRoundtripTests
     )
     {
         var securityLevel = SecurityLevel.CMac;
-        var extAuthData = new byte[hostCryptogram.Length + 1];
-        hostCryptogram.CopyTo(extAuthData, 0);
-        extAuthData[^1] = (byte)securityLevel;
-
-        return ExternalAuthenticateCommand
-            .Create(extAuthData)
-            .Bind(cmd => CalculateExternalAuthMac(cmd, sessionKeys))
-            .Bind(mac => ExternalAuthenticateCommand.Create([.. extAuthData, .. mac]))
-            .Bind(cmdWithMac => cmdWithMac.ToCommandApdu())
-            .Bind(apdu => ApduCommandExtensions.ToApdu(apdu));
-    }
-
-    private static Result<byte[], SmartCardError> CalculateExternalAuthMac(
-        ExternalAuthenticateCommand command,
-        SessionKeys sessionKeys
-    )
-    {
-        byte[] macData =
-        [
-            command.Cla,
-            command.Ins,
-            command.P1,
-            command.P2,
-            (byte)command.Data.Length,
-            .. command.Data,
-        ];
+        // SCP03 Amendment D v1.1.2, Sections 6.2.3 and 7.1.2.
+        byte[] macInput = [0x84, 0x82, (byte)securityLevel, 0x00, 0x10, .. hostCryptogram,];
 
         return CryptoService
             .ScpOperations.Scp03.CalculateCommandMac(
-                macData,
+                macInput,
                 sessionKeys.SMac,
-                new byte[16] // Zero MAC chaining
+                Gp4Net.Constants.Constants.Scp.Common.ZeroChaining16
             )
-            .Map(fullMac => fullMac[..8]);
+            .Map(fullMac => fullMac[..8])
+            .Bind(mac =>
+                ExternalAuthenticateCommand.CreateWithMac(securityLevel, hostCryptogram, mac)
+            )
+            .Bind(cmdWithMac => cmdWithMac.ToCommandApdu())
+            .Bind(apdu => ApduCommandExtensions.ToApdu(apdu));
     }
 
     private Result<bool, SmartCardError> ExecuteExternalAuthAndValidate(

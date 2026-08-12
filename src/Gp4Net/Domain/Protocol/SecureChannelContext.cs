@@ -18,13 +18,15 @@ namespace Gp4Net.Domain.Protocol;
 /// <param name="SessionKeys">The derived session keys.</param>
 /// <param name="ScpVersion">The protocol version.</param>
 /// <param name="KeySet">The key set used for authentication.</param>
+/// <param name="ImplementationParameter">The SCP implementation parameter.</param>
 [PublicAPI]
 public record SecureChannelContext(
     byte[] HostChallenge,
     InitializeUpdateResponse InitializeUpdateResponse,
     SessionKeys SessionKeys,
     ScpVersion ScpVersion,
-    IKeySet KeySet
+    IKeySet KeySet,
+    byte ImplementationParameter
 )
 {
     /// <summary>
@@ -41,13 +43,15 @@ public record SecureChannelContext(
     /// <param name="sessionKeys">The derived session keys.</param>
     /// <param name="scpVersion">The protocol version.</param>
     /// <param name="keySet">The key set used for authentication.</param>
+    /// <param name="implementationParameter">The selected SCP implementation parameter.</param>
     /// <returns>A result containing the context or an error.</returns>
     public static Result<SecureChannelContext, SmartCardError> Create(
         byte[] hostChallenge,
         InitializeUpdateResponse initializeUpdateResponse,
         SessionKeys sessionKeys,
         ScpVersion scpVersion,
-        IKeySet keySet
+        IKeySet keySet,
+        byte implementationParameter
     )
     {
         return ValidateHostChallenge(hostChallenge)
@@ -60,7 +64,8 @@ public record SecureChannelContext(
                 initializeUpdateResponse,
                 sessionKeys,
                 scpVersion,
-                keySet
+                keySet,
+                implementationParameter
             ));
     }
 

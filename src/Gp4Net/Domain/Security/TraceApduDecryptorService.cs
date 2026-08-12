@@ -259,8 +259,7 @@ public sealed class TraceApduDecryptorService
         SecureChannelState sessionState
     )
     {
-        return
-            sessionState.SecurityLevel.HasCMac() && parsedCommand.Mac.Length > 0
+        return sessionState.SecurityLevel.HasCMac() && parsedCommand.Mac.Length > 0
             ? VerifyCommandMac(parsedCommand, sessionState)
                 .Map(_ => UnitResult.Success<SmartCardError>())
             : UnitResult.Success<SmartCardError>();
@@ -301,8 +300,7 @@ public sealed class TraceApduDecryptorService
     )
     {
         var currentChaining = sessionState.MacChaining;
-        return
-            sessionState.SecurityLevel.HasCMac() && parsedCommand.Mac.Length > 0
+        return sessionState.SecurityLevel.HasCMac() && parsedCommand.Mac.Length > 0
             ? Result.Success<ImmutableArray<byte>, SmartCardError>(
                 UpdateMacChaining(
                     [.. currentChaining.ToArray()],
@@ -737,13 +735,12 @@ public sealed class TraceApduDecryptorService
 
         return macResult.Bind(expectedMac =>
         {
-            // Verify MAC matches
             var expectedToCompare =
                 sessionState.ProtocolVersion == ScpVersion.Scp03
                     ? expectedMac[..Scp.Scp03.MAC_SIZE]
                     : expectedMac[..macSize];
 
-            bool macValid = expectedToCompare.SequenceEqual(receivedMac);
+            bool macValid = CryptoService.Utils.CompareBytes(expectedToCompare, receivedMac);
 
             if (!macValid)
             {

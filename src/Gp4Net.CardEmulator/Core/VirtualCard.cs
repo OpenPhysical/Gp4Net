@@ -11,8 +11,10 @@ using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
+using Gp4Net.Transport;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
+using WSCT.ISO7816;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
 using static Gp4Net.Services.TlvService;
 using ExecutableModule = Gp4Net.CardEmulator.Functional.ExecutableModule;
@@ -206,18 +208,39 @@ public partial class VirtualCard : IVirtualCard
             .Bind(initializedState =>
                 ValidateCommand(command)
                     .Bind(cmd => ValidateInstructionSupported(cmd, config))
-                    .Bind(cmd => ApplyScpSecurity(cmd, initializedState, logging))
                     .Bind(cmd =>
-                        RouteToApplications(
-                            cmd.FullCommand,
-                            initializedState,
-                            config,
-                            rngContext,
-                            logging
-                        )
-                    )
+                    {
+                        var securityResult = ApplyScpSecurity(cmd, initializedState, logging);
+                        return securityResult.Match(
+                            secured =>
+                                RouteToApplications(
+                                    secured.command.FullCommand,
+                                    secured.state,
+                                    config,
+                                    rngContext,
+                                    logging
+                                ),
+                            error => HandleSecureChannelFailure(error, initializedState, logging)
+                        );
+                    })
             )
             .Bind(result => ApplyResponseSecurity(result, rngContext, logging));
+    }
+
+    private static Result<(ApduResponse, CardState), SmartCardError> HandleSecureChannelFailure(
+        SmartCardError error,
+        CardState state,
+        LoggingService logging
+    )
+    {
+        if (!state.SecureChannel.HasValue)
+            return Result.Failure<(ApduResponse, CardState), SmartCardError>(error);
+
+        // GP Card Specification v2.3.1, Section 10.2 and Appendix E.1.6.
+        logging.LogWarning("Secure Channel Session aborted after a command security error");
+        return Result.Success<(ApduResponse, CardState), SmartCardError>(
+            (ApduResponse.Error(0x6982), state.WithAbortedSecureChannel())
+        );
     }
 
     /// <summary>
@@ -230,6 +253,9 @@ public partial class VirtualCard : IVirtualCard
     )
     {
         (var response, var state) = result;
+
+        if (state.IsSecureChannelAborted)
+            return Result.Success<(ApduResponse, CardState), SmartCardError>(result);
 
         // Use functional approach with Maybe<T>
         return state.SecureChannel.Match(
@@ -258,20 +284,9 @@ public partial class VirtualCard : IVirtualCard
         LoggingService logging
     )
     {
-        // Check if response security is needed
         if (secureChannelState is { HasResponseMac: false, HasResponseEncryption: false })
         {
             logging.LogTrace("Security level does not require response security");
-            return Result.Success<(ApduResponse, CardState), SmartCardError>((response, state));
-        }
-
-        // Check if status word indicates we should apply security
-        if (!ShouldApplyResponseSecurity(response.StatusWord))
-        {
-            logging.LogTrace(
-                "Status word {SW:X4} does not require response security",
-                response.StatusWord
-            );
             return Result.Success<(ApduResponse, CardState), SmartCardError>((response, state));
         }
 
@@ -281,56 +296,36 @@ public partial class VirtualCard : IVirtualCard
             secureChannelState.HasResponseEncryption
         );
 
-        // Build full response (data + status word)
         byte[] fullResponse = new byte[response.Data.Length + 2];
         Array.Copy(response.Data, 0, fullResponse, 0, response.Data.Length);
         fullResponse[^2] = (byte)(response.StatusWord >> 8);
         fullResponse[^1] = (byte)(response.StatusWord & 0xFF);
 
-        // Apply response security processing (card-side)
-        return Maybe
-            .From(secureChannelState)
-            .Match(
-                channel =>
-                    // Use ScpService for response security processing
-                    Result
-                        .Success<(byte[], SecureChannelState), SmartCardError>(
-                            (fullResponse, channel)
-                        )
-                        .Match(
-                            success => ProcessSecureResponseSuccess(success, state, logging),
-                            error =>
-                                Result.Failure<(ApduResponse, CardState), SmartCardError>(
-                                    SmartCardError.SecurityError(error.ToString())
-                                )
-                        ),
-                () =>
-                    Result.Failure<(ApduResponse, CardState), SmartCardError>(
-                        SmartCardError.SecurityStatusNotSatisfied()
-                    )
-            );
+        return global::Gp4Net
+            .Services.ScpService.Security.ApplyResponseSecurity(
+                new ResponseAPDU(fullResponse),
+                secureChannelState
+            )
+            .Bind(secured => ProcessSecureResponseSuccess(secured, state, logging));
     }
 
     /// <summary>
     /// Processes the successful secure response result.
     /// </summary>
     private static Result<(ApduResponse, CardState), SmartCardError> ProcessSecureResponseSuccess(
-        (byte[] processedResponse, SecureChannelState newState) success,
+        (ResponseAPDU securedResponse, SecureChannelState newState) success,
         CardState state,
         LoggingService logging
     )
     {
-        // Extract status word from the end
-        byte[] processedResponse = success.processedResponse;
+        byte[] processedResponse = success.securedResponse.ToBytes();
         ushort sw = (ushort)(processedResponse[^2] << 8 | processedResponse[^1]);
 
-        // Response data excludes status word
         byte[] responseData = new byte[processedResponse.Length - 2];
         Array.Copy(processedResponse, 0, responseData, 0, responseData.Length);
 
         var securedResponse = new ApduResponse(responseData, sw);
 
-        // Update card state with new secure channel state
         var newCardState = state.WithUpdatedSecureChannel(success.newState);
 
         logging.LogDebug("Response security applied - New length: {Length}", responseData.Length);
@@ -338,18 +333,6 @@ public partial class VirtualCard : IVirtualCard
         return Result.Success<(ApduResponse, CardState), SmartCardError>(
             (securedResponse, newCardState)
         );
-    }
-
-    /// <summary>
-    /// Determines if response security should be applied based on status word.
-    /// Per GlobalPlatform Card Specification v2.3.1: only for success (9000) and warning (62xx, 63xx) status words.
-    /// </summary>
-    private static bool ShouldApplyResponseSecurity(ushort statusWord)
-    {
-        return statusWord == Constants.Constants.StatusWords.Success
-            || (statusWord & 0xFF00)
-                == Constants.Constants.StatusWords.Information.WarningNoInformation
-            || (statusWord & 0xFF00) == 0x6300;
     }
 
     // Private helper methods for command processing
@@ -1380,14 +1363,15 @@ public partial class VirtualCard : IVirtualCard
     /// <param name="state">The current state of the virtual card.</param>
     /// <param name="config">The card configuration used for contextual operations.</param>
     /// <returns>A result containing a tuple of the APDU response and the updated card state, or an error if processing fails.</returns>
-    private static Result<(ApduResponse, CardState), SmartCardError> ProcessPutKeyCommand(
+    internal static Result<(ApduResponse, CardState), SmartCardError> ProcessPutKeyCommand(
         byte[] command,
         CardState state,
         CardConfiguration config
     )
     {
-        // GlobalPlatform Card Specification v2.3.1 Table 11-2: PUT KEY requires AUTHENTICATED security level
-        if (state.SecurityLevel < 0x01) // AUTHENTICATED = 0x01
+        // GP Card Specification v2.3.1, Tables 10-1 and 11-2: PUT KEY requires
+        // entity authentication; C-MAC and C-DECRYPTION are separate indicators.
+        if (!state.IsSecureChannelEstablished)
             return Result.Failure<(ApduResponse, CardState), SmartCardError>(
                 SmartCardError.SecurityStatusNotSatisfied()
             );
@@ -1403,11 +1387,15 @@ public partial class VirtualCard : IVirtualCard
                 SmartCardError.WrongLength()
             );
 
-        byte replacedKeyVersion = command[2];
+        // GP Card Specification v2.3.1, 11.8.2.1, Table 11-65: b8 is the
+        // command-chaining indication and b7-b1 carry the replaced KVN.
+        bool hasMoreCommands = (command[2] & 0x80) != 0;
+        byte replacedKeyVersion = (byte)(command[2] & 0x7F);
         if (
             replacedKeyVersion != 0x00
             && !state.InstalledKeys.ContainsKey(replacedKeyVersion)
             && !config.StaticKeys.ContainsKey(replacedKeyVersion)
+            && !state.InstalledKeyComponents.Keys.Any(key => key.Version == replacedKeyVersion)
         )
             return Result.Failure<(ApduResponse, CardState), SmartCardError>(
                 SmartCardError.ReferencedDataNotFound()
@@ -1417,12 +1405,33 @@ public partial class VirtualCard : IVirtualCard
         int dataOffset = 5;
         byte keyVersion = command[dataOffset]; // First byte is new key version
         dataOffset++;
+        if (keyVersion is 0x00 or > 0x7F)
+            return SmartCardError.IncorrectData();
 
-        // Parse key data according to GlobalPlatform Card Specification v2.3.1 Section 11.5.5
+        // GP Card Specification v2.3.1, 11.8.2.2, Table 11-66: b8 marks
+        // multiple keys and b7-b1 identify the first key.
+        bool containsMultipleKeys = (command[3] & 0x80) != 0;
+        byte firstKeyIdentifier = (byte)(command[3] & 0x7F);
+
+        // Parse key data according to GlobalPlatform Card Specification v2.3.1 Section 11.8.2.3.
         // Expected format: KVN + (key_type + key_length + key_data + KCV_length + KCV) repeated
         return ParsePutKeyDataWithKcv(command, dataOffset, lc - 1, state)
+            .Ensure(
+                parsed => containsMultipleKeys == (parsed.KeyCount > 1),
+                SmartCardError.InvalidData("PUT KEY P2 does not match the number of keys")
+            )
             .Bind(parsedData => ValidateProvidedKcvs(parsedData))
-            .Bind(validatedData => CreateAndInstallNewKeyset(validatedData, keyVersion, state));
+            .Bind(validatedData =>
+                ProcessValidatedPutKey(
+                    validatedData,
+                    replacedKeyVersion,
+                    keyVersion,
+                    firstKeyIdentifier,
+                    hasMoreCommands,
+                    state,
+                    config
+                )
+            );
     }
 
     /// <summary>
@@ -1447,19 +1456,20 @@ public partial class VirtualCard : IVirtualCard
                     () =>
                     {
                         int end = dataOffset + remainingLength;
-                        var keys = new List<byte[]>();
-                        var kcvs = new List<byte[]>();
-                        bool? aes = null;
+                        var components = ImmutableArray.CreateBuilder<PutKeyComponent>();
                         while (dataOffset < end)
                         {
                             byte type = command[dataOffset++];
-                            bool blockIsAes = type == 0x88;
-                            aes ??= blockIsAes;
-                            if (aes.Value != blockIsAes)
+                            if (type is not 0x80 and not 0x88)
                                 throw new InvalidOperationException(
-                                    "Mixed key algorithms are not supported"
+                                    $"Unsupported symmetric key type {type:X2}"
                                 );
-                            int componentLength = command[dataOffset++];
+                            bool blockIsAes = type == 0x88;
+                            int componentLength = ReadPutKeyLength(command, ref dataOffset, end);
+                            if (componentLength <= 0 || dataOffset + componentLength > end)
+                                throw new InvalidOperationException(
+                                    "Invalid PUT KEY component length"
+                                );
                             byte[] componentBlock = command
                                 .Skip(dataOffset)
                                 .Take(componentLength)
@@ -1469,41 +1479,63 @@ public partial class VirtualCard : IVirtualCard
                             int clearLength = componentLength;
                             if (componentLength % blockSize != 0)
                             {
-                                clearLength = componentBlock[0];
-                                componentBlock = componentBlock.Skip(1).ToArray();
+                                int clearLengthOffset = 0;
+                                clearLength = ReadPutKeyLength(
+                                    componentBlock,
+                                    ref clearLengthOffset,
+                                    componentBlock.Length
+                                );
+                                componentBlock = componentBlock[clearLengthOffset..];
+                                if (componentBlock.Length % blockSize != 0)
+                                    throw new InvalidOperationException(
+                                        "Encrypted key component is not block aligned"
+                                    );
                             }
                             var protocol = blockIsAes
                                 ? Cryptography.CryptoService.ScpVersion.Scp03
                                 : Cryptography.CryptoService.ScpVersion.Scp02;
-                            keys.Add(
-                                global::Gp4Net.Services.GlobalPlatform.KeyChange.Unwrap(
-                                    componentBlock,
-                                    clearLength,
-                                    protocol,
-                                    dek
-                                )
+                            byte[] key = global::Gp4Net.Services.GlobalPlatform.KeyChange.Unwrap(
+                                componentBlock,
+                                clearLength,
+                                protocol,
+                                dek
                             );
+                            if (dataOffset >= end)
+                                throw new InvalidOperationException(
+                                    "Missing key check value length"
+                                );
                             int kcvLength = command[dataOffset++];
-                            kcvs.Add(command.Skip(dataOffset).Take(kcvLength).ToArray());
+                            if (kcvLength != 3 || dataOffset + kcvLength > end)
+                                throw new InvalidOperationException(
+                                    "DES and AES key check values must be 3 bytes"
+                                );
+                            byte[] kcv = command.Skip(dataOffset).Take(kcvLength).ToArray();
                             dataOffset += kcvLength;
+                            components.Add(new PutKeyComponent(type, key, kcv));
                         }
-                        if (keys.Count != 3 || kcvs.Any(kcv => kcv.Length != 3))
-                            throw new InvalidOperationException(
-                                "PUT KEY must contain ENC, MAC, and DEK with 3-byte KCVs"
-                            );
-                        return new PutKeyData(
-                            keys[0],
-                            keys[1],
-                            keys[2],
-                            kcvs[0],
-                            kcvs[1],
-                            kcvs[2],
-                            aes == true
-                        );
+                        if (components.Count == 0)
+                            throw new InvalidOperationException("PUT KEY contains no keys");
+                        return new PutKeyData(components.ToImmutable());
                     },
                     ex => SmartCardError.InvalidArgument(ex.Message)
                 )
             );
+    }
+
+    private static int ReadPutKeyLength(byte[] data, ref int offset, int end)
+    {
+        if (offset >= end)
+            throw new InvalidOperationException("Missing PUT KEY length");
+        int first = data[offset++];
+        if (first <= 0x80)
+            return first;
+        int octets = first & 0x7F;
+        if (octets is < 1 or > 2 || offset + octets > end)
+            throw new InvalidOperationException("Invalid PUT KEY BER length");
+        int length = 0;
+        for (int index = 0; index < octets; index++)
+            length = (length << 8) | data[offset++];
+        return length;
     }
 
     /// <summary>
@@ -1511,95 +1543,182 @@ public partial class VirtualCard : IVirtualCard
     /// </summary>
     private static Result<PutKeyData, SmartCardError> ValidateProvidedKcvs(PutKeyData keyData)
     {
-        byte[] encKcv = global::Gp4Net.Services.GlobalPlatform.KeyChange.CalculateKcv(
-            keyData.EncKey,
-            keyData.Aes
-        );
-        byte[] macKcv = global::Gp4Net.Services.GlobalPlatform.KeyChange.CalculateKcv(
-            keyData.MacKey,
-            keyData.Aes
-        );
-        byte[] dekKcv = global::Gp4Net.Services.GlobalPlatform.KeyChange.CalculateKcv(
-            keyData.DekKey,
-            keyData.Aes
-        );
-        return ValidateSingleKcv(keyData.EncKcv, encKcv, "ENC")
-            .Bind(_ => ValidateSingleKcv(keyData.MacKcv, macKcv, "MAC"))
-            .Bind(_ => ValidateSingleKcv(keyData.DekKcv, dekKcv, "DEK"))
-            .Map(_ => keyData);
-    }
-
-    /// <summary>
-    /// Validates a single KCV against computed value.
-    /// </summary>
-    private static Result<bool, SmartCardError> ValidateSingleKcv(
-        byte[] providedKcv,
-        byte[] computedKcv,
-        string keyType
-    )
-    {
-        return providedKcv.Take(3).SequenceEqual(computedKcv.Take(3))
-            ? Result.Success<bool, SmartCardError>(true)
-            : Result.Failure<bool, SmartCardError>(
-                SmartCardError.SecurityStatusNotSatisfied($"{keyType} key KCV validation failed")
-            );
-    }
-
-    /// <summary>
-    /// Creates and installs new keyset after successful KCV validation.
-    /// </summary>
-    private static Result<(ApduResponse, CardState), SmartCardError> CreateAndInstallNewKeyset(
-        PutKeyData keyData,
-        byte keyVersion,
-        CardState state
-    )
-    {
-        Result<IKeySet, SmartCardError> keySet = keyData.Aes
-            ? Scp03KeySet
-                .Create(
-                    encKey: keyData.EncKey,
-                    macKey: keyData.MacKey,
-                    dekKey: keyData.DekKey,
-                    keyVersion: keyVersion
-                )
-                .Bind(keys => Result.Success<IKeySet, SmartCardError>(keys))
-            : Scp02KeySet
-                .Create(
-                    encKey: keyData.EncKey,
-                    macKey: keyData.MacKey,
-                    dekKey: keyData.DekKey,
-                    keyVersion: keyVersion
-                )
-                .Bind(keys => Result.Success<IKeySet, SmartCardError>(keys));
-        return keySet.Map(newKeySet =>
+        foreach (var component in keyData.Components)
         {
-            var newState = state
-                .WithInstalledKey(keyVersion, newKeySet)
-                .WithDefaultKeyVersion(keyVersion);
+            byte[] computed = global::Gp4Net.Services.GlobalPlatform.KeyChange.CalculateKcv(
+                component.Value,
+                component.Type == 0x88
+            );
+            if (!component.CheckValue.SequenceEqual(computed))
+                return SmartCardError.SecurityStatusNotSatisfied(
+                    $"Key type {component.Type:X2} KCV validation failed"
+                );
+        }
+        return keyData;
+    }
 
-            // Create response with key version and computed KCVs
-            byte[] response = new byte[10];
-            response[0] = keyVersion;
-            Array.Copy(keyData.EncKcv, 0, response, 1, 3);
-            Array.Copy(keyData.MacKcv, 0, response, 4, 3);
-            Array.Copy(keyData.DekKcv, 0, response, 7, 3);
+    private static Result<(ApduResponse, CardState), SmartCardError> ProcessValidatedPutKey(
+        PutKeyData keyData,
+        byte replacedKeyVersion,
+        byte keyVersion,
+        byte firstKeyIdentifier,
+        bool hasMoreCommands,
+        CardState state,
+        CardConfiguration config
+    )
+    {
+        if (firstKeyIdentifier + keyData.KeyCount - 1 > 0x7F)
+            return SmartCardError.InvalidData("PUT KEY identifier sequence exceeds 7F");
 
-            return (new ApduResponse(response, Constants.Constants.StatusWords.Success), newState);
-        });
+        var currentKeys = keyData
+            .Components.Select(
+                (component, index) =>
+                    new KeyValuePair<byte, StoredKeyComponent>(
+                        (byte)(firstKeyIdentifier + index),
+                        new StoredKeyComponent(
+                            component.Type,
+                            component.Value.ToImmutableArray(),
+                            component.CheckValue.ToImmutableArray()
+                        )
+                    )
+            )
+            .ToImmutableDictionary(pair => pair.Key, pair => pair.Value);
+        var combinedKeys = currentKeys;
+        if (state.PendingPutKey.HasValue)
+        {
+            var pending = state.PendingPutKey.Value;
+            if (pending.ReplacedVersion != replacedKeyVersion || pending.NewVersion != keyVersion)
+                return SmartCardError.InvalidData(
+                    "Chained PUT KEY commands must use the same key version numbers"
+                );
+            if (currentKeys.Keys.Any(pending.Keys.ContainsKey))
+                return SmartCardError.InvalidData(
+                    "Chained symmetric PUT KEY commands contain a duplicate key identifier"
+                );
+            combinedKeys = pending.Keys.SetItems(currentKeys);
+        }
+
+        if (replacedKeyVersion != 0x00)
+        {
+            foreach (var (identifier, replacement) in combinedKeys)
+            {
+                var existing = FindExistingKeyComponent(
+                    replacedKeyVersion,
+                    identifier,
+                    state,
+                    config
+                );
+                if (!existing.HasValue)
+                    return SmartCardError.ReferencedDataNotFound();
+                if (
+                    existing.Value.Type != replacement.Type
+                    || existing.Value.Value.Length != replacement.Value.Length
+                )
+                    return SmartCardError.InvalidData(
+                        "Replacement key type and length must match the existing key"
+                    );
+            }
+        }
+
+        // GP Card Specification v2.3.1, 11.8.2.3.3: chained PUT KEY
+        // commands are committed atomically when the last command is received.
+        if (hasMoreCommands)
+        {
+            var pendingState = state.WithPendingPutKey(
+                new PendingPutKeyOperation(replacedKeyVersion, keyVersion, combinedKeys)
+            );
+            return (CreatePutKeyResponse(keyVersion, keyData), pendingState);
+        }
+
+        var installed = combinedKeys.Select(pair => new KeyValuePair<
+            KeyReference,
+            StoredKeyComponent
+        >(new KeyReference(keyVersion, pair.Key), pair.Value));
+        var newState = state.WithInstalledKeyComponents(installed).WithoutPendingPutKey();
+
+        var orderedKeys = combinedKeys.OrderBy(pair => pair.Key).ToArray();
+        bool formsSecureChannelKeySet =
+            orderedKeys.Length == 3
+            && orderedKeys[1].Key == orderedKeys[0].Key + 1
+            && orderedKeys[2].Key == orderedKeys[1].Key + 1
+            && orderedKeys.Select(pair => pair.Value.Type).Distinct().Count() == 1;
+        if (formsSecureChannelKeySet)
+        {
+            var values = orderedKeys.Select(pair => pair.Value.Value.ToArray()).ToArray();
+            Result<IKeySet, SmartCardError> keySet =
+                orderedKeys[0].Value.Type == 0x88
+                    ? Scp03KeySet
+                        .Create(values[0], values[1], values[2], keyVersion, orderedKeys[0].Key)
+                        .Bind(keys => Result.Success<IKeySet, SmartCardError>(keys))
+                    : Scp02KeySet
+                        .Create(values[0], values[1], values[2], keyVersion, orderedKeys[0].Key)
+                        .Bind(keys => Result.Success<IKeySet, SmartCardError>(keys));
+            if (keySet.IsFailure)
+                return keySet.Error;
+            newState = newState.WithInstalledKey(keyVersion, keySet.Value);
+        }
+
+        return (CreatePutKeyResponse(keyVersion, keyData), newState);
+    }
+
+    private static ApduResponse CreatePutKeyResponse(byte keyVersion, PutKeyData keyData)
+    {
+        // GP Card Specification v2.3.1, 11.8.3.1: KVN is followed by each KCV.
+        byte[] data =
+        [
+            keyVersion,
+            .. keyData.Components.SelectMany(component => component.CheckValue),
+        ];
+        return new ApduResponse(data, Constants.Constants.StatusWords.Success);
+    }
+
+    private static Maybe<StoredKeyComponent> FindExistingKeyComponent(
+        byte version,
+        byte identifier,
+        CardState state,
+        CardConfiguration config
+    )
+    {
+        if (
+            state.InstalledKeyComponents.TryGetValue(
+                new KeyReference(version, identifier),
+                out var component
+            )
+        )
+            return component;
+
+        IKeySet? keySet =
+            state.InstalledKeys.GetValueOrDefault(version)
+            ?? config.StaticKeys.GetValueOrDefault(version);
+        if (keySet is null)
+            return Maybe<StoredKeyComponent>.None;
+        int offset = identifier - keySet.KeyId;
+        byte[]? value = offset switch
+        {
+            0 => keySet.EncKey,
+            1 => keySet.MacKey,
+            2 => keySet.DekKey,
+            _ => null,
+        };
+        if (value is null)
+            return Maybe<StoredKeyComponent>.None;
+        byte type = keySet is Scp03KeySet ? (byte)0x88 : (byte)0x80;
+        byte[] kcv = global::Gp4Net.Services.GlobalPlatform.KeyChange.CalculateKcv(
+            value,
+            type == 0x88
+        );
+        return new StoredKeyComponent(type, value.ToImmutableArray(), kcv.ToImmutableArray());
     }
 
     /// <summary>
     /// Represents parsed PUT KEY command data including KCVs.
     /// </summary>
-    private record PutKeyData(
-        byte[] EncKey,
-        byte[] MacKey,
-        byte[] DekKey,
-        byte[] EncKcv,
-        byte[] MacKcv,
-        byte[] DekKcv,
-        bool Aes
-    );
+    private sealed record PutKeyComponent(byte Type, byte[] Value, byte[] CheckValue);
+
+    private sealed record PutKeyData(ImmutableArray<PutKeyComponent> Components)
+    {
+        public int KeyCount => Components.Length;
+    }
 
     /// <summary>
     /// Processes the STORE DATA command for the virtual card, parsing the command based on its data structure and executing corresponding actions.
@@ -1999,12 +2118,25 @@ public partial class VirtualCard : IVirtualCard
     /// <summary>
     /// Applies SCP security to incoming command.
     /// </summary>
-    private static Result<ParsedCommand, SmartCardError> ApplyScpSecurity(
-        ParsedCommand cmd,
-        CardState state,
-        LoggingService logging
-    )
+    private static Result<
+        (ParsedCommand command, CardState state),
+        SmartCardError
+    > ApplyScpSecurity(ParsedCommand cmd, CardState state, LoggingService logging)
     {
+        if (state.IsSecureChannelAborted)
+        {
+            bool terminatesSession =
+                cmd.Ins == Constants.Constants.Scp.Common.INITIALIZE_UPDATE_INS
+                || cmd.Ins == Gp4Net.Constants.Apdu.Instructions.SELECT;
+
+            if (!terminatesSession)
+                return Result.Failure<(ParsedCommand, CardState), SmartCardError>(
+                    SmartCardError.SecurityStatusNotSatisfied()
+                );
+
+            state = state.WithoutSecureChannel();
+        }
+
         // Apply SCP enforcement rules per GP Appendix E before command execution
         var securityValidationResult = ScpEnforcer.ValidateCommandSecurity(
             cmd.Ins,
@@ -2019,7 +2151,9 @@ public partial class VirtualCard : IVirtualCard
                 cmd.Ins,
                 securityValidationResult.Error.Message
             );
-            return Result.Failure<ParsedCommand, SmartCardError>(securityValidationResult.Error);
+            return Result.Failure<(ParsedCommand, CardState), SmartCardError>(
+                securityValidationResult.Error
+            );
         }
 
         logging.LogDebug(
@@ -2028,7 +2162,25 @@ public partial class VirtualCard : IVirtualCard
             state.SecurityLevel
         );
 
-        return Result.Success<ParsedCommand, SmartCardError>(cmd);
+        if (
+            cmd.Ins == Constants.Constants.Scp.Common.EXTERNAL_AUTHENTICATE_INS
+            || !state.SecureChannel.HasValue
+        )
+            return Result.Success<(ParsedCommand, CardState), SmartCardError>((cmd, state));
+
+        // GP Card Specification v2.3.1, E.3.3 and E.4.4-E.4.6; SCP03 Amendment D
+        // v1.1.2, 6.2.4-6.2.6: verify C-MAC, remove it, then decrypt C-ENC command data.
+        return global::Gp4Net
+            .Services.ScpService.Security.RemoveCommandSecurity(
+                new CommandAPDU(cmd.FullCommand),
+                state.SecureChannel.Value
+            )
+            .Bind(result =>
+                ParsedCommand
+                    .Parse(result.plaintextCommand.BinaryCommand)
+                    .MapError(SmartCardError.InvalidData)
+                    .Map(plaintext => (plaintext, state.WithUpdatedSecureChannel(result.newState)))
+            );
     }
 
     /// <summary>
