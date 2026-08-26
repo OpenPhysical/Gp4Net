@@ -123,7 +123,8 @@ public static class CardProfileLoader
                                                 BuildSupportedInstructions(
                                                         profile.CardData.Capabilities.Instructions
                                                     )
-                                                    .Map(instructions => new CardConfiguration(
+                                                    .Bind(instructions => BuildDelegatedManagement(profile)
+                                                    .Map(delegated => new CardConfiguration(
                                                         Atr: atrBytes,
                                                         IsdAid: isdAidBytes,
                                                         StaticKeys: staticKeys,
@@ -137,12 +138,62 @@ public static class CardProfileLoader
                                                         DefaultScpVersion: defaults.scpVersion,
                                                         DefaultScpImplementation: defaults.scpImplementation,
                                                         SupportedAlgorithms: CardConfigurationAlgorithms.CreateStandardAlgorithms()
-                                                    ))
+                                                    )
+                                                    { DelegatedManagement = delegated }))
                                             )
                                     )
                             )
                     )
             );
+    }
+
+    private static Result<DelegatedManagementConfiguration?, SmartCardError> BuildDelegatedManagement(
+        CardProfile profile
+    )
+    {
+        if (profile.DelegatedManagement is null)
+            return Result.Success<DelegatedManagementConfiguration?, SmartCardError>(null);
+
+        var value = profile.DelegatedManagement;
+        return ParseHexString(value.TokenVerificationKey, "delegated token verification key")
+            .Bind(tokenKey => ParseHexString(value.ReceiptGenerationKey, "delegated receipt generation key")
+            .Bind(receiptKey => ParseHexString(value.SecurityDomainProviderId, "SD provider ID")
+            .Bind(providerId => ParseHexString(value.SecurityDomainImageNumber, "SD image number")
+            .Bind(imageNumber => ValidateDelegatedAesKeys(tokenKey, receiptKey)
+            .Bind(_ => providerId.Length <= 251 && imageNumber.Length <= 251
+                ? Result.Success<bool, SmartCardError>(true)
+                : Result.Failure<bool, SmartCardError>(SmartCardError.InvalidData(
+                    "Delegated-management SD identity fields are too long")))
+            .Bind(_ => BuildDapVerificationKeys(value.DapVerificationKeys))
+            .Map(dapKeys => (DelegatedManagementConfiguration?)new DelegatedManagementConfiguration(
+                tokenKey, receiptKey, providerId, imageNumber, value.IncludeTokenDigest, dapKeys))))));
+    }
+
+    private static Result<ImmutableDictionary<string, byte[]>, SmartCardError> BuildDapVerificationKeys(
+        Dictionary<string, string> values) => values.Aggregate(
+        Result.Success<ImmutableDictionary<string, byte[]>, SmartCardError>(
+            ImmutableDictionary<string, byte[]>.Empty),
+        (result, item) => result.Bind(keys =>
+            ParseHexString(item.Key, "DAP Security Domain AID").Bind(aid =>
+                aid.Length is < 5 or > 16
+                    ? Result.Failure<ImmutableDictionary<string, byte[]>, SmartCardError>(
+                        SmartCardError.InvalidData("DAP Security Domain AIDs must contain 5-16 bytes"))
+                    :
+                ParseHexString(item.Value, "DAP verification key").Bind(key =>
+                    key.Length is 16 or 24 or 32
+                        ? Result.Success<ImmutableDictionary<string, byte[]>, SmartCardError>(
+                            keys.SetItem(Convert.ToHexString(aid), key))
+                        : Result.Failure<ImmutableDictionary<string, byte[]>, SmartCardError>(
+                            SmartCardError.InvalidData("DAP verification keys must contain 16, 24, or 32 bytes"))))));
+
+    private static Result<bool, SmartCardError> ValidateDelegatedAesKeys(byte[] token, byte[] receipt)
+    {
+        static bool Valid(byte[] key) => key.Length is 0 or 16 or 24 or 32;
+        return Valid(token) && Valid(receipt)
+            ? Result.Success<bool, SmartCardError>(true)
+            : Result.Failure<bool, SmartCardError>(SmartCardError.InvalidData(
+                "Delegated management supports AES keys of 16, 24, or 32 bytes only"
+            ));
     }
 
     private static Result<ImmutableDictionary<byte, IKeySet>, SmartCardError> BuildStaticKeys(
@@ -428,6 +479,18 @@ internal class CardProfile
     /// </summary>
     /// <value>Maps the <c>dataObjects</c> JSON object using tag/value pairs.</value>
     public Dictionary<string, string> DataObjects { get; set; } = new();
+
+    public DelegatedManagementProfile? DelegatedManagement { get; set; }
+}
+
+internal sealed class DelegatedManagementProfile
+{
+    public string TokenVerificationKey { get; set; } = string.Empty;
+    public string ReceiptGenerationKey { get; set; } = string.Empty;
+    public string SecurityDomainProviderId { get; set; } = string.Empty;
+    public string SecurityDomainImageNumber { get; set; } = string.Empty;
+    public bool IncludeTokenDigest { get; set; }
+    public Dictionary<string, string> DapVerificationKeys { get; set; } = new();
 }
 
 /// <summary>

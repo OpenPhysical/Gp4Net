@@ -22,6 +22,7 @@ public class CliContext : ICliExecutionContext
     private readonly KeysetResolution _keysetResolver;
     private readonly CardSessionConnections? _serviceFactory;
     private readonly ReaderSelectionOperations? _readerResolutionService;
+    private readonly WarningState _warningState;
 
     public IDisplay Display { get; }
     public ICardSessionCommands CardService { get; }
@@ -43,7 +44,8 @@ public class CliContext : ICliExecutionContext
         KeysetResolution keysetResolver,
         ILogger<CliContext> logger,
         CardSessionConnections? serviceFactory = null,
-        ReaderSelectionOperations? readerResolutionService = null
+        ReaderSelectionOperations? readerResolutionService = null,
+        WarningState? warningState = null
     )
     {
         // Pure assignment - dependency injection framework ensures non-null services
@@ -53,6 +55,7 @@ public class CliContext : ICliExecutionContext
         _logger = logger;
         _serviceFactory = serviceFactory;
         _readerResolutionService = readerResolutionService;
+        _warningState = warningState ?? new WarningState();
 
         // Create pure function for secure channel establishment
         EstablishSecureChannelAsync = (request, cancellationToken) =>
@@ -100,7 +103,8 @@ public class CliContext : ICliExecutionContext
                     _keysetResolver,
                     _logger,
                     _serviceFactory,
-                    _readerResolutionService
+                    _readerResolutionService,
+                    _warningState
                 )
         );
     }
@@ -129,6 +133,17 @@ public class CliContext : ICliExecutionContext
         CancellationToken cancellationToken = default
     )
     {
+        if (
+            SecureChannelOperations.UsesImplicitTestKeys(request)
+            && Interlocked.Exchange(ref _warningState.ImplicitTestKeysEmitted, 1) == 0
+        )
+        {
+            Console.Error.WriteLine(
+                "WARNING: No keyset was supplied. Gp4Net is using the public GlobalPlatform "
+                    + "test keys. Do not use these keys with production cards."
+            );
+        }
+
         var secureChannelResult = await EstablishSecureChannelAsync(request, cancellationToken);
         return secureChannelResult
             .Bind(secureContext =>
@@ -145,7 +160,8 @@ public class CliContext : ICliExecutionContext
                         _keysetResolver,
                         _logger,
                         _serviceFactory,
-                        _readerResolutionService
+                        _readerResolutionService,
+                        _warningState
                     )
             );
     }
@@ -181,5 +197,11 @@ public class CliContext : ICliExecutionContext
             Display.Exception(ex);
             return 1;
         }
+    }
+
+    /// <summary>Mutable state shared by immutable context replacements in one CLI invocation.</summary>
+    public sealed class WarningState
+    {
+        internal int ImplicitTestKeysEmitted;
     }
 }

@@ -168,7 +168,11 @@ public class CapFileLoadingWorkflow
     /// </summary>
     /// <param name="capFileData">The CAP file data to validate.</param>
     /// <returns>The validation result with CAP file information.</returns>
-    public static CapFileValidationResult ValidateCapFile(byte[] capFileData)
+    /// <param name="limits">Optional resource limits; hardened defaults are used when omitted.</param>
+    public static CapFileValidationResult ValidateCapFile(
+        byte[] capFileData,
+        CapParsingLimits? limits = null
+    )
     {
         if (capFileData == null)
         {
@@ -180,7 +184,7 @@ public class CapFileLoadingWorkflow
             return new CapFileValidationResult(false, "CAP file data is empty");
         }
 
-        var capFileResult = CapFileStructure.Parse(capFileData);
+        var capFileResult = CapFileStructure.Parse(capFileData, limits);
 
         if (capFileResult.IsFailure)
         {

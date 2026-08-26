@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using CSharpFunctionalExtensions;
 using JetBrains.Annotations;
 using Spectre.Console.Cli;
 
@@ -17,21 +16,21 @@ public abstract class BaseCommandSettings : SecureCommandSettings
     /// </summary>
     [CommandOption("--key-enc")]
     [Description("Encryption key (hex)")]
-    public Maybe<string> KeyEnc { get; set; } = Maybe<string>.None;
+    public string KeyEnc { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the MAC key.
     /// </summary>
     [CommandOption("--key-mac")]
     [Description("MAC key (hex)")]
-    public Maybe<string> KeyMac { get; set; } = Maybe<string>.None;
+    public string KeyMac { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the DEK key.
     /// </summary>
     [CommandOption("--key-dek")]
     [Description("DEK key (hex)")]
-    public Maybe<string> KeyDek { get; set; } = Maybe<string>.None;
+    public string KeyDek { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets whether this command requires a secure channel.

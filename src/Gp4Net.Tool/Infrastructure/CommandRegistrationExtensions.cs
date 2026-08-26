@@ -189,6 +189,8 @@ public static class CommandCatalog
             new(typeof(DeleteCommand), "delete", "Delete an applet from the card", "applet"),
             new(typeof(DeleteCommand), "uninstall", "Uninstall an applet from the card", "applet"),
             new(typeof(ListCliCommand), "list", "List applications on the card", "applet"),
+            new(typeof(CreateSsdCliCommand), "create-ssd", "Create a supplementary Security Domain", "applet"),
+            new(typeof(ExtraditeCliCommand), "extradite", "Move an application to another Security Domain", "applet"),
             new(
                 typeof(ValidateCommand),
                 "validate",

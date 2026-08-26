@@ -113,6 +113,31 @@ public class CardProfileLoaderTests
     }
 
     [Test]
+    public void LoadFromJson_WithDelegatedLoadKeys_ConfiguresAesAndDapPolicies()
+    {
+        string profile = SampleP71Profile.Replace(
+            "\"dataObjects\"",
+            "\"delegatedManagement\": {"
+                + "\"tokenVerificationKey\":\"00112233445566778899AABBCCDDEEFF\","
+                + "\"receiptGenerationKey\":\"00112233445566778899AABBCCDDEEFF\","
+                + "\"securityDomainProviderId\":\"0102\","
+                + "\"securityDomainImageNumber\":\"0304\","
+                + "\"includeTokenDigest\":true,"
+                + "\"dapVerificationKeys\":{\"A000000151000000\":\"00112233445566778899AABBCCDDEEFF\"}},"
+                + "\"dataObjects\"",
+            StringComparison.Ordinal);
+
+        var result = CardProfileLoader.LoadFromJson(profile);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.DelegatedManagement.Should().NotBeNull();
+        result.Value.DelegatedManagement!.RequiresLoadToken.Should().BeTrue();
+        result.Value.DelegatedManagement.GeneratesReceipts.Should().BeTrue();
+        result.Value.DelegatedManagement.EffectiveDapVerificationKeys
+            .Should().ContainKey("A000000151000000");
+    }
+
+    [Test]
     public void LoadFromJson_WhenManageChannelIsAdvertised_ReturnsFailure()
     {
         string profile = SampleP71Profile.Replace(

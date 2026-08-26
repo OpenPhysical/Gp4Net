@@ -31,6 +31,9 @@ public sealed record PendingLoadOperation(
     byte[] LoadFileAid,
     byte[] SecurityDomainAid,
     byte[] ExpectedHash,
+    byte[] LoadParameters,
+    byte[] LoadToken,
+    bool IsDelegated,
     ImmutableList<byte> AccumulatedData,
     byte LastBlockNumber
 );
@@ -68,7 +71,8 @@ public partial record CardState(
     public ImmutableDictionary<
         KeyReference,
         StoredKeyComponent
-    > InstalledKeyComponents { get; init; } =
+    > InstalledKeyComponents
+    { get; init; } =
         ImmutableDictionary<KeyReference, StoredKeyComponent>.Empty;
 
     public Maybe<PendingPutKeyOperation> PendingPutKey { get; init; } =
@@ -81,6 +85,9 @@ public partial record CardState(
         Maybe<PendingGetStatusOperation>.None;
 
     public bool IsSecureChannelAborted { get; init; }
+
+    /// <summary>Persistent delegated-management receipt counter. Zero is the initial value.</summary>
+    public ushort ReceiptConfirmationCounter { get; init; }
 
     /// <summary>GP Card Specification v2.3.1, §5.1 and Table 11-6.</summary>
     public CardLifecycleState CardLifecycleState { get; init; } = CardLifecycleState.OpReady;
@@ -432,24 +439,24 @@ public partial record CardState(
         {
             // Increment in big-endian format
             case 2:
-            {
-                // 2-byte counter for SCP02
-                int value = newCounter[0] << 8 | newCounter[1];
-                value++;
-                newCounter[0] = (byte)(value >> 8);
-                newCounter[1] = (byte)value;
-                break;
-            }
+                {
+                    // 2-byte counter for SCP02
+                    int value = newCounter[0] << 8 | newCounter[1];
+                    value++;
+                    newCounter[0] = (byte)(value >> 8);
+                    newCounter[1] = (byte)value;
+                    break;
+                }
             case 3:
-            {
-                // 3-byte counter for SCP03
-                int value = newCounter[0] << 16 | newCounter[1] << 8 | newCounter[2];
-                value++;
-                newCounter[0] = (byte)(value >> 16);
-                newCounter[1] = (byte)(value >> 8);
-                newCounter[2] = (byte)value;
-                break;
-            }
+                {
+                    // 3-byte counter for SCP03
+                    int value = newCounter[0] << 16 | newCounter[1] << 8 | newCounter[2];
+                    value++;
+                    newCounter[0] = (byte)(value >> 16);
+                    newCounter[1] = (byte)(value >> 8);
+                    newCounter[2] = (byte)value;
+                    break;
+                }
         }
 
         return newCounter;

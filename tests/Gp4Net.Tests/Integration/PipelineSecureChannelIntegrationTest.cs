@@ -70,6 +70,34 @@ public class PipelineSecureChannelIntegrationTest
         _ = transport.TransmissionCount.Should().Be(1);
     }
 
+    [Test]
+    public async Task Established_Secure_Channel_Wraps_Command_Without_Per_Command_Opt_In()
+    {
+        SecureChannelState state = SecureChannelState
+            .Create(
+                new SessionKeys(SEnc, SMac, SRMac),
+                SecurityLevel.CMac,
+                CryptoOperations.ScpVersion.Scp03,
+                Chaining,
+                (byte)ScpImplementation.Scp03I70
+            )
+            .Value;
+        var environment = new CommandEnvironment(
+            new FixedChannel(),
+            new FixedResponseTransport([0x90, 0x00]),
+            Maybe<SecureChannelState>.From(state),
+            NullLogger.Instance,
+            CommandOptions.Default
+        );
+        var command = SelectCommand.CreateForIssuerSecurityDomain().Value;
+
+        var result = await CommandProcessors.WrapSecureChannel(command, environment);
+
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Metadata.SecureChannelWrapped.Should().BeTrue();
+        _ = result.Value.Data[0].Should().Be(0x04);
+    }
+
     private sealed class FixedChannel : ICardChannel
     {
         public TransportProtocol Protocol => TransportProtocol.T1;

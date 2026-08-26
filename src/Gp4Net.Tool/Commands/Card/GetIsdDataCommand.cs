@@ -38,7 +38,21 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
             .RequireCardConnection(settings.GetReaderName());
 
         return await connectionResult.Match(
-            async connectedCtx => await GetDataObjectsAsync(connectedCtx, settings),
+            async connectedCtx =>
+            {
+                var selection = await Discovery.DetectAndSelectIsdAsync(
+                    (apdu, cancellationToken) =>
+                        connectedCtx.CardService.ExecuteCommandAsync(apdu, cancellationToken),
+                    CancellationToken.None
+                );
+                if (selection.IsFailure)
+                {
+                    connectedCtx.Display.Error($"Unable to select the ISD: {selection.Error.Message}");
+                    return 1;
+                }
+
+                return await GetDataObjectsAsync(connectedCtx, settings);
+            },
             async connectionError =>
             {
                 AnsiConsole.MarkupLine($"[red]Connection error: {connectionError.Message}[/]");
@@ -309,6 +323,7 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
     private static async Task<int> GetAllDataAsync(ICliExecutionContext context, Settings settings)
     {
         var results = new Dictionary<string, string>();
+        var rawResults = new Dictionary<string, byte[]>();
         List<string> errors = [];
 
         // Try to get all standard data objects
@@ -340,6 +355,7 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
                     });
                 if (dataResult.IsSuccess)
                 {
+                    rawResults[name] = dataResult.Value;
                     results[name] = FormatDataForDisplay(
                         new GetDataResponse(tag, dataResult.Value),
                         settings.Format
@@ -359,51 +375,33 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
         }
 
         // Try to reconstruct OPID if possible
-        if (
-            results.ContainsKey("IIN")
-            && results.ContainsKey("CIN")
-            && results.ContainsKey("Manager URL")
-        )
-        {
-            // Functional OPID reconstruction with proper error handling
-            var opidResult = Result
-                .Success<byte[], SmartCardError>(Convert.FromHexString(results["IIN"]))
-                .Map(bytes => Encoding.ASCII.GetString(bytes))
-                .Bind(iin =>
-                    Result
-                        .Success<byte[], SmartCardError>(Convert.FromHexString(results["CIN"]))
-                        .Map(bytes => Encoding.ASCII.GetString(bytes))
-                        .Bind(cin =>
-                            Result
-                                .Success<byte[], SmartCardError>(
-                                    Convert.FromHexString(results["Manager URL"])
-                                )
-                                .Map(bytes => Encoding.ASCII.GetString(bytes))
-                                .Bind(url =>
-                                {
-                                    if (OpenPhysicalId.TryFromCardData(iin, cin, url, out var opid))
-                                    {
-                                        return Result.Success<OpenPhysicalId, SmartCardError>(opid);
-                                    }
-                                    return Result.Failure<OpenPhysicalId, SmartCardError>(
-                                        SmartCardError.InvalidArgument(
-                                            "Failed to construct OPID from card data"
-                                        )
-                                    );
-                                })
-                        )
-                );
-
-            opidResult.Match(
-                opid => results["OPID"] = opid.ToDisplayFormat(),
-                error =>
-                { /* OPID reconstruction failed, that's okay */
-                }
-            );
-        }
+        TryCreateOpid(rawResults).Execute(opid => results["OPID"] = opid.ToDisplayFormat());
 
         DisplayAllData(context, settings, results, errors);
         return errors.Count > 0 ? 1 : 0;
+    }
+
+    internal static Maybe<OpenPhysicalId> TryCreateOpid(
+        IReadOnlyDictionary<string, byte[]> rawResults
+    )
+    {
+        if (
+            !rawResults.TryGetValue("IIN", out byte[]? iinBytes)
+            || !rawResults.TryGetValue("CIN", out byte[]? cinBytes)
+            || !rawResults.TryGetValue("Manager URL", out byte[]? managerUrlBytes)
+        )
+        {
+            return Maybe<OpenPhysicalId>.None;
+        }
+
+        return OpenPhysicalId.TryFromCardData(
+            Encoding.ASCII.GetString(iinBytes),
+            Encoding.ASCII.GetString(cinBytes),
+            Encoding.ASCII.GetString(managerUrlBytes),
+            out OpenPhysicalId opid
+        )
+            ? Maybe<OpenPhysicalId>.From(opid)
+            : Maybe<OpenPhysicalId>.None;
     }
 
     private static int HandleInvalidDataObject(ICliExecutionContext context, string dataObject)

@@ -305,6 +305,34 @@ public class LoadCommand : IApduCommand
         return Result.Success<IList<LoadCommand>, SmartCardError>(commands);
     }
 
+    /// <summary>Creates LOAD commands from an already encoded Load File (optional E2 blocks followed by C4).</summary>
+    public static Result<IList<LoadCommand>, SmartCardError> CreateFromEncodedLoadFile(
+        byte[] encodedLoadFile,
+        int maxBlockSize = Constants.Constants.GlobalPlatform.ApduLimits.DEFAULT_LOAD_BLOCK_SIZE
+    )
+    {
+        if (encodedLoadFile is null || encodedLoadFile.Length == 0)
+            return SmartCardError.InvalidArgument("Encoded Load File cannot be null or empty.");
+        if (maxBlockSize is < 1 or > 255)
+            return SmartCardError.InvalidArgument("Block size must be between 1 and 255 bytes.");
+
+        List<LoadCommand> commands = [];
+        int offset = 0;
+        byte blockNumber = 0;
+        while (offset < encodedLoadFile.Length)
+        {
+            if (blockNumber == byte.MaxValue && encodedLoadFile.Length - offset > maxBlockSize)
+                return SmartCardError.InvalidArgument("Encoded Load File requires more than 256 LOAD blocks.");
+            int count = Math.Min(maxBlockSize, encodedLoadFile.Length - offset);
+            byte[] block = encodedLoadFile.AsSpan(offset, count).ToArray();
+            bool final = offset + count == encodedLoadFile.Length;
+            commands.Add(new LoadCommand(blockNumber, block, final, Maybe<uint>.None));
+            offset += count;
+            blockNumber++;
+        }
+        return commands;
+    }
+
     /// <summary>
     /// Calculates the TLV header size for a given total CAP file size.
     /// </summary>
@@ -387,10 +415,11 @@ public class LoadCommand : IApduCommand
 }
 
 /// <summary>
-/// Represents the response to a LOAD command.
+/// Represents a strictly parsed LOAD response.
+/// See GlobalPlatform Card Specification v2.3.1, sections 11.6.3 and 11.1.6.
 /// </summary>
 [PublicAPI]
-public class LoadResponse
+public sealed class LoadResponse
 {
     /// <summary>
     /// Gets the response data (typically empty for LOAD commands).
@@ -408,26 +437,135 @@ public class LoadResponse
     public ushort StatusWord { get; }
 
     /// <summary>
+    /// Gets the delegated-management receipt and Confirmation Data, when returned.
+    /// See GlobalPlatform Card Specification v2.3.1, section 11.1.6 and Appendix C.5.1.
+    /// </summary>
+    public Maybe<LoadConfirmation> Confirmation { get; }
+
+    /// <summary>
     /// Initializes a new instance of the LoadResponse class.
     /// </summary>
     /// <param name="data">The response data.</param>
     /// <param name="statusWord">The status word.</param>
     public LoadResponse(byte[] data, ushort statusWord)
+        : this(data, statusWord, Maybe<LoadConfirmation>.None) { }
+
+    private LoadResponse(byte[] data, ushort statusWord, Maybe<LoadConfirmation> confirmation)
     {
         Data = data != null ? (byte[])data.Clone() : [];
         StatusWord = statusWord;
         IsSuccessful = statusWord == 0x9000;
+        Confirmation = confirmation;
     }
 
     /// <summary>
-    /// Parses a LOAD response.
+    /// Parses a LOAD response and rejects non-canonical lengths, truncation, and trailing data.
     /// </summary>
     /// <param name="response">The response data (excluding status word).</param>
     /// <param name="statusWord">The status word from the response.</param>
     /// <returns>The parsed response.</returns>
-    public static LoadResponse Parse(byte[] response, ushort statusWord)
+    public static Result<LoadResponse, SmartCardError> Parse(byte[] response, ushort statusWord)
     {
-        return new LoadResponse(response ?? [], statusWord);
+        response ??= [];
+        if (statusWord != 0x9000)
+            return new LoadResponse(response, statusWord);
+        if (response.Length == 1 && response[0] == 0x00)
+            return new LoadResponse(response, statusWord);
+        if (response.Length == 0)
+            return SmartCardError.InvalidData("LOAD response is missing its mandatory confirmation length.");
+
+        return ReadBerLength(response, 0).Bind(length =>
+        {
+            if (length.Offset + length.Length != response.Length)
+                return Result.Failure<LoadResponse, SmartCardError>(
+                    SmartCardError.InvalidData("LOAD confirmation length does not consume the response."));
+            if (length.Length == 0)
+                return Result.Success<LoadResponse, SmartCardError>(new LoadResponse(response, statusWord));
+            return ParseConfirmation(response.AsSpan(length.Offset, length.Length).ToArray())
+                .Map(value => new LoadResponse(response, statusWord, Maybe<LoadConfirmation>.From(value)));
+        });
+    }
+
+    private static Result<LoadConfirmation, SmartCardError> ParseConfirmation(byte[] data) =>
+        ReadBerLength(data, 0).Bind(receiptLength =>
+        {
+            int receiptEnd = receiptLength.Offset + receiptLength.Length;
+            if (receiptEnd > data.Length)
+                return Result.Failure<LoadConfirmation, SmartCardError>(SmartCardError.InvalidData("Load Receipt is truncated."));
+            byte[] receipt = data.AsSpan(receiptLength.Offset, receiptLength.Length).ToArray();
+            int offset = receiptEnd;
+            if (offset >= data.Length || data[offset++] != 2 || offset + 2 > data.Length)
+                return Result.Failure<LoadConfirmation, SmartCardError>(SmartCardError.InvalidData("Confirmation Counter must contain two bytes."));
+            ushort counter = (ushort)(data[offset] << 8 | data[offset + 1]);
+            offset += 2;
+            if (offset >= data.Length)
+                return Result.Failure<LoadConfirmation, SmartCardError>(SmartCardError.InvalidData("SD Unique Data length is missing."));
+            int uniqueLength = data[offset++];
+            if (uniqueLength == 0 || offset + uniqueLength > data.Length)
+                return Result.Failure<LoadConfirmation, SmartCardError>(SmartCardError.InvalidData("SD Unique Data is invalid."));
+            byte[] uniqueData = data.AsSpan(offset, uniqueLength).ToArray();
+            offset += uniqueLength;
+            byte[] digest = [];
+            if (offset < data.Length)
+            {
+                int digestLength = data[offset++];
+                if (digestLength != 32 || offset + digestLength != data.Length)
+                    return Result.Failure<LoadConfirmation, SmartCardError>(SmartCardError.InvalidData("Token Data digest must be a complete SHA-256 value."));
+                digest = data.AsSpan(offset, digestLength).ToArray();
+                offset += digestLength;
+            }
+            if (offset != data.Length)
+                return Result.Failure<LoadConfirmation, SmartCardError>(SmartCardError.InvalidData("LOAD confirmation has trailing data."));
+            return Result.Success<LoadConfirmation, SmartCardError>(new LoadConfirmation(receipt, counter, uniqueData, digest));
+        });
+
+    private static Result<(int Length, int Offset), SmartCardError> ReadBerLength(byte[] data, int offset)
+    {
+        if (offset >= data.Length)
+            return SmartCardError.InvalidData("BER length is missing.");
+        byte first = data[offset++];
+        if (first <= 0x7F)
+            return (first, offset);
+        if (first != 0x81 || offset >= data.Length || data[offset] < 0x80)
+            return SmartCardError.InvalidData("BER length is non-canonical or unsupported.");
+        return (data[offset], offset + 1);
+    }
+}
+
+/// <summary>
+/// Contains a delegated LOAD Receipt and its Confirmation Data.
+/// See GlobalPlatform Card Specification v2.3.1, section 11.1.6 and Appendix C.5.1.
+/// </summary>
+public sealed class LoadConfirmation
+{
+    private readonly byte[] _receipt;
+    private readonly byte[] _sdUniqueData;
+    private readonly byte[] _tokenDataDigest;
+    /// <summary>Gets a defensive copy of the Load Receipt.</summary>
+    public byte[] Receipt => (byte[])_receipt.Clone();
+
+    /// <summary>Gets the 16-bit Receipt Generation Security Domain counter.</summary>
+    public ushort ConfirmationCounter { get; }
+
+    /// <summary>Gets a defensive copy of the SD Unique Data.</summary>
+    public byte[] SecurityDomainUniqueData => (byte[])_sdUniqueData.Clone();
+
+    /// <summary>Gets the optional SHA-256 token-data digest.</summary>
+    public Maybe<byte[]> TokenDataDigest => _tokenDataDigest.Length == 0
+        ? Maybe<byte[]>.None
+        : Maybe<byte[]>.From((byte[])_tokenDataDigest.Clone());
+
+    /// <summary>Creates an immutable parsed confirmation value.</summary>
+    public LoadConfirmation(
+        byte[] receipt,
+        ushort confirmationCounter,
+        byte[] sdUniqueData,
+        byte[] tokenDataDigest)
+    {
+        _receipt = (byte[])receipt.Clone();
+        ConfirmationCounter = confirmationCounter;
+        _sdUniqueData = (byte[])sdUniqueData.Clone();
+        _tokenDataDigest = (byte[])tokenDataDigest.Clone();
     }
 }
 

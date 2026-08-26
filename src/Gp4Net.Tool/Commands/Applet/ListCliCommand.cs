@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading;
@@ -6,10 +7,14 @@ using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
+using Gp4Net.Services.GlobalPlatform;
+using Gp4Net.Tool.Extensions;
 using Gp4Net.Tool.Infrastructure;
+using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 using Spectre.Console;
 using Spectre.Console.Cli;
+using static Gp4Net.Constants.Constants.GlobalPlatform;
 
 namespace Gp4Net.Tool.Commands.Applet;
 
@@ -19,148 +24,79 @@ namespace Gp4Net.Tool.Commands.Applet;
 /// </summary>
 [PublicAPI]
 [CliCommand("list", "List applications on the card", "applet")]
+[CommandHandler]
 [Description("List applications on the card")]
-public class ListCliCommand : AsyncCommand<ListCliCommand.Settings>
+public class ListCliCommand : IPipelineCommand<ListCliCommand.Settings>
 {
-    /// <summary>
-    /// Initializes a new instance of the ListCliCommand class.
-    /// Uses static GlobalPlatform services.
-    /// </summary>
-    public ListCliCommand() { }
-
     /// <summary>
     /// Executes the list command using library services for data and tool for display.
     /// </summary>
     /// <param name="context">The command context.</param>
     /// <param name="settings">The command settings.</param>
     /// <returns>0 if successful, 1 if failed.</returns>
-    public override Task<int> ExecuteAsync(CommandContext context, Settings settings)
+    public async Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
     {
-        AnsiConsole.MarkupLine("[yellow]Listing applications on card...[/]");
+        var connected = await context.RequireCardConnection(settings.GetReaderName());
+        if (connected.IsFailure)
+        {
+            context.Display.Error($"Card connection failed: {connected.Error.Message}");
+            return 1;
+        }
 
-        AnsiConsole.MarkupLine(
-            "[red]Application listing not yet implemented with static services.[/]"
+        var secured = await connected.Value.RequireSecureChannel(settings.ToSecureChannelRequest());
+        if (secured.IsFailure)
+        {
+            context.Display.Error($"Secure channel establishment failed: {secured.Error.Message}");
+            return 1;
+        }
+
+        var result = await Applications.RetrieveCompleteCardContentAsync(
+            (command, ct) => secured.Value.CardService.ExecuteCommandAsync(command, ct),
+            CancellationToken.None
         );
-        return Task.FromResult(1);
+        if (result.IsFailure)
+        {
+            context.Display.Error($"Application listing failed: {result.Error.Message}");
+            return 1;
+        }
+
+        ProcessApplications(ToApplicationInfos(result.Value), settings);
+        return 0;
     }
 
-    /// <summary>
-    /// Executes with the service using proper library/tool separation.
-    /// </summary>
-    private async Task<int> ExecuteWithService(
-        object service, // OBSOLETE: Need to refactor to static services
-        Settings settings,
-        CancellationToken cancellationToken
-    )
+    private static IReadOnlyList<ApplicationInfo> ToApplicationInfos(CardContent content)
     {
-        // This obsolete service pattern will be removed - placeholder return
-        return await Task.FromResult(
-                Result.Failure<IReadOnlyList<ApplicationInfo>, SmartCardError>(
-                    SmartCardError.Unsupported("Service integration pending")
+        var applications = new List<ApplicationInfo>();
+        content.IssuerSecurityDomain.Execute(applications.Add);
+        applications.AddRange(content.SecurityDomains);
+        applications.AddRange(content.Applications);
+        applications.AddRange(
+            content.ExecutableLoadFiles.Select(loadFile =>
+                new ApplicationInfo(
+                    loadFile.Aid,
+                    (byte)loadFile.LifecycleState,
+                    ImmutableList<Privilege>.Empty,
+                    ApplicationType.ExecutableLoadFile,
+                    loadFile.Version,
+                    loadFile.AssociatedSecurityDomainAid
                 )
             )
-            .Match(
-                applications =>
-                {
-                    ProcessApplications(applications, settings);
-                    return 0;
-                },
-                error =>
-                {
-                    HandleError(error, "Operation failed", settings);
-                    return 1;
-                }
-            );
-    }
-
-    /// <summary>
-    /// Establishes secure channel from settings with functional patterns.
-    /// </summary>
-    private Task<Result<SecureChannelState, SmartCardError>> EstablishSecureChannelFromSettings(
-        object service, // OBSOLETE: Need to refactor to static services
-        Settings settings,
-        CancellationToken cancellationToken
-    )
-    {
-        // Use pattern matching to check if all keys are provided
-        return (
-            settings.KeyEnc.HasValue && settings.KeyMac.HasValue && settings.KeyDek.HasValue
-        ) switch
-        {
-            true
-                =>
-                // All keys provided - extract them using pattern matching
-                Task.FromResult(
-                    settings.KeyEnc.Match(
-                        encKey =>
-                            settings.KeyMac.Match(
-                                macKey =>
-                                    settings.KeyDek.Match(
-                                        dekKey =>
-                                            Result.Failure<SecureChannelState, SmartCardError>(
-                                                SmartCardError.Unsupported(
-                                                    "Service integration pending"
-                                                )
-                                            ),
-                                        () =>
-                                            Result.Failure<SecureChannelState, SmartCardError>(
-                                                SmartCardError.InvalidData(
-                                                    "DEK key is required when using explicit keys"
-                                                )
-                                            )
-                                    ),
-                                () =>
-                                    Result.Failure<SecureChannelState, SmartCardError>(
-                                        SmartCardError.InvalidData(
-                                            "MAC key is required when using explicit keys"
-                                        )
-                                    )
-                            ),
-                        () =>
-                            Result.Failure<SecureChannelState, SmartCardError>(
-                                SmartCardError.InvalidData(
-                                    "ENC key is required when using explicit keys"
-                                )
-                            )
-                    )
-                ),
-            false
-                =>
-                // Use keyset specification (placeholder implementation)
-                Task.FromResult(
-                    Result.Failure<SecureChannelState, SmartCardError>(
-                        SmartCardError.Unsupported("Service integration pending")
-                    )
-                ),
-        };
-    }
-
-    /// <summary>
-    /// Handles errors with proper tool-layer error display.
-    /// </summary>
-    private static void HandleError(SmartCardError error, string operation, Settings settings)
-    {
-        AnsiConsole.MarkupLine($"[red]{operation}: {error.Message}[/]");
-
-        if (settings.Verbose && error.InnerException.HasValue)
-        {
-            error.InnerException.Match(
-                exception =>
-                {
-                    AnsiConsole.MarkupLine("[red]Detailed error information:[/]");
-                    AnsiConsole.WriteException(exception);
-                    return true;
-                },
-                () => false
-            );
-        }
+        );
+        return applications;
     }
 
     /// <summary>
     /// Processes applications for display using functional composition.
     /// </summary>
-    private void ProcessApplications(IReadOnlyList<ApplicationInfo> applications, Settings settings)
+    private static void ProcessApplications(
+        IReadOnlyList<ApplicationInfo> applications,
+        Settings settings
+    )
     {
+        IReadOnlyList<ApplicationInfo> filtered = ApplicationTableBuilder.ApplyFilter(
+            applications,
+            settings.Filter
+        );
         // Build semantic rows using pure functional composition
         var semanticRows = ApplicationTableBuilder
             .BuildApplicationRows(
@@ -175,12 +111,12 @@ public class ListCliCommand : AsyncCommand<ListCliCommand.Settings>
         switch (settings.Format.ToLowerInvariant())
         {
             case "json":
-                string json = ApplicationTableBuilder.ToJson(applications);
+                string json = ApplicationTableBuilder.ToJson(filtered);
                 AnsiConsole.WriteLine(json);
                 break;
 
             case "csv":
-                string csv = ApplicationTableBuilder.ToCsv(applications);
+                string csv = ApplicationTableBuilder.ToCsv(filtered);
                 AnsiConsole.WriteLine(csv);
                 break;
 

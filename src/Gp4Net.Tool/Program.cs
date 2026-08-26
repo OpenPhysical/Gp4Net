@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Gp4Net.Services;
@@ -46,8 +47,15 @@ public class Program
 
             using var loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder =>
             {
-                _ = builder.SetMinimumLevel(LogLevel.Debug);
-                _ = builder.AddConsole();
+                LogLevel minimumLevel = args.Any(arg => arg is "-d" or "--debug")
+                    ? LogLevel.Debug
+                    : args.Any(arg => arg is "-v" or "--verbose")
+                        ? LogLevel.Information
+                        : LogLevel.Warning;
+                _ = builder.SetMinimumLevel(minimumLevel);
+                _ = builder.AddConsole(options =>
+                    options.LogToStandardErrorThreshold = LogLevel.Trace
+                );
             });
             var display = new ConsoleDisplay();
             var keysets = new KeysetResolution();

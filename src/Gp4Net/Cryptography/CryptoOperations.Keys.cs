@@ -15,6 +15,26 @@ public static partial class CryptoOperations
     /// </summary>
     public static class Keys
     {
+        /// <summary>Computes a full-length AES-CMAC for delegated-management data.</summary>
+        public static Result<byte[], SmartCardError> ComputeAesCmac(byte[] key, byte[] data)
+        {
+            if (key.Length is not (16 or 24 or 32))
+                return SmartCardError.InvalidArgument("AES-CMAC keys must contain 16, 24, or 32 bytes.");
+
+            return Result.Try(
+                () =>
+                {
+                    var cmac = new CMac(new AesEngine(), 128);
+                    cmac.Init(new KeyParameter(key));
+                    byte[] result = new byte[16];
+                    cmac.BlockUpdate(data, 0, data.Length);
+                    cmac.DoFinal(result, 0);
+                    return result;
+                },
+                ex => SmartCardError.CryptographicError($"AES-CMAC calculation failed: {ex.Message}")
+            );
+        }
+
         /// <summary>
         /// Computes a spec-compliant Delete Token for the DELETE command, per GP Table C-9.
         /// Currently supports AES CMAC only.
@@ -56,21 +76,7 @@ public static partial class CryptoOperations
                 _
                     => BuildDeleteTokenInput(p1, p2, aid, optionalTlv)
                         .Bind(input =>
-                            Result.Try(
-                                () =>
-                                {
-                                    var cmac = new CMac(new AesEngine(), 128);
-                                    cmac.Init(new KeyParameter(macKey));
-                                    byte[] mac = new byte[16];
-                                    cmac.BlockUpdate(input, 0, input.Length);
-                                    cmac.DoFinal(mac, 0);
-                                    return mac;
-                                },
-                                ex =>
-                                    SmartCardError.CryptographicError(
-                                        $"Delete token calculation failed: {ex.Message}"
-                                    )
-                            )
+                            ComputeAesCmac(macKey, input)
                         ),
             };
         }

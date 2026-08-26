@@ -384,11 +384,13 @@ public class LoadCommandTests
     public void LoadResponse_Parse_ReturnsCorrectResponse()
     {
         // Arrange
-        byte[] data = TestData;
+        byte[] data = [0x00];
         const ushort statusWord = 0x9000;
 
         // Act
-        var response = LoadResponse.Parse(data, statusWord);
+        var result = LoadResponse.Parse(data, statusWord);
+        _ = result.IsSuccess.Should().BeTrue();
+        var response = result.Value;
 
         // Assert
         _ = response.Data.Should().BeEquivalentTo(data);
@@ -403,8 +405,7 @@ public class LoadCommandTests
         var response = LoadResponse.Parse(null!, 0x9000);
 
         // Assert
-        _ = response.Data.Should().NotBeNull();
-        _ = response.Data.Length.Should().Be(0);
+        _ = response.IsFailure.Should().BeTrue();
     }
 
     [Test]

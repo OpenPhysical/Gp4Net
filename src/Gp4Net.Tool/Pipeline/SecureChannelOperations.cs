@@ -17,6 +17,9 @@ namespace Gp4Net.Tool.Pipeline;
 [PublicAPI]
 public static class SecureChannelOperations
 {
+    internal static bool UsesImplicitTestKeys(SecureChannelRequest request) =>
+        !request.ExplicitKeys.HasValue && !request.KeysetName.HasValue;
+
     /// <summary>
     /// Establishes secure channel from a functional request structure.
     /// Pure function that converts request to secure channel operations.

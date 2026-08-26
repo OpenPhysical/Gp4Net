@@ -205,6 +205,7 @@ public static class VirtualCardStateStore
                         counter => counter.Value
                     ),
                     CardLifecycleState = (CardLifecycleState)snapshot.CardLifecycle,
+                    ReceiptConfirmationCounter = snapshot.ReceiptConfirmationCounter,
                 };
 
                 return CardStateTransitions.InitializeApplicationRegistryWithDataObjects(
@@ -235,10 +236,20 @@ public static class VirtualCardStateStore
 
     private static byte[] ComputeProfileFingerprint(CardConfiguration configuration)
     {
+        IEnumerable<byte> delegated = configuration.DelegatedManagement is { } dm
+            ? dm.TokenVerificationKey
+                .Concat(dm.ReceiptGenerationKey)
+                .Concat(dm.SecurityDomainProviderId)
+                .Concat(dm.SecurityDomainImageNumber)
+                .Concat([dm.IncludeTokenDigest ? (byte)1 : (byte)0])
+                .Concat(dm.EffectiveDapVerificationKeys.OrderBy(item => item.Key)
+                    .SelectMany(item => Encoding.ASCII.GetBytes(item.Key).Concat(item.Value)))
+            : [];
         byte[] material = configuration
             .Atr.Concat(configuration.IsdAid)
             .Concat([configuration.DefaultScpVersion, (byte)configuration.DefaultScpImplementation])
             .Concat(Encoding.UTF8.GetBytes(configuration.CardType))
+            .Concat(delegated)
             .ToArray();
         return CryptoOperations.Hash.Sha256(material).Value;
     }
@@ -339,6 +350,8 @@ public static class VirtualCardStateStore
         CounterSnapshot[] SequenceCounters
     )
     {
+        public ushort ReceiptConfirmationCounter { get; init; }
+
         public static CardSnapshot From(CardState state) =>
             new(
                 state.Uuid.ToGuid(),
@@ -387,6 +400,7 @@ public static class VirtualCardStateStore
                 state
                     .SequenceCounters.Select(item => new CounterSnapshot(item.Key, item.Value))
                     .ToArray()
-            );
+            )
+            { ReceiptConfirmationCounter = state.ReceiptConfirmationCounter };
     }
 }
