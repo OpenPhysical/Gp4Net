@@ -885,4 +885,18 @@ public class InstallCommandTests
         _ = command.AppletAid.Should().BeEquivalentTo(originalAppletAid);
         _ = command.Privileges.Should().BeEquivalentTo(originalPrivileges);
     }
+
+    [Test]
+    public void InstallForExtraditionCommand_MatchesCapturedJcop4Vector()
+    {
+        var result = InstallCommand.InstallForManagementCommand.CreateForExtradition(
+            Convert.FromHexString("A0000001515350D3"),
+            Convert.FromHexString("A000000308000010000100"));
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.P1.Should().Be(0x10);
+        result.Value.P2.Should().Be(0x00);
+        result.Value.Data.Should().Equal(Convert.FromHexString(
+            "08A0000001515350D3000BA000000308000010000100000000"));
+    }
 }

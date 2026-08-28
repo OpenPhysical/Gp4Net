@@ -136,6 +136,29 @@ public class SecureChannelOperationsTests
         Assert.That(result.Error.Message, Does.Contain("Unknown keyset"));
     }
 
+    [Test]
+    public void Should_Warn_Only_For_Implicit_Test_Keys()
+    {
+        var implicitRequest = new SecureChannelRequest(
+            Maybe<string>.None,
+            Maybe<ExplicitKeys>.None,
+            Maybe<Dictionary<string, string>>.None,
+            SecurityLevel.CMac,
+            Maybe<byte>.None
+        );
+        var namedRequest = implicitRequest with { KeysetName = Maybe<string>.From("gp_test_keys") };
+        var explicitRequest = implicitRequest with
+        {
+            ExplicitKeys = Maybe<ExplicitKeys>.From(new ExplicitKeys(
+                GpTestKeys.GpTestKey, GpTestKeys.GpTestKey, GpTestKeys.GpTestKey
+            )),
+        };
+
+        Assert.That(SecureChannelOperations.UsesImplicitTestKeys(implicitRequest), Is.True);
+        Assert.That(SecureChannelOperations.UsesImplicitTestKeys(namedRequest), Is.False);
+        Assert.That(SecureChannelOperations.UsesImplicitTestKeys(explicitRequest), Is.False);
+    }
+
     private static async Task<ICardSessionCommands> CreateSmartCardServiceAsync()
     {
         string readerSpec = $"virtual:{ProfilePath}";

@@ -7,6 +7,8 @@ using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain.Keys;
 using JetBrains.Annotations;
+using Org.BouncyCastle.Crypto.Engines;
+using Org.BouncyCastle.Crypto.Parameters;
 
 namespace Gp4Net.Services;
 
@@ -142,6 +144,101 @@ public static class KeyDiversification
                                 )
                             )
                     )
+            );
+    }
+
+    /// <summary>Diversifies an SCP02 keyset with an EMV, VISA, or VISA2 template.</summary>
+    public static Result<Scp02KeySet, SmartCardError> DiversifyScp02KeySet(
+        Scp02KeySet baseKeySet,
+        KeyDiversificationSpec spec,
+        byte[] keyDiversificationData
+    )
+    {
+        if (keyDiversificationData.Length == 0)
+            return baseKeySet;
+
+        if (!Templates.TryGetValue(spec.Scheme, out var template) || spec.Scheme == "scp03")
+        {
+            return SmartCardError.Unsupported(
+                $"Diversification scheme '{spec.Scheme}' is not supported for SCP02"
+            );
+        }
+
+        return DiversifyScp02Key(
+                baseKeySet.EncKey,
+                template,
+                keyDiversificationData,
+                DiversificationKeyPurpose.Enc
+            )
+            .Bind(enc =>
+                DiversifyScp02Key(
+                        baseKeySet.MacKey,
+                        template,
+                        keyDiversificationData,
+                        DiversificationKeyPurpose.Mac
+                    )
+                    .Bind(mac =>
+                        DiversifyScp02Key(
+                                baseKeySet.DekKey,
+                                template,
+                                keyDiversificationData,
+                                DiversificationKeyPurpose.Dek
+                            )
+                            .Bind(dek =>
+                                Scp02KeySet.Create(
+                                    enc,
+                                    mac,
+                                    dek,
+                                    baseKeySet.KeyVersion,
+                                    baseKeySet.KeyId
+                                )
+                            )
+                    )
+            );
+    }
+
+    private static Result<byte[], SmartCardError> DiversifyScp02Key(
+        byte[] baseKey,
+        string template,
+        byte[] keyDiversificationData,
+        DiversificationKeyPurpose purpose
+    )
+    {
+        return ExpandTemplate(
+                NormalizeTemplate(template),
+                keyDiversificationData,
+                (byte)purpose,
+                128
+            )
+            .Ensure(
+                blocks => blocks.BlockA.Length == 0 && blocks.BlockB.Length == 16,
+                SmartCardError.InvalidArgument(
+                    "SCP02 diversification template must expand to one 16-byte block"
+                )
+            )
+            .Bind(blocks =>
+                CryptoOperations.Utils.ExpandTripleDesKey(baseKey).Map(key => (blocks, key))
+            )
+            .Bind(context =>
+                Result.Try(
+                    () =>
+                    {
+                        var engine = new DesEdeEngine();
+                        engine.Init(true, new DesEdeParameters(context.key));
+                        var result = new byte[context.blocks.BlockB.Length];
+                        for (
+                            var offset = 0;
+                            offset < result.Length;
+                            offset += engine.GetBlockSize()
+                        )
+                            engine.ProcessBlock(context.blocks.BlockB, offset, result, offset);
+                        return result;
+                    },
+                    error =>
+                        SmartCardError.SecurityError(
+                            $"SCP02 key diversification failed: {error.Message}"
+                        )
+                )
             );
     }
 

@@ -1,0 +1,278 @@
+{
+  "source": "Gp4Net hardware capture, 2026-08-26",
+  "card": {
+    "atr": "3B8580018073C821100E",
+    "isdAid": "A000000151000000",
+    "platform": "NXP P71D321 / JCOP4",
+    "globalPlatform": "2.2.3",
+    "secureChannel": "SCP02 i=55",
+    "keyVersion": 1,
+    "publicTestKey": "404142434445464748494A4B4C4D4E4F"
+  },
+  "vectors": [
+    {
+      "name": "scp02-static-test-key-session",
+      "hostChallenge": "E3E36E6FBBC98F00",
+      "initializeUpdateResponse": "0000316803496620744801020017CE12B6373F902AA03BDA981D015E",
+      "sequenceCounter": "0017",
+      "sessionEnc": "56A1DC0A4B4165C9ED464FAB97380ABD",
+      "sessionMac": "6DDCB69848E88F941CDD5978B46B6A3E",
+      "sessionRmac": "04F08E7AA9F735905DB96CFF6DF02A30",
+      "cardCryptogram": "2AA03BDA981D015E",
+      "hostCryptogram": "DF4B2AC87842B118",
+      "externalAuthenticateMac": "AD3410261EB6603F",
+      "statusWord": "9000"
+    },
+    {
+      "name": "install-for-load-ordinary-success",
+      "commandData": "0AA000000382001100010000000000",
+      "p1": "02",
+      "p2": "00",
+      "statusWord": "9000"
+    },
+    {
+      "name": "combined-install-with-parameters-success",
+      "commandData": "0AA00000038200110001000AA00000038200110001010AA00000038200110001A1010005C903C9010100",
+      "p1": "0C",
+      "p2": "00",
+      "statusWord": "9000"
+    },
+    {
+      "name": "delete-instance-with-related-objects-success",
+      "commandData": "4F0AA00000038200110001A1",
+      "p1": "00",
+      "p2": "80",
+      "statusWord": "9000"
+    },
+    {
+      "name": "aes-delegated-install-for-load-to-isd-rejected",
+      "commandData": "06D2760001240108A00000015100000020058B5BABCED417130E0F7705BBEE30D9B65A5E0E49D161A7B08D575053FC825C06EF04C6020001109D4EA1F08CC49CD22D059EA3D58BCCB7",
+      "p1": "02",
+      "p2": "00",
+      "statusWord": "6A80",
+      "notes": "LFDBH and AES-CMAC token were calculated locally from SmartPGP v1.23.1. The ISD is not a valid provisioned delegated target on this card."
+    },
+    {
+      "name": "create-ssd-with-delegated-management-rejected",
+      "commandData": "0AA00000038200110001000AA00000038200110001010AA00000038200110001D001A00000",
+      "p1": "0C",
+      "p2": "00",
+      "statusWord": "6985"
+    },
+    {
+      "name": "create-built-in-ssd-with-delegated-management-success",
+      "commandData": "07A000000151535008A00000015153504108A0000001515350D101A002C90000",
+      "p1": "0C",
+      "p2": "00",
+      "responseData": "00",
+      "statusWord": "9000"
+    },
+    {
+      "name": "put-aes-token-verification-key-success",
+      "keyVersion": "70",
+      "keyType": "88",
+      "keyLength": 16,
+      "keyCheckValue": "3544E0",
+      "responseData": "703544E0",
+      "statusWord": "9000",
+      "notes": "The encrypted key bytes and C-MAC are session-specific and intentionally omitted."
+    },
+    {
+      "name": "ordinary-load-to-delegated-ssd-requires-token",
+      "commandData": "06D2760001240108A0000001515350D1000000",
+      "p1": "02",
+      "p2": "00",
+      "statusWord": "6985"
+    },
+    {
+      "name": "aes-delegated-load-to-provisioned-ssd-without-receipt-key-rejected",
+      "commandData": "06D2760001240108A0000001515350D120058B5BABCED417130E0F7705BBEE30D9B65A5E0E49D161A7B08D575053FC825C0010AD1249FE79651F089512F861CA052774",
+      "p1": "02",
+      "p2": "00",
+      "statusWord": "6985",
+      "notes": "The ISD had AES token-verification key version 0x70. No receipt key version 0x71 was provisioned."
+    },
+    {
+      "name": "get-status-load-files-first-page-splits-tlv",
+      "p1": "10",
+      "p2": "02",
+      "responseData": "E3254F07A00000015153509F700101CE02FFFF8408A000000151535041CC08A000000151000000E3314F0DA00000016443446F634C6974659F700101CE020100840EA00000016443446F634C69746501CC08A000000151000000E31B4F07A00000006202049F700101CE020100CC08A000000151000000E31B4F07A00000006202029F700101CE020103CC08A000000151000000E32A4F09A000000308000010009F700101CE02010A840BA000000308000010000100CC08A000000151000000E32A4F0AA00000038200110001009F700101CE020100840AA0000003820011000101CC08A000000151000000E32C4F",
+      "statusWord": "6310"
+    },
+    {
+      "name": "get-status-load-files-next-page-completes-tlv",
+      "p1": "10",
+      "p2": "03",
+      "responseData": "06D276000124019F700101CE0201008410D276000124010304AFAF000000000000CC08A000000151000000",
+      "statusWord": "9000"
+    },
+    {
+      "name": "create-ordinary-ssd-jcop-empty-parameters-success",
+      "commandData": "07A000000151535008A00000015153504108A0000001515350D2018002C90000",
+      "p1": "0C",
+      "p2": "00",
+      "responseData": "00",
+      "statusWord": "9000"
+    },
+    {
+      "name": "create-ordinary-ssd-gp-scp-parameter-rejected",
+      "commandData": "07A000000151535008A00000015153504108A0000001515350D2018006C9048102020000",
+      "p1": "0C",
+      "p2": "00",
+      "statusWord": "6A80"
+    },
+    {
+      "name": "create-extradition-target-ssd-success",
+      "commandData": "07A000000151535008A00000015153504108A0000001515350D3018006C9048202202000",
+      "p1": "0C",
+      "p2": "00",
+      "responseData": "00",
+      "statusWord": "9000"
+    },
+    {
+      "name": "extradite-isd-applet-to-enabled-ssd-rejected",
+      "commandData": "08A0000001515350D3000BA000000308000010000100000000",
+      "p1": "10",
+      "p2": "00",
+      "statusWord": "6985"
+    },
+    {
+      "name": "create-dap-verification-ssd-success",
+      "commandData": "07A000000151535008A00000015153504108A0000001515350D401C002C90000",
+      "p1": "0C",
+      "p2": "00",
+      "responseData": "00",
+      "statusWord": "9000"
+    },
+    {
+      "name": "create-authorized-management-ssd-rejected",
+      "commandData": "07A000000151535008A00000015153504108A0000001515350D50380400002C90000",
+      "p1": "0C",
+      "p2": "00",
+      "statusWord": "6A80"
+    },
+    {
+      "name": "create-token-verification-ssd-rejected",
+      "commandData": "07A000000151535008A00000015153504108A0000001515350D50380200002C90000",
+      "p1": "0C",
+      "p2": "00",
+      "statusWord": "6A80"
+    },
+    {
+      "name": "ordinary-load-to-ordinary-ssd-rejected-even-when-authenticated-to-ssd",
+      "commandData": "05A00000064708A0000001515350D2000000",
+      "p1": "02",
+      "p2": "00",
+      "statusWord": "6985"
+    },
+    {
+      "name": "aes-delegated-load-with-load-parameters-and-missing-receipt-key-rejected",
+      "commandData": "05A00000064708A0000001515350D120E134954587576FA08EC6887C955D8045B047D79C0A8E6D8A637D5566D7756E5A05C903C90101107F61ED0FF553A0C7CFD5479F19A89396",
+      "p1": "02",
+      "p2": "00",
+      "statusWord": "6985",
+      "notes": "Gp4Net calculated the SHA-256 LFDBH and AES-CMAC token locally for FIDO2 v2.4.2. The card rejected INSTALL [for load] before any LOAD block because receipt key 0x71 remains absent."
+    },
+    {
+      "name": "put-aes-receipt-generation-key-success",
+      "keyVersion": "71",
+      "keyType": "88",
+      "keyLength": 16,
+      "keyCheckValue": "8289B3",
+      "responseData": "718289B3",
+      "statusWord": "9000"
+    },
+    {
+      "name": "put-aes-dap-verification-key-in-dap-ssd-success",
+      "securityDomainAid": "A0000001515350D4",
+      "keyVersion": "73",
+      "keyType": "88",
+      "keyLength": 16,
+      "keyCheckValue": "E2443A",
+      "responseData": "73E2443A",
+      "statusWord": "9000"
+    },
+    {
+      "name": "fido2-loadable-component-stream-sha256",
+      "packageAid": "A000000647",
+      "excludedComponent": "Descriptor.cap",
+      "incorrectHashIncludingDescriptor": "E134954587576FA08EC6887C955D8045B047D79C0A8E6D8A637D5566D7756E5A",
+      "expectedHash": "21532CC4A6E6BEF2F144EE4F0B5A95FF7E13B3EBC6448B392F2F696CEA549A88"
+    },
+    {
+      "name": "corrected-delegated-install-for-load-still-policy-rejected",
+      "securityDomainAid": "A0000001515350D6",
+      "loadFileDataBlockHash": "21532CC4A6E6BEF2F144EE4F0B5A95FF7E13B3EBC6448B392F2F696CEA549A88",
+      "loadToken": "ACA765775F655A2864A439C95B913163",
+      "p1": "02",
+      "p2": "00",
+      "statusWord": "6985"
+    },
+    {
+      "name": "aes-dap-install-for-load-accepted",
+      "commandData": "05A00000064708A0000001510000002021532CC4A6E6BEF2F144EE4F0B5A95FF7E13B3EBC6448B392F2F696CEA549A880000",
+      "p1": "02",
+      "p2": "00",
+      "responseData": "00",
+      "statusWord": "9000"
+    },
+    {
+      "name": "aes-dap-first-load-block-rejected",
+      "dapSecurityDomainAid": "A0000001515350D4",
+      "dapSignature": "12AB0DB05DFF3F1751798C704C0C68F7",
+      "loadFileDataBlockHash": "21532CC4A6E6BEF2F144EE4F0B5A95FF7E13B3EBC6448B392F2F696CEA549A88",
+      "p1": "00",
+      "p2": "00",
+      "statusWord": "6985"
+    },
+    {
+      "name": "ordinary-fido2-load-without-descriptor-success",
+      "packageAid": "A000000647",
+      "firstBlock": "00",
+      "finalBlock": "91",
+      "finalResponseData": "00",
+      "statusWord": "9000"
+    },
+    {
+      "name": "delete-large-ordinary-load-after-corrected-stream-success",
+      "commandData": "4F05A000000647",
+      "p1": "00",
+      "p2": "00",
+      "responseData": "00",
+      "statusWord": "9000"
+    },
+    {
+      "name": "get-status-packages-continuation-can-be-single-byte",
+      "p1": "20",
+      "firstPageSuffix": "CC08A0000001510000",
+      "firstPageStatusWord": "6310",
+      "nextPageData": "00",
+      "nextPageStatusWord": "9000",
+      "notes": "JCOP4 split the final byte of the associated-SD AID into a one-byte continuation page. Parsers must concatenate raw pages before TLV parsing."
+    },
+    {
+      "name": "gp4net-create-delegated-ssd-success",
+      "securityDomainAid": "A0000001515350D7",
+      "packageAid": "A0000001515350",
+      "moduleAid": "A000000151535041",
+      "privileges": "A0",
+      "statusWord": "9000"
+    },
+    {
+      "name": "gp4net-extradition-policy-rejected",
+      "targetSecurityDomainAid": "A0000001515350D3",
+      "applicationAid": "A000000308000010000100",
+      "commandData": "08A0000001515350D3000BA000000308000010000100000000",
+      "statusWord": "6985"
+    },
+    {
+      "name": "aes-dap-gp4net-gppro-parity",
+      "dapSecurityDomainAid": "A0000001515350D4",
+      "loadFileDataBlockHash": "21532CC4A6E6BEF2F144EE4F0B5A95FF7E13B3EBC6448B392F2F696CEA549A88",
+      "dapSignature": "12AB0DB05DFF3F1751798C704C0C68F7",
+      "gp4netStatusWord": "6985",
+      "globalPlatformProStatusWord": "6985",
+      "notes": "Both tools emitted the same E2/4F/C3 DAP block. Remaining rejection is card policy or D4 provisioning."
+    }
+  ]
+}

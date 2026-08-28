@@ -3,12 +3,16 @@ using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
+using Gp4Net.Core;
+using Gp4Net.Domain.Commands;
+using Gp4Net.Services.Helpers;
 using Gp4Net.Tool.Extensions;
 using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 using Spectre.Console;
 using Spectre.Console.Cli;
+using GlobalPlatformConstants = Gp4Net.Constants.Constants.GlobalPlatform;
 
 namespace Gp4Net.Tool.Commands.Applet;
 
@@ -51,24 +55,12 @@ public class InstantiateCliCommand : IPipelineCommand<InstantiateCliCommand.Sett
                                 );
                             }
 
-                            if (!settings.NoCardInfo)
-                            {
-                                await DisplayCardInfoAsync(secureCtx);
-                            }
-
-                            AnsiConsole.MarkupLine(
-                                "[yellow]Warning:[/] Applet instantiation is not yet implemented"
-                            );
-                            AnsiConsole.MarkupLine(
-                                "[dim]This feature will be available in a future release[/]"
-                            );
-
                             if (settings.ShowSteps)
                             {
                                 AnsiConsole.WriteLine();
                                 AnsiConsole.MarkupLine("[blue]Installation steps:[/]");
                                 AnsiConsole.MarkupLine("1. Select Security Domain");
-                                AnsiConsole.MarkupLine("2. INSTALL [for install] command");
+                                AnsiConsole.WriteLine("2. INSTALL [for install] command");
                                 AnsiConsole.MarkupLine($"   - Package AID: {settings.PackageAid}");
                                 AnsiConsole.MarkupLine($"   - Applet AID: {settings.AppletAid}");
                                 AnsiConsole.MarkupLine(
@@ -92,7 +84,7 @@ public class InstantiateCliCommand : IPipelineCommand<InstantiateCliCommand.Sett
                                 if (settings.MakeSelectable)
                                 {
                                     AnsiConsole.WriteLine();
-                                    AnsiConsole.MarkupLine(
+                                    AnsiConsole.WriteLine(
                                         "3. INSTALL [for make selectable] command"
                                     );
                                     AnsiConsole.MarkupLine(
@@ -101,7 +93,44 @@ public class InstantiateCliCommand : IPipelineCommand<InstantiateCliCommand.Sett
                                 }
                             }
 
-                            return await Task.FromResult(0);
+                            var commandResult = CreateInstallCommand(settings);
+                            if (commandResult.IsFailure)
+                            {
+                                secureCtx.Display.Error(commandResult.Error.Message);
+                                return 1;
+                            }
+
+                            var apduResult = commandResult.Value.ToCommandApdu();
+                            if (apduResult.IsFailure)
+                            {
+                                secureCtx.Display.Error(apduResult.Error.Message);
+                                return 1;
+                            }
+
+                            var responseResult = await secureCtx.CardService.ExecuteCommandAsync(
+                                apduResult.Value,
+                                useSecureChannel: true
+                            );
+                            return responseResult.Match(
+                                response =>
+                                {
+                                    if (!response.IsSuccess)
+                                    {
+                                        secureCtx.Display.Error(
+                                            $"INSTALL [for install] failed with SW: {response.StatusWord:X4}"
+                                        );
+                                        return 1;
+                                    }
+
+                                    secureCtx.Display.Success("Applet instantiated successfully");
+                                    return 0;
+                                },
+                                error =>
+                                {
+                                    secureCtx.Display.Error(error.Message);
+                                    return 1;
+                                }
+                            );
                         },
                         async secureChannelError =>
                         {
@@ -121,11 +150,83 @@ public class InstantiateCliCommand : IPipelineCommand<InstantiateCliCommand.Sett
         });
     }
 
-    private static Task DisplayCardInfoAsync(ICliExecutionContext context)
+    internal static Result<
+        InstallCommand.InstallForInstallCommand,
+        SmartCardError
+    > CreateInstallCommand(Settings settings)
     {
-        context.Display.Info("Card information display would go here");
-        return Task.CompletedTask;
+        byte[] packageAid = Convert.FromHexString(settings.PackageAid.Replace(" ", ""));
+        byte[] moduleAid = Convert.FromHexString(settings.AppletAid.Replace(" ", ""));
+        byte[] instanceAid = Convert.FromHexString(
+            (settings.InstanceAid ?? settings.AppletAid).Replace(" ", "")
+        );
+        byte[] privilegeBytes = ParsePrivileges(settings.Privileges).ToBytesCompact();
+        Maybe<byte[]> installParameters = string.IsNullOrWhiteSpace(settings.InstallParams)
+            ? Maybe<byte[]>.None
+            : Maybe<byte[]>.From(WrapApplicationParameters(settings.InstallParams));
+
+        return settings.MakeSelectable
+            ? InstallCommand.InstallForInstallCommand.CreateAndMakeSelectable(
+                packageAid,
+                moduleAid,
+                instanceAid,
+                privilegeBytes,
+                installParameters
+            )
+            : InstallCommand.InstallForInstallCommand.Create(
+                packageAid,
+                moduleAid,
+                instanceAid,
+                privilegeBytes,
+                installParameters
+            );
     }
+
+    private static GlobalPlatformConstants.Privilege ParsePrivileges(string[] names)
+    {
+        GlobalPlatformConstants.Privilege value = GlobalPlatformConstants.Privilege.None;
+        foreach (string name in ExpandPrivileges(names))
+        {
+            string enumName = name.ToLowerInvariant() switch
+            {
+                "mandated-dap" => nameof(GlobalPlatformConstants.Privilege.MandatedDapVerification),
+                "ciphered-load-file" => nameof(GlobalPlatformConstants.Privilege.CipheredLoadFileDataBlock),
+                _ => name.Replace("-", ""),
+            };
+            if (Enum.TryParse(enumName, ignoreCase: true, out GlobalPlatformConstants.Privilege parsed))
+                value |= parsed;
+        }
+        return value;
+    }
+
+    private static string[] ExpandPrivileges(string[] names) =>
+        names.SelectMany(name =>
+                name.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            )
+            .ToArray();
+
+    private static byte[] WrapApplicationParameters(string parameters)
+    {
+        byte[] value = Convert.FromHexString(parameters.Replace(" ", ""));
+        return
+        [
+            0xC9,
+            .. EncodeBerLength(value.Length),
+            .. value,
+        ];
+    }
+
+    private static byte[] EncodeBerLength(int length) =>
+        length switch
+        {
+            < 0x80 => [(byte)length],
+            <= 0xFF => [0x81, (byte)length],
+            <= 0xFFFF => [0x82, (byte)(length >> 8), (byte)length],
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(length),
+                "Install parameters exceed the supported BER length"
+            ),
+        };
 
     /// <summary>
     /// Settings for the instantiate command.
@@ -272,7 +373,7 @@ public class InstantiateCliCommand : IPipelineCommand<InstantiateCliCommand.Sett
                 "ciphered-load-file",
             };
 
-            foreach (var privilege in Privileges)
+            foreach (var privilege in ExpandPrivileges(Privileges))
             {
                 if (!validPrivileges.Contains(privilege.ToLowerInvariant()))
                 {

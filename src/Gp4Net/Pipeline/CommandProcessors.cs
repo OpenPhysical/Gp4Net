@@ -86,8 +86,9 @@ public static class CommandProcessors
         cancellationToken
     ) =>
     {
-        // Check if caller explicitly wants secure channel
-        if (!environment.Options.UseSecureChannel)
+        // Once a session has a secure channel, every subsequent GP command must use it.
+        // UseSecureChannel requests fail closed when no channel has been established.
+        if (!environment.SecureChannel.HasValue && !environment.Options.UseSecureChannel)
         {
             // No secure channel requested - pass through
             return Task.FromResult(

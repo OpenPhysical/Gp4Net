@@ -264,6 +264,48 @@
       "additionalProperties": {
         "$ref": "#/definitions/keySet"
       }
+    },
+    "delegatedManagement": {
+      "type": "object",
+      "required": [
+        "tokenVerificationKey",
+        "receiptGenerationKey",
+        "securityDomainProviderId",
+        "securityDomainImageNumber"
+      ],
+      "properties": {
+        "tokenVerificationKey": {
+          "type": "string",
+          "pattern": "^(?:[0-9A-Fa-f]{32}|[0-9A-Fa-f]{48}|[0-9A-Fa-f]{64})$"
+        },
+        "receiptGenerationKey": {
+          "type": "string",
+          "pattern": "^(?:[0-9A-Fa-f]{32}|[0-9A-Fa-f]{48}|[0-9A-Fa-f]{64})$"
+        },
+        "securityDomainProviderId": {
+          "type": "string",
+          "pattern": "^[0-9A-Fa-f]+$"
+        },
+        "securityDomainImageNumber": {
+          "type": "string",
+          "pattern": "^[0-9A-Fa-f]+$"
+        },
+        "includeTokenDigest": {
+          "type": "boolean",
+          "default": false
+        },
+        "dapVerificationKeys": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[0-9A-Fa-f]{10,32}$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^(?:[0-9A-Fa-f]{32}|[0-9A-Fa-f]{48}|[0-9A-Fa-f]{64})$"
+          }
+        }
+      },
+      "additionalProperties": false
     }
   },
   "definitions": {

@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Domain;
@@ -44,6 +46,53 @@ public sealed class EmulatorCapFiles
             )
             .Bind(capStructure => VerifyLfdbhIfProvided(capFileData, expectedHash, capStructure))
             .Bind(capStructure => ExtractExecutableModuleFromStructure(capStructure));
+    }
+
+    /// <summary>
+    /// Parses the expanded component stream carried by a GlobalPlatform C4 Load File Data Block.
+    /// </summary>
+    public Result<ExecutableModule, SmartCardError> ProcessLoadFileDataBlockPayload(
+        byte[] componentData,
+        Maybe<LoadFileDataBlockHash> expectedHash = default
+    )
+    {
+        Result<bool, SmartCardError> hashResult = expectedHash.Match(
+            hash => _coreService.VerifyLoadFileDataBlockHash(componentData, hash.Value),
+            () => Result.Success<bool, SmartCardError>(true)
+        );
+
+        return hashResult.Bind(_ => ParseExpandedComponents(componentData));
+    }
+
+    private static Result<ExecutableModule, SmartCardError> ParseExpandedComponents(
+        byte[] componentData
+    )
+    {
+        using var stream = new MemoryStream(componentData, writable: false);
+        byte[]? packageAid = null;
+        while (stream.Position < stream.Length)
+        {
+            var componentResult = CapComponent.Parse(stream);
+            if (componentResult.IsFailure)
+                return componentResult.Error;
+
+            CapComponent component = componentResult.Value;
+            if (component.Tag != Constants.Constants.JavaCard.ComponentTags.HEADER)
+                continue;
+
+            if (component.Data.Length < 10)
+                return SmartCardError.InvalidData("CAP header component is truncated");
+            int aidLength = component.Data[9];
+            if (aidLength is < 5 or > 16 || component.Data.Length < 10 + aidLength)
+                return SmartCardError.InvalidData("CAP header contains an invalid package AID");
+            packageAid = component.Data.AsSpan(10, aidLength).ToArray();
+        }
+
+        return packageAid is null
+            ? SmartCardError.InvalidData("Load File Data Block has no CAP header component")
+            : Result.Success<ExecutableModule, SmartCardError>(
+                new ExecutableModule(packageAid, 0x01)
+            );
     }
 
     /// <summary>

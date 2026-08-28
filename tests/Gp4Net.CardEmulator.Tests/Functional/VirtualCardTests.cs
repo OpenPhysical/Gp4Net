@@ -1,5 +1,7 @@
 using System;
 using System.Linq;
+using System.IO;
+using System.Collections.Immutable;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
@@ -10,6 +12,7 @@ using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
+using Gp4Net.Domain.CapFile;
 using Gp4Net.Domain.Keys;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
@@ -29,6 +32,157 @@ namespace Gp4Net.CardEmulator.Tests.Functional;
 [TestFixture]
 public class VirtualCardTests
 {
+    [Test]
+    public void ProcessCommand_DelegatedLoad_VerifiesTokenDapAndReturnsReceiptAtomically()
+    {
+        byte[] key = Convert.FromHexString("00112233445566778899AABBCCDDEEFF");
+        var baseConfig = CardConfiguration.P71().Value;
+        string sdHex = Convert.ToHexString(baseConfig.IsdAid);
+        var config = baseConfig with
+        {
+            DelegatedManagement = new DelegatedManagementConfiguration(
+                key, key, [0x01, 0x02], [0x03, 0x04], true,
+                ImmutableDictionary<string, byte[]>.Empty.Add(sdHex, key))
+        };
+        string capPath = Path.GetFullPath(Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            "../../../../applets/OpenFIPS201-v1_10_2.cap"));
+        var cap = CapFileStructure.Parse(File.ReadAllBytes(capPath)).Value;
+        var options = DelegatedLoadOptions.Create(
+            config.IsdAid,
+            new DelegatedLoadTokenSource.AesKey(key),
+            dapSecurityDomainAid: config.IsdAid,
+            dapKey: key).Value;
+        var artifacts = DelegatedLoadArtifacts.Create(cap, options, 200).Value;
+        VirtualCard card = CreateCardWithSecureChannel(configuration: config);
+
+        var install = card.ProcessCommand(SecureCommand(card, artifacts.InstallForLoad.ToBytes()));
+        Assert.That(install.IsSuccess, Is.True, () => install.Error.Message);
+        card = (VirtualCard)install.Value.UpdatedCard;
+        ApduResponse? finalResponse = null;
+        foreach (var load in artifacts.LoadCommands)
+        {
+            var result = card.ProcessCommand(SecureCommand(card, load.ToBytes()));
+            Assert.That(result.IsSuccess, Is.True, () => result.Error.Message);
+            finalResponse = result.Value.Response;
+            card = (VirtualCard)result.Value.UpdatedCard;
+        }
+
+        Assert.That(finalResponse!.StatusWord, Is.EqualTo(StatusWords.Success));
+        var parsed = LoadResponse.Parse(finalResponse.Data, 0x9000);
+        Assert.That(parsed.IsSuccess, Is.True, () => parsed.Error.Message);
+        Assert.That(parsed.Value.Confirmation.HasValue, Is.True);
+        Assert.That(parsed.Value.Confirmation.Value.ConfirmationCounter, Is.Zero);
+        Assert.That(card.CurrentState.ReceiptConfirmationCounter, Is.EqualTo(1));
+        Assert.That(card.CurrentState.PendingLoad.HasValue, Is.False);
+        Assert.That(card.CurrentState.LoadFiles.Any(load => load.Aid.SequenceEqual(cap.PackageAid)), Is.True);
+    }
+
+    [Test]
+    public void ProcessCommand_DelegatedLoad_InvalidDapClearsPendingStateWithoutCommit()
+    {
+        byte[] key = Convert.FromHexString("00112233445566778899AABBCCDDEEFF");
+        byte[] wrongDapKey = Convert.FromHexString("FFEEDDCCBBAA99887766554433221100");
+        var baseConfig = CardConfiguration.P71().Value;
+        string sdHex = Convert.ToHexString(baseConfig.IsdAid);
+        var config = baseConfig with
+        {
+            DelegatedManagement = new DelegatedManagementConfiguration(
+                key, key, [0x01], [0x02], false,
+                ImmutableDictionary<string, byte[]>.Empty.Add(sdHex, key))
+        };
+        string capPath = Path.GetFullPath(Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            "../../../../applets/OpenFIPS201-v1_10_2.cap"));
+        var cap = CapFileStructure.Parse(File.ReadAllBytes(capPath)).Value;
+        var options = DelegatedLoadOptions.Create(
+            config.IsdAid, new DelegatedLoadTokenSource.AesKey(key),
+            dapSecurityDomainAid: config.IsdAid, dapKey: wrongDapKey).Value;
+        var artifacts = DelegatedLoadArtifacts.Create(cap, options, 200).Value;
+        VirtualCard card = CreateCardWithSecureChannel(configuration: config);
+        var install = card.ProcessCommand(SecureCommand(card, artifacts.InstallForLoad.ToBytes()));
+        card = (VirtualCard)install.Value.UpdatedCard;
+        ApduResponse? finalResponse = null;
+        foreach (var load in artifacts.LoadCommands)
+        {
+            var result = card.ProcessCommand(SecureCommand(card, load.ToBytes()));
+            Assert.That(result.IsSuccess, Is.True, () => result.Error.Message);
+            finalResponse = result.Value.Response;
+            card = (VirtualCard)result.Value.UpdatedCard;
+        }
+
+        Assert.That(finalResponse!.StatusWord, Is.EqualTo((StatusWord)0x6982));
+        Assert.That(card.CurrentState.PendingLoad.HasValue, Is.False);
+        Assert.That(card.CurrentState.LoadFiles, Is.Empty);
+        Assert.That(card.CurrentState.ReceiptConfirmationCounter, Is.Zero);
+    }
+
+    [Test]
+    public void ProcessCommand_DelegatedLoad_MissingReceiptKeyFailsClosedWithoutCommit()
+    {
+        byte[] tokenKey = Convert.FromHexString("00112233445566778899AABBCCDDEEFF");
+        var baseConfig = CardConfiguration.P71().Value;
+        var config = baseConfig with
+        {
+            DelegatedManagement = new DelegatedManagementConfiguration(
+                tokenKey, [], [0x01, 0x02], [0x03, 0x04])
+        };
+        string capPath = Path.GetFullPath(Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            "../../../../applets/OpenFIPS201-v1_10_2.cap"));
+        var cap = CapFileStructure.Parse(File.ReadAllBytes(capPath)).Value;
+        var options = DelegatedLoadOptions.Create(
+            config.IsdAid, new DelegatedLoadTokenSource.AesKey(tokenKey)).Value;
+        var artifacts = DelegatedLoadArtifacts.Create(cap, options, 200).Value;
+        VirtualCard card = CreateCardWithSecureChannel(configuration: config);
+
+        var install = card.ProcessCommand(SecureCommand(card, artifacts.InstallForLoad.ToBytes()));
+        Assert.That(install.IsSuccess, Is.True, () => install.Error.Message);
+        card = (VirtualCard)install.Value.UpdatedCard;
+        ApduResponse? finalResponse = null;
+        foreach (var load in artifacts.LoadCommands)
+        {
+            var result = card.ProcessCommand(SecureCommand(card, load.ToBytes()));
+            Assert.That(result.IsSuccess, Is.True, () => result.Error.Message);
+            finalResponse = result.Value.Response;
+            card = (VirtualCard)result.Value.UpdatedCard;
+        }
+
+        Assert.That(finalResponse!.StatusWord, Is.EqualTo((StatusWord)0x6985));
+        Assert.That(card.CurrentState.PendingLoad.HasValue, Is.False);
+        Assert.That(card.CurrentState.LoadFiles, Is.Empty);
+        Assert.That(card.CurrentState.ReceiptConfirmationCounter, Is.Zero);
+    }
+
+    [Test]
+    public void ProcessCommand_GetStatus_PaginatesAndAcceptsGetNextLikeJcop4()
+    {
+        VirtualCard card = CreateCardWithSecureChannel();
+        CardState populatedState = card.CurrentState;
+        for (int index = 0; index < 12; index++)
+        {
+            byte[] aid = [0xA0, 0x00, 0x00, 0x01, 0x51, 0x70, (byte)index];
+            populatedState = populatedState.WithApplication(
+                Convert.ToHexString(aid),
+                new InstalledApplication(
+                    aid, aid, 0x07, GlobalPlatform.Privilege.None,
+                    ImmutableDictionary<string, byte[]>.Empty));
+        }
+        card = RehydrateCard(card, populatedState);
+
+        var first = card.ProcessCommand(SecureCommand(card, Convert.FromHexString("80F24002024F00")));
+        Assert.That(first.IsSuccess, Is.True, () => first.Error.Message);
+        Assert.That(first.Value.Response.StatusWord, Is.EqualTo((StatusWord)0x6310));
+        Assert.That(first.Value.Response.Data, Is.Not.Empty);
+        card = (VirtualCard)first.Value.UpdatedCard;
+
+        var next = card.ProcessCommand(SecureCommand(card, Convert.FromHexString("80F24003024F00")));
+        Assert.That(next.IsSuccess, Is.True, () => next.Error.Message);
+        Assert.That(next.Value.Response.StatusWord, Is.EqualTo(StatusWords.Success));
+        Assert.That(next.Value.Response.Data, Is.Not.Empty);
+        Assert.That(((VirtualCard)next.Value.UpdatedCard).CurrentState.PendingGetStatus.HasValue, Is.False);
+    }
+
     [Test]
     public void P71Card_ShouldHaveCorrectAtr()
     {
@@ -351,10 +505,10 @@ public class VirtualCardTests
     public void ProcessCommand_DeleteApplication_RemovesFromCardState()
     {
         // Arrange - Create card with established secure channel for DELETE command testing
-        var card = CreateCardWithSecureChannel(SecurityLevel.CDecryption);
+        byte[] testAid = Convert.FromHexString("A00000030800001000");
+        var card = CreateCardWithSecureChannel(SecurityLevel.CDecryption, testAid);
 
         // Create DELETE command for a test application
-        byte[] testAid = Convert.FromHexString("A00000030800001000");
         var deleteResult = DeleteCommand.CreateForApplication(testAid, deleteRelated: true);
 
         // Act
@@ -374,6 +528,56 @@ public class VirtualCardTests
         // Per GlobalPlatform Card Specification v2.3.1 Table 11-26,
         // DELETE Response should contain one byte (00) indicating success
         _ = response.Data.Should().BeEquivalentTo(new byte[] { 0x00 });
+    }
+
+    [Test]
+    public void ProcessCommand_DelegatedDelete_VerifiesAesTokenAndReturnsReceipt()
+    {
+        byte[] aid = Convert.FromHexString("A00000030800001000");
+        byte[] key = Convert.FromHexString("00112233445566778899AABBCCDDEEFF");
+        var baseConfig = CardConfiguration.P71().Value;
+        var config = baseConfig with
+        {
+            DelegatedManagement = new DelegatedManagementConfiguration(
+                key, key, [0x01, 0x02], [0x03, 0x04]
+            ),
+        };
+        var card = CreateCardWithSecureChannel(SecurityLevel.CDecryption, aid, config);
+        var command = DeleteCommand.CreateForApplicationWithTokenParams(
+            aid, deleteTokenKey: Maybe<byte[]>.From(key)
+        ).Value;
+
+        var result = card.ProcessCommand(SecureCommand(card, command.ToBytes()));
+
+        Assert.That(result.IsSuccess, Is.True, () => result.Error.Message);
+        Assert.That(result.Value.Response.StatusWord, Is.EqualTo(StatusWords.Success));
+        Assert.That(result.Value.Response.Data.Length, Is.GreaterThan(16));
+        var updated = (VirtualCard)result.Value.UpdatedCard;
+        Assert.That(updated.CurrentState.ReceiptConfirmationCounter, Is.EqualTo(1));
+        Assert.That(updated.CurrentState.Applications.ContainsKey(Convert.ToHexString(aid)), Is.False);
+    }
+
+    [Test]
+    public void ProcessCommand_DelegatedDelete_InvalidTokenLeavesStateUnchanged()
+    {
+        byte[] aid = Convert.FromHexString("A00000030800001000");
+        byte[] key = Convert.FromHexString("00112233445566778899AABBCCDDEEFF");
+        var config = CardConfiguration.P71().Value with
+        {
+            DelegatedManagement = new DelegatedManagementConfiguration(
+                key, key, [0x01], [0x02]
+            ),
+        };
+        var card = CreateCardWithSecureChannel(SecurityLevel.CDecryption, aid, config);
+        var command = DeleteCommand.CreateForApplication(
+            aid, deletionToken: Maybe<byte[]>.From(new byte[16])
+        ).Value;
+
+        var result = card.ProcessCommand(SecureCommand(card, command.ToBytes()));
+
+        Assert.That(result.IsFailure, Is.True);
+        Assert.That(card.CurrentState.ReceiptConfirmationCounter, Is.Zero);
+        Assert.That(card.CurrentState.Applications.ContainsKey(Convert.ToHexString(aid)), Is.True);
     }
 
     [Test]
@@ -576,10 +780,14 @@ public class VirtualCardTests
     /// Applies proper security level required for DELETE and INSTALL commands.
     /// </summary>
     private VirtualCard CreateCardWithSecureChannel(
-        SecurityLevel securityLevel = SecurityLevel.CMac
+        SecurityLevel securityLevel = SecurityLevel.CMac,
+        byte[]? installedAid = null,
+        CardConfiguration? configuration = null
     )
     {
-        var configResult = CardConfiguration.P71();
+        var configResult = configuration is null
+            ? CardConfiguration.P71()
+            : Result.Success<CardConfiguration, SmartCardError>(configuration);
         CardConfiguration config = default!;
         if (configResult.IsSuccess)
         {
@@ -618,6 +826,19 @@ public class VirtualCardTests
         {
             var currentState = card.CurrentState;
             var newState = currentState.WithSecureChannel(secureChannelResult.Value);
+            if (installedAid is not null)
+            {
+                newState = newState.WithApplication(
+                    Convert.ToHexString(installedAid),
+                    new InstalledApplication(
+                        installedAid,
+                        installedAid,
+                        0x07,
+                        GlobalPlatform.Privilege.None,
+                        ImmutableDictionary<string, byte[]>.Empty
+                    )
+                );
+            }
 
             return new VirtualCard(
                 card.Configuration,
@@ -651,6 +872,16 @@ public class VirtualCardTests
             () => throw new AssertionException("Secure channel is not established")
         );
     }
+
+    private static VirtualCard RehydrateCard(VirtualCard card, CardState state) =>
+        new(
+            card.Configuration,
+            Rng.CreateSecureContext(),
+            state,
+            new CardLogging(Maybe<ILogger>.None),
+            new EmulatorCapFiles(),
+            new CardStateTransitions(Maybe<ILogger>.None),
+            Maybe<CardState>.From(card.CurrentState));
 
     [Test]
     public void ProcessCommandFunctionally_ShouldProcessSelectCommand()

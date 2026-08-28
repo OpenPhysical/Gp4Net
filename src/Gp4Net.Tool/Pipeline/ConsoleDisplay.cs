@@ -15,7 +15,7 @@ public class ConsoleDisplay : IDisplay
     private readonly IAnsiConsole _console;
 
     public ConsoleDisplay(bool verboseMode = false)
-        : this(AnsiConsole.Console, verboseMode) { }
+        : this(CreateStandardErrorConsole(), verboseMode) { }
 
     public ConsoleDisplay(IAnsiConsole console, bool verboseMode = false)
     {
@@ -25,29 +25,29 @@ public class ConsoleDisplay : IDisplay
 
     public void Success(string message)
     {
-        _console.MarkupLine($"[green]✓ {message}[/]");
+        _console.MarkupLine($"[green]✓ {Spectre.Console.Markup.Escape(message)}[/]");
     }
 
     public void Error(string message)
     {
-        _console.MarkupLine($"[red]✗ {message}[/]");
+        _console.MarkupLine($"[red]✗ {Spectre.Console.Markup.Escape(message)}[/]");
     }
 
     public void Warning(string message)
     {
-        _console.MarkupLine($"[yellow]⚠ {message}[/]");
+        _console.MarkupLine($"[yellow]⚠ {Spectre.Console.Markup.Escape(message)}[/]");
     }
 
     public void Info(string message)
     {
-        _console.MarkupLine($"[blue]ℹ {message}[/]");
+        _console.MarkupLine($"[blue]ℹ {Spectre.Console.Markup.Escape(message)}[/]");
     }
 
     public void Verbose(string message)
     {
         if (_verboseMode)
         {
-            _console.MarkupLine($"[dim]🔍 {message}[/]");
+            _console.MarkupLine($"[dim]🔍 {Spectre.Console.Markup.Escape(message)}[/]");
         }
     }
 
@@ -65,4 +65,9 @@ public class ConsoleDisplay : IDisplay
     {
         _console.MarkupLine(markup);
     }
+
+    private static IAnsiConsole CreateStandardErrorConsole() =>
+        AnsiConsole.Create(
+            new AnsiConsoleSettings { Out = new AnsiConsoleOutput(Console.Error) }
+        );
 }

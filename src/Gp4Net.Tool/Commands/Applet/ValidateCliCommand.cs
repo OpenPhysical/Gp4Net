@@ -6,6 +6,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Xml;
 using System.Xml.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
@@ -221,7 +222,11 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
                 .Serialization
                 .JsonIgnoreCondition
                 .WhenWritingNull,
-            Converters = { new Tool.Common.ByteArrayHexConverter() },
+            Converters =
+            {
+                new Tool.Common.ByteArrayHexConverter(),
+                new Tool.Common.MaybeJsonConverterFactory(),
+            },
         };
 
         string json = JsonSerializer.Serialize(validationResult, options);
@@ -1513,7 +1518,9 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
 
         using var manifestStream = manifestEntry.Open();
         using var reader = new StreamReader(manifestStream);
-        var properties = ParseManifestProperties(reader.ReadToEnd());
+        var properties = ParseManifestProperties(
+            ReadTextWithLimit(reader, CapParsingLimits.Default.MaxManifestCharacters)
+        );
 
         string[] usefulKeys =
         [
@@ -1539,7 +1546,16 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         }
 
         using var xmlStream = xmlEntry.Open();
-        var document = XDocument.Load(xmlStream);
+        using var xmlReader = XmlReader.Create(
+            xmlStream,
+            new XmlReaderSettings
+            {
+                DtdProcessing = DtdProcessing.Prohibit,
+                XmlResolver = null,
+                MaxCharactersInDocument = CapParsingLimits.Default.MaxXmlCharacters,
+            }
+        );
+        var document = XDocument.Load(xmlReader, LoadOptions.None);
         var root = document.Root;
         if (root == null)
         {
@@ -1572,6 +1588,22 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         }
 
         return metadata;
+    }
+
+    private static string ReadTextWithLimit(StreamReader reader, int maximumCharacters)
+    {
+        char[] buffer = new char[8192];
+        var text = new System.Text.StringBuilder();
+        int read;
+        while ((read = reader.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            if (text.Length + read > maximumCharacters)
+                throw new InvalidDataException(
+                    $"Archive metadata exceeds the {maximumCharacters}-character limit."
+                );
+            text.Append(buffer, 0, read);
+        }
+        return text.ToString();
     }
 
     private static Dictionary<string, string> ParseManifestProperties(string manifestContent)

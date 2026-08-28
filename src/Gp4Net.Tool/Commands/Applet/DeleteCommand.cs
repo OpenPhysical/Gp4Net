@@ -134,12 +134,6 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
                     return await secureChannelResult.Match(
                         async secureCtx =>
                         {
-                            // Display card info if requested
-                            if (!settings.NoCardInfo)
-                            {
-                                await DisplayCardInfo(secureCtx);
-                            }
-
                             // Perform deletions
                             return await PerformDeletions(secureCtx, aidsToDelete, settings);
                         },

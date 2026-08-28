@@ -44,6 +44,37 @@ public class KeyDiversificationServiceTests
     }
 
     [Test]
+    public void DiversifyScp02KeySet_WithVisa2_ShouldProduceCapturedKeys()
+    {
+        var baseKeyResult = Scp02KeySet.Create(TestKey, TestKey, TestKey, 0x01, 0x01);
+        Assert.That(baseKeyResult.IsSuccess, Is.True);
+        var specResult = KeyDiversification.CreateSpec("visa2");
+        Assert.That(specResult.IsSuccess, Is.True);
+
+        var result = KeyDiversification.DiversifyScp02KeySet(
+            baseKeyResult.Value,
+            specResult.Value,
+            Convert.FromHexString("00112233445566778899")
+        );
+
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(result.Value.KeyVersion, Is.EqualTo(0x01));
+        Assert.That(result.Value.KeyId, Is.EqualTo(0x01));
+        Assert.That(
+            Convert.ToHexString(result.Value.EncKey),
+            Is.EqualTo("456CEAAF837C2D932162DA9C4D68E956")
+        );
+        Assert.That(
+            Convert.ToHexString(result.Value.MacKey),
+            Is.EqualTo("6CC1D686816C069843B9DA63F58B5BA6")
+        );
+        Assert.That(
+            Convert.ToHexString(result.Value.DekKey),
+            Is.EqualTo("AA15435D35CF69D09A65DC2B6F63D76A")
+        );
+    }
+
+    [Test]
     public void CreateSpec_ShouldNormalizeScp03AliasesToCanonicalName()
     {
         var aliases = new[] { "kdf3", "scp03", "SCP03-Default", "key-derivation-function-3", };

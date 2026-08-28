@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Security.Cryptography;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Applications;
 using Gp4Net.CardEmulator.Domain;
@@ -10,6 +11,7 @@ using Gp4Net.CardEmulator.Services;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain;
+using Gp4Net.Domain.CapFile;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
@@ -436,16 +438,20 @@ public partial class VirtualCard : IVirtualCard
         bool installForLoad = (p1 & 0x02) != 0;
         bool installForInstall = (p1 & 0x04) != 0;
 
+        // GP 2.3.1 Table 11-41 assigns P1=10 to INSTALL [for extradition].
+        if (p1 == 0x10)
+            return ProcessInstallForExtradition(commandData, state);
+
         if (installForLoad && !installForInstall)
         {
-            // INSTALL [for load] - GlobalPlatform Card Specification v2.3.1 Section 11.5.2.1
+            // GP 2.3.1 section 11.5.2.3.1 defines INSTALL [for load] data.
             return ParseInstallForLoadData(commandData)
-                .Bind(parsedData => ValidateInstallToken(parsedData.loadToken).Map(_ => parsedData))
+                .Bind(parsedData => ValidateLoadRequest(parsedData, p1, p2, state, config).Map(_ => parsedData))
                 .Bind(parsedData => CreateInstallForLoadResponse(parsedData, state, config));
         }
         if (installForInstall)
         {
-            // INSTALL [for install] - GlobalPlatform Card Specification v2.3.1 Section 11.5.2.2
+            // GP 2.3.1 section 11.5.2.3.2 defines INSTALL [for install] data.
             return ParseInstallForInstallData(commandData)
                 .Bind(parsedData =>
                 {
@@ -497,6 +503,64 @@ public partial class VirtualCard : IVirtualCard
         return Result.Failure<(ApduResponse, CardState), SmartCardError>(
             SmartCardError.IncorrectP1P2()
         );
+    }
+
+    /// <summary>
+    /// Applies INSTALL [for extradition] using the field order in GlobalPlatform
+    /// Card Specification v2.3.1, Table 11-45. State changes only after every
+    /// field and registry reference has been validated.
+    /// </summary>
+    internal static Result<(ApduResponse, CardState), SmartCardError> ProcessInstallForExtradition(
+        byte[] data,
+        CardState state)
+    {
+        int offset = 0;
+        Result<byte[], SmartCardError> ReadField(string name)
+        {
+            if (offset >= data.Length)
+                return SmartCardError.InvalidData($"Missing {name}");
+            int length = data[offset++];
+            if (offset + length > data.Length)
+                return SmartCardError.InvalidData($"Truncated {name}");
+            byte[] value = data.AsSpan(offset, length).ToArray();
+            offset += length;
+            return value;
+        }
+
+        var target = ReadField("target Security Domain AID");
+        var loadFile = ReadField("Executable Load File AID");
+        var application = ReadField("application AID");
+        var privileges = ReadField("privileges");
+        var parameters = ReadField("extradition parameters");
+        var token = ReadField("extradition token");
+        if (target.IsFailure || loadFile.IsFailure || application.IsFailure || privileges.IsFailure
+            || parameters.IsFailure || token.IsFailure || offset != data.Length)
+            return Result.Failure<(ApduResponse, CardState), SmartCardError>(
+                SmartCardError.InvalidData("Malformed INSTALL [for extradition] data"));
+        if (loadFile.Value.Length != 0 || privileges.Value.Length != 0
+            || target.Value.Length is < 5 or > 16
+            || application.Value.Length is < 5 or > 16)
+            return Result.Failure<(ApduResponse, CardState), SmartCardError>(
+                SmartCardError.InvalidData("Invalid extradition AID fields"));
+
+        string targetKey = Convert.ToHexString(target.Value);
+        string applicationKey = Convert.ToHexString(application.Value);
+        if (!state.Applications.TryGetValue(targetKey, out InstalledApplication? targetDomain)
+            || (targetDomain.Privileges & Privilege.SecurityDomain) == 0
+            || !state.Applications.TryGetValue(applicationKey, out InstalledApplication? installed))
+            return Result.Failure<(ApduResponse, CardState), SmartCardError>(
+                SmartCardError.ReferencedDataNotFound());
+
+        var updated = installed with
+        {
+            ApplicationData = installed.ApplicationData.SetItem(
+                "AssociatedSecurityDomainAid", (byte[])target.Value.Clone()),
+        };
+        CardState newState = state with
+        {
+            Applications = state.Applications.SetItem(applicationKey, updated),
+        };
+        return (new ApduResponse([0x00], Constants.Constants.StatusWords.Success), newState);
     }
 
     /// <summary>
@@ -603,7 +667,9 @@ public partial class VirtualCard : IVirtualCard
                 loadTokenResult.Error
             );
 
-        (byte[] loadToken, int _) = loadTokenResult.Value;
+        (byte[] loadToken, int endOffset) = loadTokenResult.Value;
+        if (endOffset != data.Length)
+            return SmartCardError.InvalidData("INSTALL [for load] contains trailing data");
 
         return Result.Success<(byte[], Maybe<byte[]>, byte[], byte[], byte[]), SmartCardError>(
             (loadFileAid, securityDomainAid, loadFileDataBlockHash, loadParameters, loadToken)
@@ -785,18 +851,70 @@ public partial class VirtualCard : IVirtualCard
         bool isLastBlock = (p1 & 0x80) != 0x00; // P1 bit 8: 1 = last block, 0 = more blocks
 
         // Process the data block according to GP specification
-        return ProcessLoadDataBlock(dataBlock, blockNumber, isLastBlock, state, config)
-            .Map(result =>
+        var processed = ProcessLoadDataBlock(dataBlock, blockNumber, isLastBlock, state, config);
+        if (processed.IsFailure && isLastBlock)
+        {
+            ushort statusWord = processed.Error.StatusWord.GetValueOrDefault(0x6F00);
+            return Result.Success<(ApduResponse, CardState), SmartCardError>((
+                ApduResponse.Error(statusWord), RemoveLoadContext(state)));
+        }
+        return processed.Bind(result =>
             {
                 (var newState, bool loadComplete) = result;
+                if (!loadComplete)
+                    return Result.Success<(ApduResponse, CardState), SmartCardError>((
+                        new ApduResponse([0x00], Constants.Constants.StatusWords.Success), newState));
+                if (!state.PendingLoad.HasValue)
+                    return Result.Failure<(ApduResponse, CardState), SmartCardError>(
+                        SmartCardError.ConditionsNotSatisfied());
+                var completion = CreateLoadCompletionResponse(newState, state.PendingLoad.Value, config);
+                if (completion.IsSuccess)
+                    return completion;
+                ushort statusWord = completion.Error.StatusWord.GetValueOrDefault(0x6F00);
+                return Result.Success<(ApduResponse, CardState), SmartCardError>((
+                    ApduResponse.Error(statusWord), RemoveLoadContext(state)));
+            });
+    }
 
-                // Create response according to GP Table 11-18: LOAD Response Message
-                byte[] responseData = loadComplete ? [0x00] : [];
+    private static Result<(ApduResponse, CardState), SmartCardError> CreateLoadCompletionResponse(
+        CardState state,
+        PendingLoadOperation load,
+        CardConfiguration config)
+    {
+        var delegated = config.DelegatedManagement;
+        if (!load.IsDelegated)
+            return (new ApduResponse([0x00], Constants.Constants.StatusWords.Success), state);
+        // GP 2.3.1 section C.1.1.2 requires a delegated operation to fail when the
+        // Receipt Generation SD has no usable receipt key. Never silently
+        // downgrade a delegated operation to an ordinary load.
+        if (delegated?.GeneratesReceipts != true)
+            return SmartCardError.ConditionsNotSatisfied();
+        if (state.ReceiptConfirmationCounter == ushort.MaxValue)
+            return SmartCardError.ConditionsNotSatisfied();
 
-                return (
-                    new ApduResponse(responseData, Constants.Constants.StatusWords.Success),
-                    newState
-                );
+        // Sections 11.1.6 and C.5.1 define Confirmation Data and the exact
+        // Load Receipt input order. The counter advances only after CMAC succeeds.
+        ushort counter = state.ReceiptConfirmationCounter;
+        List<byte> unique = [0x42, (byte)delegated.SecurityDomainProviderId.Length,
+            .. delegated.SecurityDomainProviderId, 0x45,
+            (byte)delegated.SecurityDomainImageNumber.Length, .. delegated.SecurityDomainImageNumber];
+        List<byte> confirmation = [0x02, (byte)(counter >> 8), (byte)counter,
+            (byte)unique.Count, .. unique];
+        if (delegated.IncludeTokenDigest)
+        {
+            byte[] digest = SHA256.HashData(load.LoadToken);
+            confirmation.Add((byte)digest.Length);
+            confirmation.AddRange(digest);
+        }
+        List<byte> receiptInput = [.. confirmation, (byte)load.LoadFileAid.Length,
+            .. load.LoadFileAid, (byte)load.SecurityDomainAid.Length, .. load.SecurityDomainAid];
+        return CryptoOperations.Keys.ComputeAesCmac(delegated.ReceiptGenerationKey, receiptInput.ToArray())
+            .Map(receipt =>
+            {
+                List<byte> inner = [(byte)receipt.Length, .. receipt, .. confirmation];
+                byte[] response = [.. DelegatedLoadCryptography.EncodeBerLength(inner.Count), .. inner];
+                CardState updated = state with { ReceiptConfirmationCounter = (ushort)(counter + 1) };
+                return (new ApduResponse(response, Constants.Constants.StatusWords.Success), updated);
             });
     }
 
@@ -835,7 +953,7 @@ public partial class VirtualCard : IVirtualCard
                         if (isLastBlock)
                         {
                             // Process complete CAP file and update load files
-                            return ProcessCompleteCapFile(updatedData, state, loadContext)
+                            return ProcessCompleteCapFile(updatedData, state, loadContext, config)
                                 .Map(newState =>
                                 {
                                     // Remove load context from state and mark load as complete
@@ -892,10 +1010,22 @@ public partial class VirtualCard : IVirtualCard
     private static Result<CardState, SmartCardError> ProcessCompleteCapFile(
         ImmutableList<byte> capFileData,
         CardState state,
-        PendingLoadOperation loadContext
+        PendingLoadOperation loadContext,
+        CardConfiguration config
     )
     {
-        byte[] capBytes = capFileData.ToArray();
+        byte[] encoded = capFileData.ToArray();
+        var parsed = ParseEncodedLoadFile(encoded);
+        if (parsed.IsFailure)
+            return parsed.Error;
+        (ImmutableArray<DapProcessor.DapBlock> dapBlocks, byte[] capPayload) = parsed.Value;
+        byte[] actualHash = SHA256.HashData(capPayload);
+        if (loadContext.ExpectedHash.Length > 0
+            && !CryptographicOperations.FixedTimeEquals(actualHash, loadContext.ExpectedHash))
+            return SmartCardError.SecurityStatusNotSatisfied("Load File Data Block Hash verification failed");
+        var dapVerification = VerifyDapBlocks(dapBlocks, actualHash, config);
+        if (dapVerification.IsFailure)
+            return dapVerification.Error;
         var capFileService = new EmulatorCapFiles();
         Result<Maybe<LoadFileDataBlockHash>, SmartCardError> expectedHash =
             loadContext.ExpectedHash.Length == 0
@@ -908,10 +1038,116 @@ public partial class VirtualCard : IVirtualCard
 
         return expectedHash.Bind(hash =>
             capFileService
-                .ProcessCapFileForLoading(capBytes, hash)
+                .ProcessLoadFileDataBlockPayload(capPayload, hash)
                 .Bind(module => CreateLoadFileFromModule(module, loadContext))
                 .Map(loadFile => state.WithLoadFile(loadFile))
         );
+    }
+
+    private static Result<bool, SmartCardError> VerifyDapBlocks(
+        ImmutableArray<DapProcessor.DapBlock> blocks,
+        byte[] hash,
+        CardConfiguration config)
+    {
+        // Section 11.6.2.3 permits multiple leading DAP blocks. Section C.3
+        // requires each named Security Domain to verify its signature over LFDBH.
+        var keys = config.DelegatedManagement?.EffectiveDapVerificationKeys
+            ?? ImmutableDictionary<string, byte[]>.Empty;
+        if (blocks.Select(block => Convert.ToHexString(block.SecurityDomainAid.AsSpan())).Distinct().Count()
+            != blocks.Length)
+            return SmartCardError.IncorrectData();
+        var present = blocks.Select(block => Convert.ToHexString(block.SecurityDomainAid.AsSpan()))
+            .ToHashSet(StringComparer.Ordinal);
+        if (keys.Keys.Any(required => !present.Contains(required)))
+            return SmartCardError.SecurityStatusNotSatisfied("A mandatory AES DAP Block is missing");
+        foreach (var block in blocks)
+        {
+            string aid = Convert.ToHexString(block.SecurityDomainAid.AsSpan());
+            if (!keys.TryGetValue(aid, out byte[]? key))
+                return SmartCardError.SecurityStatusNotSatisfied($"No AES DAP verification key is configured for {aid}");
+            if (block.LoadFileDataBlockSignature.Length != 16)
+                return SmartCardError.AlgorithmNotSupported();
+            var expected = CryptoOperations.Keys.ComputeAesCmac(key, hash);
+            if (expected.IsFailure || !CryptographicOperations.FixedTimeEquals(
+                    expected.Value, block.LoadFileDataBlockSignature.AsSpan()))
+                return SmartCardError.SecurityStatusNotSatisfied("DAP verification failed");
+        }
+        return true;
+    }
+
+    private static Result<(ImmutableArray<DapProcessor.DapBlock>, byte[]), SmartCardError> ParseEncodedLoadFile(
+        byte[] encoded)
+    {
+        // Table 11-58 permits leading E2 DAP blocks followed by one C4 load block.
+        var dapResult = DapProcessor.ParseDapBlocks(encoded);
+        if (dapResult.IsFailure)
+            return dapResult.Error;
+        int offset = 0;
+        foreach (var _ in dapResult.Value)
+        {
+            var length = ReadCanonicalBerLength(encoded, offset + 1);
+            if (length.IsFailure)
+                return length.Error;
+            offset = length.Value.offset + length.Value.length;
+        }
+        if (offset >= encoded.Length || encoded[offset++] != 0xC4)
+            return SmartCardError.IncorrectData();
+        var c4Length = ReadCanonicalBerLength(encoded, offset);
+        if (c4Length.IsFailure || c4Length.Value.offset + c4Length.Value.length != encoded.Length)
+            return SmartCardError.IncorrectData();
+        byte[] payload = encoded.AsSpan(c4Length.Value.offset, c4Length.Value.length).ToArray();
+        if (ValidateLoadFileDataBlock([0xC4, .. DelegatedLoadCryptography.EncodeBerLength(payload.Length), .. payload]).IsFailure)
+            return SmartCardError.IncorrectData();
+        return (dapResult.Value, payload);
+    }
+
+    private static Result<(int length, int offset), SmartCardError> ReadCanonicalBerLength(byte[] data, int offset)
+    {
+        if (offset >= data.Length)
+            return SmartCardError.IncorrectData();
+        byte first = data[offset++];
+        if (first <= 0x7F)
+            return (first, offset);
+        if (first == 0x81 && offset < data.Length && data[offset] >= 0x80)
+            return (data[offset], offset + 1);
+        if (first == 0x82 && offset + 1 < data.Length && data[offset] != 0
+            && (data[offset] > 0 || data[offset + 1] > 0xFF))
+            return (data[offset] << 8 | data[offset + 1], offset + 2);
+        return SmartCardError.IncorrectData();
+    }
+
+    internal static Result<bool, SmartCardError> ValidateLoadFileDataBlock(byte[] data)
+    {
+        if (data.Length < 9 || data[0] != 0xC4)
+            return SmartCardError.IncorrectData();
+
+        int offset = 1;
+        int length;
+        byte firstLength = data[offset++];
+        if (firstLength < 0x80)
+            length = firstLength;
+        else if (firstLength == 0x81 && offset < data.Length)
+            length = data[offset++];
+        else if (firstLength == 0x82 && offset + 1 < data.Length)
+        {
+            length = data[offset] << 8 | data[offset + 1];
+            offset += 2;
+        }
+        else
+            return SmartCardError.IncorrectData();
+
+        if (length != data.Length - offset || length < 13)
+            return SmartCardError.IncorrectData();
+
+        int headerSize = data[offset + 1] << 8 | data[offset + 2];
+        bool validHeader =
+            data[offset] == Constants.Constants.JavaCard.ComponentTags.HEADER
+            && headerSize >= 10
+            && headerSize <= length - 3
+            && data.AsSpan(offset + 3, 4).SequenceEqual(new byte[] { 0xDE, 0xCA, 0xFF, 0xED });
+        return validHeader
+            ? Result.Success<bool, SmartCardError>(true)
+            : Result.Failure<bool, SmartCardError>(SmartCardError.IncorrectData());
     }
 
     /// <summary>
@@ -946,17 +1182,43 @@ public partial class VirtualCard : IVirtualCard
     /// Validates install token according to GlobalPlatform Card Specification v2.3.1 Section 11.5.2.1.
     /// Token validation ensures authorization for load file installation operations.
     /// </summary>
-    private static Result<bool, SmartCardError> ValidateInstallToken(byte[] loadToken)
+    private static Result<bool, SmartCardError> ValidateLoadRequest(
+        (byte[] loadFileAid, Maybe<byte[]> securityDomainAid, byte[] loadFileDataBlockHash,
+            byte[] loadParameters, byte[] loadToken) request,
+        byte p1,
+        byte p2,
+        CardState state,
+        CardConfiguration config)
     {
-        // Token verification is conditional. This profile has no Token Verification key or
-        // policy, so an omitted token is valid and a supplied token must not be simulated.
-        return loadToken.Length == 0
-            ? Result.Success<bool, SmartCardError>(true)
-            : Result.Failure<bool, SmartCardError>(
-                SmartCardError.SecurityStatusNotSatisfied(
-                    "The active card profile does not configure install-token verification"
-                )
-            );
+        if (state.CardLifecycleState is CardLifecycleState.CardLocked or CardLifecycleState.Terminated)
+            return SmartCardError.ConditionsNotSatisfied();
+        if (state.LoadFiles.Any(load => load.Aid.SequenceEqual(request.loadFileAid))
+            || state.Applications.Values.Any(app => app.Aid.SequenceEqual(request.loadFileAid)))
+            return SmartCardError.ConditionsNotSatisfied();
+
+        var delegated = config.DelegatedManagement;
+        bool hasToken = request.loadToken.Length > 0;
+        if (delegated?.RequiresLoadToken != true)
+            return hasToken
+                ? SmartCardError.SecurityStatusNotSatisfied("Delegated LOAD is not configured")
+                : Result.Success<bool, SmartCardError>(true);
+        if (!hasToken || request.loadToken.Length != 16 || request.loadFileDataBlockHash.Length != 32
+            || !request.securityDomainAid.HasValue)
+            return SmartCardError.SecurityStatusNotSatisfied("AES delegated LOAD requires a Security Domain, SHA-256 LFDBH, and 16-byte Load Token");
+        byte[] targetSecurityDomain = request.securityDomainAid.Value;
+        bool targetExists = targetSecurityDomain.SequenceEqual(config.IsdAid)
+            || state.Applications.Values.Any(app => app.Aid.SequenceEqual(targetSecurityDomain)
+                && (app.Privileges & Privilege.SecurityDomain) != 0);
+        if (!targetExists)
+            return SmartCardError.ReferencedDataNotFound();
+
+        return DelegatedLoadCryptography.ComputeLoadToken(
+                delegated.TokenVerificationKey, p1, p2, request.loadFileAid,
+                request.securityDomainAid.Value, request.loadFileDataBlockHash, request.loadParameters)
+            .Bind(expected => CryptographicOperations.FixedTimeEquals(expected, request.loadToken)
+                ? Result.Success<bool, SmartCardError>(true)
+                : Result.Failure<bool, SmartCardError>(
+                    SmartCardError.SecurityStatusNotSatisfied("Load Token verification failed")));
     }
 
     /// <summary>
@@ -983,6 +1245,9 @@ public partial class VirtualCard : IVirtualCard
             (byte[])parsedData.loadFileAid.Clone(),
             (byte[])resolvedSecurityDomain.Clone(),
             (byte[])parsedData.loadFileDataBlockHash.Clone(),
+            (byte[])parsedData.loadParameters.Clone(),
+            (byte[])parsedData.loadToken.Clone(),
+            parsedData.loadToken.Length > 0,
             ImmutableList<byte>.Empty,
             0xFF
         );
@@ -1075,7 +1340,7 @@ public partial class VirtualCard : IVirtualCard
                         SmartCardError.InvalidData("No TLV objects found in DELETE data")
                     )
             )
-            .Bind(tlvs => ProcessDeleteTlvData(tlvs, state, logging));
+            .Bind(tlvs => ProcessDeleteTlvData(tlvs, state, config, p1, p2, logging));
     }
 
     /// <summary>
@@ -1745,45 +2010,107 @@ public partial class VirtualCard : IVirtualCard
     private static Result<(ApduResponse, CardState), SmartCardError> ProcessDeleteTlvData(
         ImmutableArray<TlvObject> tlvs,
         CardState state,
+        CardConfiguration config,
+        byte p1,
+        byte p2,
         CardLogging logging
     )
     {
         logging.LogDebug("DELETE command parsed {Count} TLV objects", tlvs.Length);
+        byte[]? aid = null;
+        byte[]? token = null;
+        byte[]? controlReference = null;
+        foreach (var tlv in tlvs)
+        {
+            var tag = tlv.Tag.ToNumber();
+            if (tag.IsFailure)
+                return SmartCardError.IncorrectData();
+            byte[] value = tlv.TlvData.Bytes.ToArray();
+            switch (tag.Value)
+            {
+                case 0x4F when aid is null: aid = value; break;
+                case 0x9E when token is null: token = value; break;
+                case 0xB6 when controlReference is null:
+                    controlReference = [0xB6, (byte)value.Length, .. value];
+                    break;
+                default: return SmartCardError.IncorrectData();
+            }
+        }
 
-        // Process TLV data
-        var newState = tlvs.Aggregate(
-            state,
-            (currentState, tlv) =>
-                tlv
-                    .Tag.ToNumber()
-                    .Match(
-                        tagNumber =>
-                        {
-                            logging.LogDebug(
-                                "Processing DELETE TLV tag 0x{TagNumber:X2}",
-                                tagNumber
-                            );
-                            return ProcessDeleteTlv(tagNumber, tlv, currentState);
-                        },
-                        error =>
-                        {
-                            logging.LogWarning(
-                                "Skipping invalid TLV in DELETE command: {Error}",
-                                error.Message
-                            );
-                            return currentState; // Skip invalid TLVs
-                        }
-                    )
+        if (aid is null || aid.Length is < 5 or > 16)
+            return SmartCardError.IncorrectData();
+        bool exists = state.Applications.Values.Any(app => app.Aid.SequenceEqual(aid))
+            || state.LoadFiles.Any(load => load.Aid.SequenceEqual(aid));
+        if (!exists)
+            return SmartCardError.ReferencedDataNotFound();
+        if (state.CardLifecycleState is CardLifecycleState.CardLocked or CardLifecycleState.Terminated)
+            return SmartCardError.ConditionsNotSatisfied();
+
+        var delegated = config.DelegatedManagement;
+        if (delegated?.RequiresDeleteToken == true)
+        {
+            if (token is null || token.Length != 16)
+                return SmartCardError.SecurityStatusNotSatisfied("A valid AES Delete Token is required");
+            var expected = CryptoOperations.Keys.ComputeDeleteToken(
+                delegated.TokenVerificationKey, p1, p2, aid,
+                controlReference is null ? Maybe<byte[]>.None : Maybe<byte[]>.From(controlReference)
+            );
+            if (expected.IsFailure || !CryptographicOperations.FixedTimeEquals(expected.Value, token))
+                return SmartCardError.SecurityStatusNotSatisfied("Delete Token verification failed");
+        }
+        else if (token is not null)
+            return SmartCardError.SecurityStatusNotSatisfied("Delegated DELETE is not configured");
+
+        if (token is not null && delegated?.GeneratesReceipts != true)
+            return SmartCardError.ConditionsNotSatisfied();
+
+        var newState = ProcessApplicationAidDeletion(
+            tlvs.First(item => item.Tag.ToNumber().Match(number => number == 0x4F, _ => false)), state
         );
-
-        // GlobalPlatform Card Specification v2.3.1 Table 11-26: DELETE Response Message
-        // Response data field contains one byte set to '00'
+        if ((p2 & 0x80) != 0)
+        {
+            var moduleAids = state.LoadFiles
+                .Where(load => load.Aid.SequenceEqual(aid))
+                .SelectMany(load => load.ExecutableModules)
+                .Select(module => module.Aid)
+                .ToList();
+            newState = newState with
+            {
+                Applications = newState.Applications
+                    .Where(item => !moduleAids.Any(moduleAid =>
+                        item.Value.ExecutableModuleAid.SequenceEqual(moduleAid)))
+                    .ToImmutableDictionary(),
+            };
+        }
         byte[] responseData = [0x00];
+        if (delegated?.GeneratesReceipts == true)
+        {
+            if (state.ReceiptConfirmationCounter == ushort.MaxValue)
+                return SmartCardError.ConditionsNotSatisfied();
+            ushort counter = state.ReceiptConfirmationCounter;
+            List<byte> unique = [0x42, (byte)delegated.SecurityDomainProviderId.Length,
+                .. delegated.SecurityDomainProviderId, 0x45,
+                (byte)delegated.SecurityDomainImageNumber.Length, .. delegated.SecurityDomainImageNumber];
+            List<byte> confirmation = [0x02, (byte)(counter >> 8), (byte)counter,
+                (byte)unique.Count, .. unique];
+            if (delegated.IncludeTokenDigest && token is not null)
+            {
+                byte[] digest = SHA256.HashData(token);
+                confirmation.Add(0x00); // no token identifier
+                confirmation.Add((byte)digest.Length);
+                confirmation.AddRange(digest);
+            }
+            List<byte> receiptInput = [.. confirmation, (byte)aid.Length, .. aid];
+            var receipt = CryptoOperations.Keys.ComputeAesCmac(
+                delegated.ReceiptGenerationKey, receiptInput.ToArray()
+            );
+            if (receipt.IsFailure)
+                return receipt.Error;
+            responseData = [(byte)receipt.Value.Length, .. receipt.Value, .. confirmation];
+            newState = newState with { ReceiptConfirmationCounter = (ushort)(counter + 1) };
+        }
 
-        logging.LogDebug("DELETE command processed successfully");
-        return Result.Success<(ApduResponse, CardState), SmartCardError>(
-            (new ApduResponse(responseData, Constants.Constants.StatusWords.Success), newState)
-        );
+        return (new ApduResponse(responseData, Constants.Constants.StatusWords.Success), newState);
     }
 
     /// <summary>

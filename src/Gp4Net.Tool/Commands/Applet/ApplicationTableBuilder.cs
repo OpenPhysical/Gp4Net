@@ -67,7 +67,7 @@ public static class ApplicationTableBuilder
         var filteredApps =
             string.IsNullOrEmpty(filter) || filter == "all"
                 ? applications
-                : FilterApplications(applications, filter);
+                : ApplyFilter(applications, filter);
 
         if (filteredApps.Count == 0)
         {
@@ -163,7 +163,7 @@ public static class ApplicationTableBuilder
     /// <summary>
     /// Filters applications based on filter criteria using pure functions.
     /// </summary>
-    private static IReadOnlyList<ApplicationInfo> FilterApplications(
+    public static IReadOnlyList<ApplicationInfo> ApplyFilter(
         IReadOnlyList<ApplicationInfo> applications,
         string filter
     )
@@ -177,11 +177,18 @@ public static class ApplicationTableBuilder
                     .Where(a => a.Type == ApplicationType.SupplementarySecurityDomain)
                     .ToList(),
             "app"
+            or "apps"
             or "applet"
+            or "applets"
                 => applications.Where(a => a.Type == ApplicationType.Application).ToList(),
             "pkg"
             or "package"
-                => applications.Where(a => a.Type == ApplicationType.LoadFile).ToList(),
+            or "packages"
+                => applications
+                    .Where(a =>
+                        a.Type is ApplicationType.LoadFile or ApplicationType.ExecutableLoadFile
+                    )
+                    .ToList(),
             "selectable" => applications.Where(a => a.IsSelectable).ToList(),
             "locked" => applications.Where(a => a.LifecycleStateString == "Locked").ToList(),
             "installed" => applications.Where(a => a.LifecycleStateString == "Installed").ToList(),

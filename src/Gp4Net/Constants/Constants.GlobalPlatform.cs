@@ -222,7 +222,12 @@ public static partial class Constants
             /// <summary>Maximum APDU data length for short format (255 bytes).</summary>
             public const int MAX_SHORT_DATA_LENGTH = 255;
 
-            /// <summary>Default load block size for LOAD commands (245 bytes).</summary>
+            /// <summary>
+            /// Default plaintext LOAD data size. This keeps an SCP02-wrapped LOAD,
+            /// including its eight-byte C-MAC, within short-APDU data limits.
+            /// See ISO/IEC 7816-4:2020,
+            /// section 5.1, and GlobalPlatform Card Specification v2.3.1, Appendix E.4.
+            /// </summary>
             public const int DEFAULT_LOAD_BLOCK_SIZE = 245;
         }
 

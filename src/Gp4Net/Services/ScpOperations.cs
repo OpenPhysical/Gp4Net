@@ -250,8 +250,8 @@ public static partial class ScpOperations
                 ? FindScp02Implementation(cardCapabilities.Value)
                 : Maybe<byte>.None;
 
-            // GP Card Spec 2.3.1, B.4.3 and SCP03 1.1.2, 5.2 require a fresh
-            // unpredictable host challenge for each authentication attempt.
+            // GP Card Specification v2.3.1 sections D.4.1.5 and E.5.1.5 require
+            // a host challenge unique to each Secure Channel Session.
             var challengeResult = CryptoOperations.Rng.GenerateHostChallenge();
             if (challengeResult.IsFailure)
                 return challengeResult.Error;
@@ -514,7 +514,8 @@ public static partial class ScpOperations
             CancellationToken cancellationToken
         )
         {
-            // GP Card Spec 2.3.1, B.4.3 requires a fresh random host challenge.
+            // GP Card Specification v2.3.1 section D.4.1.5 requires a host
+            // challenge unique to this SCP02 Secure Channel Session.
             var challengeResult = CryptoOperations.Rng.GenerateHostChallenge();
             if (challengeResult.IsFailure)
                 return challengeResult.Error;

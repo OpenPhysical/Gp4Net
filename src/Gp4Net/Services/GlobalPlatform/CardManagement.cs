@@ -22,6 +22,156 @@ namespace Gp4Net.Services.GlobalPlatform;
 public static class CardManagement
 {
     /// <summary>
+    /// Identifies a successfully loaded package and the verified LFDBH.
+    /// See GlobalPlatform Card Specification v2.3.1, sections 11.6 and C.2.
+    /// </summary>
+    public sealed record DapLoadResult(byte[] PackageAid, byte[] LoadFileDataBlockHash);
+
+    /// <summary>
+    /// Creates a supplementary Security Domain with INSTALL [for install and make selectable].
+    /// The privilege field must include Security Domain privilege. See GlobalPlatform
+    /// Card Specification v2.3.1, sections 6.6.3 and 11.5.2.3.2 and Table 11-43.
+    /// </summary>
+    public static async Task<Result<bool, SmartCardError>> CreateSupplementarySecurityDomainAsync(
+        byte[] packageAid,
+        byte[] moduleAid,
+        byte[] securityDomainAid,
+        byte[] privileges,
+        Maybe<byte[]> installParameters,
+        Func<CommandAPDU, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> executeCommand,
+        CancellationToken cancellationToken = default)
+    {
+        if (privileges is null || privileges.Length == 0 || (privileges[0] & 0x80) == 0)
+            return SmartCardError.InvalidArgument(
+                "Supplementary Security Domain privileges must include Security Domain.");
+
+        return await InstallCommand.InstallForInstallCommand
+            .CreateAndMakeSelectable(packageAid, moduleAid, securityDomainAid, privileges, installParameters)
+            .Bind(command => command.ToCommandApdu())
+            .Bind(apdu => executeCommand(apdu, cancellationToken))
+            .Bind(response => response.IsSuccess
+                ? Result.Success<bool, SmartCardError>(true)
+                : Result.Failure<bool, SmartCardError>(SmartCardError.CardError(
+                    $"Security Domain creation failed with SW: {response.StatusWord:X4}")));
+    }
+
+    /// <summary>
+    /// Changes an application's associated Security Domain with INSTALL [for extradition].
+    /// See GlobalPlatform Card Specification v2.3.1, section 11.5.2.3.4 and Table 11-45.
+    /// </summary>
+    public static async Task<Result<bool, SmartCardError>> ExtraditeApplicationAsync(
+        byte[] applicationAid,
+        byte[] targetSecurityDomainAid,
+        Maybe<byte[]> extraditionParameters,
+        Maybe<byte[]> extraditionToken,
+        Func<CommandAPDU, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> executeCommand,
+        CancellationToken cancellationToken = default)
+    {
+        return await InstallCommand.InstallForManagementCommand
+            .CreateForExtradition(targetSecurityDomainAid, applicationAid, extraditionParameters, extraditionToken)
+            .Bind(command => command.ToCommandApdu())
+            .Bind(apdu => executeCommand(apdu, cancellationToken))
+            .Bind(response => response.IsSuccess
+                ? Result.Success<bool, SmartCardError>(true)
+                : Result.Failure<bool, SmartCardError>(SmartCardError.CardError(
+                    $"INSTALL [for extradition] failed with SW: {response.StatusWord:X4}")));
+    }
+
+    /// <summary>
+    /// Loads a CAP package with an AES-CMAC DAP block before the <c>C4</c> Load
+    /// File Data Block. See GlobalPlatform Card Specification v2.3.1,
+    /// section 11.6.2.3, Table 11-58, and sections B.2.2 and C.3.
+    /// </summary>
+    public static async Task<Result<DapLoadResult, SmartCardError>> LoadCapFileWithDapAsync(
+        byte[] capFileData,
+        byte[] dapSecurityDomainAid,
+        byte[] dapKey,
+        Maybe<byte[]> targetSecurityDomainAid,
+        Maybe<byte[]> loadParameters,
+        int maxBlockSize,
+        Func<CommandAPDU, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> executeCommand,
+        CancellationToken cancellationToken = default)
+    {
+        var cap = ValidateCapFile(capFileData);
+        if (cap.IsFailure) return cap.Error;
+        var artifacts = DapLoadArtifacts.Create(cap.Value, dapSecurityDomainAid, dapKey,
+            targetSecurityDomainAid, loadParameters, maxBlockSize);
+        if (artifacts.IsFailure) return artifacts.Error;
+        var install = artifacts.Value.InstallForLoad.ToCommandApdu();
+        if (install.IsFailure) return install.Error;
+        var installResponse = await executeCommand(install.Value, cancellationToken);
+        if (installResponse.IsFailure) return installResponse.Error;
+        if (!installResponse.Value.IsSuccess)
+            return SmartCardError.CardError($"INSTALL [for load] failed with SW: {installResponse.Value.StatusWord:X4}");
+        foreach (LoadCommand command in artifacts.Value.LoadCommands)
+        {
+            var apdu = command.ToCommandApdu();
+            if (apdu.IsFailure) return apdu.Error;
+            var response = await executeCommand(apdu.Value, cancellationToken);
+            if (response.IsFailure) return response.Error;
+            if (!response.Value.IsSuccess)
+                return SmartCardError.CardError($"LOAD failed with SW: {response.Value.StatusWord:X4}");
+            var parsed = LoadResponse.Parse(response.Value.Data, response.Value.StatusWord);
+            if (parsed.IsFailure) return parsed.Error;
+        }
+        return new DapLoadResult(cap.Value.PackageAid, artifacts.Value.LoadFileDataBlockHash);
+    }
+
+    /// <summary>
+    /// Loads a CAP package using AES-CMAC delegated management and strictly parses
+    /// the optional Load Receipt. See GlobalPlatform Card Specification v2.3.1,
+    /// sections 11.1.6 and 11.6 and Appendices C.4.1 and C.5.1.
+    /// </summary>
+    public static async Task<Result<DelegatedLoadResult, SmartCardError>> LoadCapFileAsync(
+        byte[] capFileData,
+        DelegatedLoadOptions options,
+        int maxBlockSize,
+        Func<CommandAPDU, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> executeCommand,
+        CancellationToken cancellationToken = default)
+    {
+        var capResult = ValidateCapFile(capFileData);
+        if (capResult.IsFailure)
+            return capResult.Error;
+        var artifactsResult = DelegatedLoadArtifacts.Create(capResult.Value, options, maxBlockSize);
+        if (artifactsResult.IsFailure)
+            return artifactsResult.Error;
+        DelegatedLoadArtifacts artifacts = artifactsResult.Value;
+
+        var installApdu = artifacts.InstallForLoad.ToCommandApdu();
+        if (installApdu.IsFailure)
+            return installApdu.Error;
+        var installResponse = await executeCommand(installApdu.Value, cancellationToken);
+        if (installResponse.IsFailure)
+            return installResponse.Error;
+        if (!installResponse.Value.IsSuccess)
+            return SmartCardError.CardError($"INSTALL [for load] failed with SW: {installResponse.Value.StatusWord:X4}");
+
+        Maybe<LoadConfirmation> confirmation = Maybe<LoadConfirmation>.None;
+        foreach (LoadCommand loadCommand in artifacts.LoadCommands)
+        {
+            var apdu = loadCommand.ToCommandApdu();
+            if (apdu.IsFailure)
+                return apdu.Error;
+            var response = await executeCommand(apdu.Value, cancellationToken);
+            if (response.IsFailure)
+                return response.Error;
+            if (!response.Value.IsSuccess)
+                return SmartCardError.CardError($"LOAD failed with SW: {response.Value.StatusWord:X4}");
+            var parsed = LoadResponse.Parse(response.Value.Data, response.Value.StatusWord);
+            if (parsed.IsFailure)
+                return parsed.Error;
+            if (loadCommand.IsFinalBlock)
+                confirmation = parsed.Value.Confirmation;
+        }
+
+        return new DelegatedLoadResult(
+            capResult.Value.PackageAid,
+            artifacts.LoadFileDataBlockHash,
+            artifacts.LoadToken,
+            confirmation);
+    }
+
+    /// <summary>
     /// Installs a CAP file on the card with complete workflow.
     /// Reference: GlobalPlatform Card Specification v2.3.1 Section 11.5
     /// </summary>
@@ -54,7 +204,7 @@ public static class CardManagement
                         cancellationToken
                     )
                     .Bind(_ =>
-                        LoadCapFileDataSequential(capFileData, executeCommand, cancellationToken)
+                        LoadCapFileDataSequential(capFile, executeCommand, cancellationToken)
                     )
                     .Bind(_ =>
                         installApplets && capFile.Applets.Count > 0
@@ -117,7 +267,7 @@ public static class CardManagement
     }
 
     private static async Task<Result<bool, SmartCardError>> LoadCapFileDataSequential(
-        byte[] capFileData,
+        CapFileStructure capFile,
         Func<
             CommandAPDU,
             CancellationToken,
@@ -127,7 +277,7 @@ public static class CardManagement
     )
     {
         return await LoadCommand
-            .CreateFromCapFile(capFileData)
+            .CreateFromCapFile(capFile)
             .Bind(loadCommands =>
                 loadCommands
                     .Select(loadCmd =>
@@ -290,6 +440,26 @@ public static class CardManagement
                         )
                     )
             );
+    }
+}
+
+/// <summary>Result of an AES delegated LOAD operation.</summary>
+public sealed class DelegatedLoadResult
+{
+    private readonly byte[] _packageAid;
+    private readonly byte[] _hash;
+    private readonly byte[] _token;
+    public byte[] PackageAid => (byte[])_packageAid.Clone();
+    public byte[] LoadFileDataBlockHash => (byte[])_hash.Clone();
+    public byte[] LoadToken => (byte[])_token.Clone();
+    public Maybe<LoadConfirmation> Confirmation { get; }
+
+    public DelegatedLoadResult(byte[] packageAid, byte[] hash, byte[] token, Maybe<LoadConfirmation> confirmation)
+    {
+        _packageAid = (byte[])packageAid.Clone();
+        _hash = (byte[])hash.Clone();
+        _token = (byte[])token.Clone();
+        Confirmation = confirmation;
     }
 }
 

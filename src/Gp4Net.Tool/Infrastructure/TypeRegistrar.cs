@@ -19,7 +19,8 @@ public sealed class TypeRegistrar : ITypeRegistrar
 
     /// <inheritdoc />
     public void Register(Type service, Type implementation) =>
-        factories[service] = () => Create(implementation);
+        factories[service] =
+            service == implementation ? () => Instantiate(implementation) : () => Create(implementation);
 
     /// <inheritdoc />
     public void RegisterInstance(Type service, object implementation) =>
@@ -34,6 +35,12 @@ public sealed class TypeRegistrar : ITypeRegistrar
         {
             return factory();
         }
+
+        return Instantiate(type);
+    }
+
+    private object Instantiate(Type type)
+    {
 
         if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(ILogger<>))
         {

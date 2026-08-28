@@ -89,6 +89,11 @@ public record CardConfiguration(
 )
 {
     /// <summary>
+    /// Gets AES-only delegated-management settings for the emulator.
+    /// See GlobalPlatform Card Specification v2.3.1, sections C.3 through C.5.
+    /// </summary>
+    public DelegatedManagementConfiguration? DelegatedManagement { get; init; }
+    /// <summary>
     /// Creates a configuration for emulated NXP P71 cards using the JSON profile.
     /// </summary>
     public static Result<CardConfiguration, SmartCardError> P71() =>
@@ -146,4 +151,40 @@ public record CardConfiguration(
     /// Creates a new configuration with updated ISD AID.
     /// </summary>
     public CardConfiguration WithIsdAid(byte[] isdAid) => this with { IsdAid = isdAid };
+}
+
+/// <summary>
+/// Defines the keys and Security Domain identity data used for AES delegated
+/// management. The emulator implements AES-CMAC only and rejects other schemes.
+/// See GlobalPlatform Card Specification v2.3.1, sections B.2.2, C.3, C.4,
+/// and C.5, and section 11.1.6 for Confirmation Data.
+/// </summary>
+/// <param name="TokenVerificationKey">AES key used to verify management tokens.</param>
+/// <param name="ReceiptGenerationKey">AES key used to generate receipts.</param>
+/// <param name="SecurityDomainProviderId">Tag <c>42</c> value used in SD Unique Data.</param>
+/// <param name="SecurityDomainImageNumber">Tag <c>45</c> value used in SD Unique Data.</param>
+/// <param name="IncludeTokenDigest">Whether Confirmation Data includes a SHA-256 token digest.</param>
+/// <param name="DapVerificationKeys">AES DAP keys indexed by Security Domain AID.</param>
+[PublicAPI]
+public sealed record DelegatedManagementConfiguration(
+    byte[] TokenVerificationKey,
+    byte[] ReceiptGenerationKey,
+    byte[] SecurityDomainProviderId,
+    byte[] SecurityDomainImageNumber,
+    bool IncludeTokenDigest = false,
+    ImmutableDictionary<string, byte[]>? DapVerificationKeys = null
+)
+{
+    /// <summary>Gets whether DELETE requires an AES Delete Token.</summary>
+    public bool RequiresDeleteToken => TokenVerificationKey.Length > 0;
+
+    /// <summary>Gets whether LOAD requires an AES Load Token.</summary>
+    public bool RequiresLoadToken => TokenVerificationKey.Length > 0;
+
+    /// <summary>Gets whether delegated operations generate AES receipts.</summary>
+    public bool GeneratesReceipts => ReceiptGenerationKey.Length > 0;
+
+    /// <summary>Gets the configured AES DAP verification keys.</summary>
+    public ImmutableDictionary<string, byte[]> EffectiveDapVerificationKeys =>
+        DapVerificationKeys ?? ImmutableDictionary<string, byte[]>.Empty;
 }
