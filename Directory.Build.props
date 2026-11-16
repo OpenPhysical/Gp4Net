@@ -4,7 +4,7 @@
     <Authors>OpenPhysical</Authors>
     <Company>OpenPhysical</Company>
     <Copyright>Copyright © 2025-2026 Mistial Developer</Copyright>
-    <PackageLicenseExpression>AGPL-3.0-only</PackageLicenseExpression>
+    <PackageLicenseExpression>GPL-2.0-or-later</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/OpenPhysical/Gp4Net</PackageProjectUrl>
     <RepositoryUrl>https://github.com/OpenPhysical/Gp4Net</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -29,6 +29,7 @@
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)assets/logo_64x64.png" Pack="true" PackagePath="" />
     <None Include="$(MSBuildThisFileDirectory)LICENSE" Pack="true" PackagePath="" />
+    <None Include="$(MSBuildThisFileDirectory)NOTICE" Pack="true" PackagePath="" />
     <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="" />
     <None Include="$(MSBuildThisFileDirectory)COMMERCIAL-LICENSING.md" Pack="true" PackagePath="" />
     <None Include="$(MSBuildThisFileDirectory)THIRD_PARTY_NOTICES.md" Pack="true" PackagePath="" />

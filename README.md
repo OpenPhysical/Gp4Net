@@ -2,7 +2,7 @@
 
 [![Build and Test](https://github.com/OpenPhysical/Gp4Net/actions/workflows/build.yml/badge.svg)](https://github.com/OpenPhysical/Gp4Net/actions/workflows/build.yml)
 [![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
-[![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0--only-blue.svg)](LICENSE)
+[![License: GPL v2 or later](https://img.shields.io/badge/license-GPL--2.0--or--later-blue.svg)](LICENSE)
 
 Gp4Net is a .NET 10 toolkit for GlobalPlatform card management. It provides a reusable library,
 a command-line interface, and a virtual-card emulator, with support centered on GlobalPlatform
@@ -175,7 +175,7 @@ are complete. Until then, the supported workflow is building from this repositor
 
 ## License
 
-Gp4Net is licensed under the [GNU Affero General Public License v3.0 only](LICENSE), identified by
-SPDX as `AGPL-3.0-only`. Organizations that need different terms may request a separately
+Gp4Net is licensed under the [GNU General Public License version 2 or later](LICENSE), identified by
+SPDX as `GPL-2.0-or-later`. Organizations that need different terms may request a separately
 negotiated [commercial license](COMMERCIAL-LICENSING.md). Licensing fees for Gp4Net support the
 development of OpenPhysical software and services.

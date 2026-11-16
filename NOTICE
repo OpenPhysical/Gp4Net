@@ -1,0 +1,11 @@
+Gp4Net
+Copyright (c) 2025-2026 Mistial Developer
+
+First-party code is licensed under the GNU General Public License, version 2
+or (at your option) any later version.
+SPDX-License-Identifier: GPL-2.0-or-later
+
+This program is distributed without any warranty. See LICENSE for the full terms.
+Third-party components retain their original copyright and license notices;
+see THIRD_PARTY_NOTICES.md. Previously published artifacts retain their recorded
+license metadata and are not overwritten by this source licensing change.

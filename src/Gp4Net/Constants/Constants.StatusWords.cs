@@ -1,6 +1,6 @@
 // -----------------------------------------------------------------------------
 // Copyright (c) 2025 Mistial Developer <opensource@mistial.dev>
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: GPL-2.0-or-later
 // -----------------------------------------------------------------------------
 
 using Gp4Net.Core;

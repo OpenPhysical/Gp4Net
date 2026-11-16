@@ -4,6 +4,11 @@ Gp4Net welcomes focused technical contributions. Participation is governed by th
 [Bounded Contribution Policy](CODE_OF_CONDUCT.md), and every contributor must accept the
 [Contributor Copyright Assignment](CONTRIBUTOR_ASSIGNMENT.md) before a pull request can merge.
 
+
+The current first-party source license is GPL-2.0-or-later, effective for this release work on
+2026-11-16. The retained version 1.0 contributor assignment is historical agreement text;
+this licensing change does not rewrite previously accepted agreements or their promises.
+
 ## Before contributing
 
 You must own or control the rights to your contribution. Obtain employer approval when required and
@@ -11,7 +16,7 @@ identify third-party, generated, or externally sourced material in the pull requ
 or another entity owns the work, an authorized representative must accept the assignment.
 
 The CLA service records electronic acceptance. Accepted contributions remain available under
-`AGPL-3.0-only` and may also be offered under separate commercial licenses. The contributor keeps a
+`GPL-2.0-or-later` and may also be offered under separate commercial licenses. The contributor keeps a
 broad license to reuse their contribution.
 
 ## Development setup

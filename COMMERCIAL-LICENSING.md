@@ -2,14 +2,14 @@
 
 Gp4Net is available under two licensing paths.
 
-## AGPL path
+## GPL path
 
-The source repository and any public NuGet package are licensed under `AGPL-3.0-only`. The AGPL
+The source repository and any public NuGet package are licensed under `GPL-2.0-or-later`. The GPL
 permits commercial use, modification, and distribution when all of its conditions are followed.
 
 ## Commercial path
 
-Organizations that need terms different from the AGPL may request a separately negotiated
+Organizations that need terms different from the GPL may request a separately negotiated
 commercial license. No commercial rights are granted by this document, package metadata, or a
 purchase inquiry. They arise only from a signed agreement with the applicable copyright holder.
 

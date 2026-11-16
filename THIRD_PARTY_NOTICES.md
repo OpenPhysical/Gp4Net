@@ -8,7 +8,7 @@ informational and does not replace the license texts distributed by those projec
 - Bouncy Castle Cryptography
 - CSharpFunctionalExtensions
 - JetBrains.Annotations
-- Kdf108, available under AGPL-3.0-only or separate commercial terms
+- Kdf108, available under GPL-2.0-or-later or separate commercial terms
 - Microsoft.Extensions libraries
 - WSCT.Core and WSCT.Wrapper.Desktop
 - log4net
