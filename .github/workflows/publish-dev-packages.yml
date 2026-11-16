@@ -1,0 +1,85 @@
+name: Publish immutable DEV NuGet packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_commit:
+        description: Full commit SHA to test and package
+        required: true
+        type: string
+      package_version:
+        description: Exact DEV version pinned by private consumers
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: nuget-dev-publish-gp4net
+  cancel-in-progress: false
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+  MSBUILDDISABLENODEREUSE: '1'
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_commit }}
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require source commit on the default branch
+        env:
+          SOURCE_COMMIT: ${{ inputs.source_commit }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          git fetch origin "$DEFAULT_BRANCH"
+          git merge-base --is-ancestor "$SOURCE_COMMIT" "origin/$DEFAULT_BRANCH"
+          python scripts/assert-package-source.py --source-commit "$SOURCE_COMMIT"
+      - name: Enforce package source boundaries
+        run: python scripts/check-product-boundaries.py --repository . --role sdk
+      - name: Restore, build, and test exact source
+        run: |
+          set -euo pipefail
+          dotnet restore Gp4Net.sln
+          dotnet build Gp4Net.sln -c Release --no-restore -m:1 -nr:false -p:UseSharedCompilation=false
+          dotnet test Gp4Net.sln -c Release --no-build --no-restore -m:1 -nr:false
+      - name: Pack pinned DEV version and create source manifest
+        env:
+          SOURCE_COMMIT: ${{ inputs.source_commit }}
+          PACKAGE_VERSION: ${{ inputs.package_version }}
+        run: |
+          set -euo pipefail
+          [[ "$PACKAGE_VERSION" =~ ^[0-9A-Za-z.+-]+-dev\.[0-9A-Za-z.-]+$ ]]
+          python scripts/pack-publisher-projects.py --source-commit "$SOURCE_COMMIT" --package-version "$PACKAGE_VERSION" --output artifacts/packages
+          python scripts/write-nuget-publication-manifest.py --repository OpenPhysical/Gp4Net --source-commit "$SOURCE_COMMIT" --package-version "$PACKAGE_VERSION" --packages artifacts/packages --output artifacts/package-manifest.json
+      - name: Refuse an existing package ID and version
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/check-nuget-versions-absent.py --manifest artifacts/package-manifest.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nuget-dev-candidate-${{ inputs.package_version }}-${{ inputs.source_commit }}
+          path: |
+            artifacts/packages/*.nupkg
+            artifacts/package-manifest.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Publish immutable package with GITHUB_TOKEN
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          NuGetPackageSourceCredentials_openphysical: Username=${{ github.actor }};Password=${{ github.token }}
+        run: dotnet nuget push artifacts/packages/*.nupkg --api-key "$GITHUB_TOKEN" --source https://nuget.pkg.github.com/OpenPhysical/index.json

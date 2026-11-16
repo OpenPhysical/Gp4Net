@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "projects": [
+    "src/Gp4Net/Gp4Net.csproj"
+  ]
+}

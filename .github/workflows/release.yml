@@ -26,6 +26,9 @@ jobs:
       with:
         dotnet-version: '10.0.x'
 
+    - name: Enforce package source boundaries
+      run: python scripts/check-product-boundaries.py --repository . --role sdk
+
     - name: Restore dependencies
       run: dotnet restore
 
